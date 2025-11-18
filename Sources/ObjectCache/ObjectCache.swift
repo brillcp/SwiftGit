@@ -181,7 +181,7 @@ private extension ObjectCache {
             // For treePaths cache
             return dict.keys.reduce(0) { $0 + $1.count } + dict.values.reduce(0) { $0 + $1.count }
             
-        case let array as [Ref]:
+        case let array as [GitRef]:
             // For refs cache
             return array.count * 100
             

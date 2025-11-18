@@ -30,7 +30,7 @@ protocol GitRepositoryProtocol: Actor {
     // MARK: - References
     
     /// Get all refs (branches, tags, etc.)
-    func getRefs() async throws -> [Ref]
+    func getRefs() async throws -> [GitRef]
     
     /// Get current HEAD commit hash
     func getHEAD() async throws -> String?
@@ -48,7 +48,7 @@ protocol GitRepositoryProtocol: Actor {
 }
 
 // MARK: -
-actor Repository {
+actor GitRepository {
     private let cache: ObjectCacheProtocol
     private let locator: ObjectLocatorProtocol
     private let looseParser: LooseObjectParserProtocol
@@ -90,7 +90,7 @@ actor Repository {
 }
 
 // MARK: -
-extension Repository: GitRepositoryProtocol {
+extension GitRepository: GitRepositoryProtocol {
     func getCommit(_ hash: String) async throws -> Commit? {
         // Check cache first
         if let cached: Commit = await cache.get(.commit(hash: hash)) {
@@ -209,13 +209,13 @@ extension Repository: GitRepositoryProtocol {
     
     // MARK: - References
     
-    func getRefs() async throws -> [Ref] {
+    func getRefs() async throws -> [GitRef] {
         // Check cache
-        if let cached: [Ref] = await cache.get(.refs) {
+        if let cached: [GitRef] = await cache.get(.refs) {
             return cached
         }
         
-        var refs: [Ref] = []
+        var refs: [GitRef] = []
         let gitURL = url.appendingPathComponent(".git")
         
         // Read loose refs
@@ -330,7 +330,7 @@ enum RepositoryError: Error {
 }
 
 // MARK: - Private functions
-private extension Repository {
+private extension GitRepository {
     var gitURL: URL {
         url.appendingPathComponent(".git")
     }
@@ -431,14 +431,14 @@ private extension Repository {
     }
     
     /// Read refs from a directory
-    func readRefs(from gitURL: URL, relativePath: String, type: RefType) throws -> [Ref] {
+    func readRefs(from gitURL: URL, relativePath: String, type: RefType) throws -> [GitRef] {
         let baseURL = gitURL.appendingPathComponent(relativePath)
         
         guard fileManager.fileExists(atPath: baseURL.path) else {
             return []
         }
         
-        var refs: [Ref] = []
+        var refs: [GitRef] = []
         
         guard let enumerator = fileManager.enumerator(
             at: baseURL,
@@ -456,14 +456,14 @@ private extension Repository {
             let hash = try String(contentsOf: fileURL, encoding: .utf8)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             
-            refs.append(Ref(name: name, hash: hash, type: type))
+            refs.append(GitRef(name: name, hash: hash, type: type))
         }
         
         return refs
     }
     
     /// Read packed-refs file
-    func readPackedRefs(gitURL: URL) throws -> [Ref] {
+    func readPackedRefs(gitURL: URL) throws -> [GitRef] {
         let packedURL = gitURL.appendingPathComponent("packed-refs")
         
         guard fileManager.fileExists(atPath: packedURL.path) else {
@@ -471,7 +471,7 @@ private extension Repository {
         }
         
         let content = try String(contentsOf: packedURL, encoding: .utf8)
-        var refs: [Ref] = []
+        var refs: [GitRef] = []
         var peeledMap: [String: String] = [:]
         
         let lines = content.split(whereSeparator: \.isNewline)
@@ -497,19 +497,19 @@ private extension Repository {
             let name = String(parts[1])
             
             if name.hasPrefix("refs/heads/") {
-                refs.append(Ref(
+                refs.append(GitRef(
                     name: String(name.dropFirst("refs/heads/".count)),
                     hash: sha,
                     type: .localBranch
                 ))
             } else if name.hasPrefix("refs/remotes/") {
-                refs.append(Ref(
+                refs.append(GitRef(
                     name: String(name.dropFirst("refs/remotes/".count)),
                     hash: sha,
                     type: .remoteBranch
                 ))
             } else if name.hasPrefix("refs/tags/") {
-                refs.append(Ref(
+                refs.append(GitRef(
                     name: String(name.dropFirst("refs/tags/".count)),
                     hash: sha,
                     type: .tag
@@ -520,7 +520,7 @@ private extension Repository {
         // Replace annotated tag SHAs with peeled commit SHAs
         for i in refs.indices where refs[i].type == .tag {
             if let peeled = peeledMap[refs[i].hash] {
-                refs[i] = Ref(
+                refs[i] = GitRef(
                     name: refs[i].name,
                     hash: peeled,
                     type: .tag
