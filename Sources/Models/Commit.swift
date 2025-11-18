@@ -4,7 +4,7 @@ struct Commit: Identifiable {
     let id: String
     let title: String
     let body: String
-//    let author: Author
+    let author: Author
     let parents: [String]
     let tree: String
 }

@@ -17,8 +17,8 @@ extension CommitParser: CommitParserProtocol {
 
         var tree = ""
         var parents: [String] = []
-//        var author: Author?
-//        var committer: Author?
+        var author: Author?
+        var committer: Author?
 
         var messageLines: [String] = []
         var inMessage = false
@@ -39,18 +39,18 @@ extension CommitParser: CommitParserProtocol {
                 tree = String(line.dropFirst(5))
             case _ where line.hasPrefix("parent "):
                 parents.append(String(line.dropFirst(7)))
-//            case _ where line.hasPrefix("author "):
-//                author = String(line).parseAuthor()
-//            case _ where line.hasPrefix("committer "):
-//                committer = String(line).parseAuthor("committer ")
+            case _ where line.hasPrefix("author "):
+                author = String(line).parseAuthor()
+            case _ where line.hasPrefix("committer "):
+                committer = String(line).parseAuthor("committer ")
             default:
                 break
             }
         }
 
         guard !tree.isEmpty,
-//              let author,
-//              let committer,
+              let author,
+              let committer,
               !messageLines.isEmpty
         else {
             throw ParseError.malformedCommit
@@ -63,9 +63,38 @@ extension CommitParser: CommitParserProtocol {
             id: hash,
             title: title,
             body: body,
-//            author: author,
+            author: author,
             parents: parents,
             tree: tree
+        )
+    }
+}
+
+// MARK: - Private author parser
+private extension String {
+    func parseAuthor(_ prefix: String = "author ") -> Author? {
+        let raw = dropFirst(prefix.count)
+
+        guard let emailStart = raw.firstIndex(of: "<"),
+              let emailEnd = raw.firstIndex(of: ">")
+        else { return nil }
+
+        let name = raw[..<emailStart].trimmingCharacters(in: .whitespaces)
+        let email = raw[raw.index(after: emailStart)..<emailEnd]
+        let remainder = raw[emailEnd...].dropFirst().split(separator: " ")
+
+        guard remainder.count >= 2 else { return nil }
+
+        let timestampString = remainder[0]
+        let timezoneString = remainder[1]
+
+        guard let ts = TimeInterval(timestampString) else { return nil }
+
+        return Author(
+            name: name,
+            email: String(email),
+            timestamp: Date(timeIntervalSince1970: ts),
+            timezone: String(timezoneString)
         )
     }
 }
