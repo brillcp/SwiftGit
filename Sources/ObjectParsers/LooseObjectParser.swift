@@ -28,30 +28,22 @@ final class LooseObjectParser: LooseObjectParserProtocol {
     }
     
     func parse(hash: String, data: Data) throws -> ParsedObject {
-        // 1. Decompress the loose object file
         let decompressed = data.decompressed
-        
-        // 2. Split header from content
         let (type, objectData) = try splitHeader(decompressed)
-        
-        // 3. Route to appropriate parser
+
         switch type {
         case "commit":
             let commit = try commitParser.parse(hash: hash, data: objectData)
             return .commit(commit)
-            
         case "tree":
             let tree = try treeParser.parse(hash: hash, data: objectData)
             return .tree(tree)
-            
         case "blob":
             let blob = try blobParser.parse(hash: hash, data: objectData)
             return .blob(blob)
-            
         case "tag":
             // TODO: Implement tag parsing
             throw ParseError.unsupportedObjectType(type)
-            
         default:
             throw ParseError.unsupportedObjectType(type)
         }
