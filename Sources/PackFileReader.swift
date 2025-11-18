@@ -13,7 +13,7 @@ enum ObjectType: String {
     case tag
 }
 
-protocol PackFileReaderProtocol {
+protocol PackFileReaderProtocol: Actor {
     /// Read object at a specific offset in pack file
     func readObject(at location: PackObjectLocation) throws -> PackObject
     
@@ -22,4 +22,182 @@ protocol PackFileReaderProtocol {
     
     /// Unmap pack file if mapped (to reduce memory pressure)
     func unmap()
+}
+
+// MARK: -
+actor PackFileReader: @unchecked Sendable {
+    private let deltaResolver: DeltaResolverProtocol
+    private let parsers: PackParsers
+    
+    // Pack file cache (URL -> Data)
+    private var packCache: [URL: Data] = [:]
+    
+    struct PackParsers {
+        let commit: any CommitParserProtocol
+        let tree: any TreeParserProtocol
+        let blob: any BlobParserProtocol
+    }
+    
+    var isMapped: Bool {
+        !packCache.isEmpty
+    }
+    
+    init(
+        deltaResolver: DeltaResolverProtocol,
+        parsers: PackParsers
+    ) {
+        self.deltaResolver = deltaResolver
+        self.parsers = parsers
+    }
+}
+
+// MARK: - PackFileReaderProtocol
+extension PackFileReader: PackFileReaderProtocol {
+    func readObject(at location: PackObjectLocation) throws -> PackObject {
+        let packData = try getPackData(for: location.packURL)
+        
+        // Read and resolve the object (handles deltas recursively)
+        var cache: [Int: (type: String, data: Data)] = [:]
+        let hashToOffset: [String: Int] = [location.hash: location.offset]
+        
+        guard let (typeStr, data) = try readPackObjectAtOffset(
+            packData: packData,
+            offset: location.offset,
+            hashToOffset: hashToOffset,
+            cache: &cache
+        ) else {
+            throw PackIndexError.objectNotFound
+        }
+        
+        guard let type = ObjectType(rawValue: typeStr) else {
+            throw PackError.unsupportedObjectType(typeStr)
+        }
+        
+        return PackObject(hash: location.hash, type: type, data: data)
+    }
+    
+    func unmap() {
+        packCache.removeAll()
+    }
+}
+
+// MARK: - Private Helpers
+private extension PackFileReader {
+    func getPackData(for url: URL) throws -> Data {        
+        if let cached = packCache[url] {
+            return cached
+        }
+        
+        // Memory-map the pack file
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        packCache[url] = data
+        return data
+    }
+    
+    func readPackObjectAtOffset(
+        packData: Data,
+        offset: Int,
+        hashToOffset: [String: Int],
+        cache: inout [Int: (type: String, data: Data)]
+    ) throws -> (String, Data)? {
+        if let cached = cache[offset] { return cached }
+        
+        var pos = offset
+        guard pos < packData.count else { return nil }
+        
+        // Read object header (variable length)
+        var byte = packData[pos]
+        pos += 1
+        
+        let type = Int((byte >> 4) & 0x07)
+        var size = Int(byte & 0x0f)
+        var shift = 4
+        
+        // Read variable-length size
+        while byte & 0x80 != 0 {
+            guard pos < packData.count else { return nil }
+            byte = packData[pos]
+            pos += 1
+            size |= Int(byte & 0x7f) << shift
+            shift += 7
+        }
+        
+        switch type {
+        case 1, 2, 3, 4:
+            // Non-delta types: decompress and return
+            guard pos < packData.count else { return nil }
+            let compressedData = packData.subdata(in: pos..<packData.count)
+            let decompressed = compressedData.decompressed
+            let actualData = decompressed.prefix(size)
+            
+            let typeStr: String
+            switch type {
+            case 1: typeStr = "commit"
+            case 2: typeStr = "tree"
+            case 3: typeStr = "blob"
+            case 4: typeStr = "tag"
+            default: return nil
+            }
+            cache[offset] = (typeStr, Data(actualData))
+            return (typeStr, Data(actualData))
+            
+        case 6: // OFS_DELTA
+            var basePos = pos
+            var c = Int(packData[basePos])
+            basePos += 1
+            var baseOffset = c & 0x7f
+            while c & 0x80 != 0 {
+                baseOffset += 1
+                c = Int(packData[basePos])
+                basePos += 1
+                baseOffset = (baseOffset << 7) + (c & 0x7f)
+            }
+            let baseObjectOffset = offset - baseOffset
+            let compressedData = packData.subdata(in: basePos..<packData.count)
+            let deltaData = compressedData.decompressed
+            
+            guard let base = try readPackObjectAtOffset(
+                packData: packData,
+                offset: baseObjectOffset,
+                hashToOffset: hashToOffset,
+                cache: &cache
+            ) else { return nil }
+            
+            let result = try deltaResolver.apply(delta: deltaData, to: base.1)
+            cache[offset] = (base.0, result)
+            return (base.0, result)
+            
+        case 7: // REF_DELTA
+            guard pos + 20 <= packData.count else { return nil }
+            let baseHashData = packData[pos..<(pos+20)]
+            pos += 20
+            let baseHash = baseHashData.map { String(format: "%02x", $0) }.joined()
+            guard let baseOffset = hashToOffset[baseHash] else { return nil }
+            
+            let compressedData = packData.subdata(in: pos..<packData.count)
+            let deltaData = compressedData.decompressed
+            
+            guard let base = try readPackObjectAtOffset(
+                packData: packData,
+                offset: baseOffset,
+                hashToOffset: hashToOffset,
+                cache: &cache
+            ) else { return nil }
+            
+            let result = try deltaResolver.apply(delta: deltaData, to: base.1)
+            cache[offset] = (base.0, result)
+            return (base.0, result)
+            
+        default:
+            return nil
+        }
+    }
+}
+
+// MARK: - Pack Errors
+enum PackError: Error {
+    case objectNotFound
+    case unsupportedObjectType(String)
+    case corruptedData
+    case invalidPackFile
 }

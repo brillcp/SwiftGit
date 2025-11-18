@@ -38,7 +38,7 @@ extension PackIndex: PackIndexProtocol {
         let version = idxData.readUInt32(at: &offset)
         
         guard magic == 0xff744f63, version == 2 else {
-            throw PackError.unsupportedPackVersion
+            throw PackIndexError.unsupportedPackVersion
         }
         
         // Read fanout table to get object count
@@ -105,7 +105,7 @@ extension PackIndex: PackIndexProtocol {
 }
 
 // MARK: - Git Error
-enum PackError: Error {
+enum PackIndexError: Error {
     case unsupportedPackVersion
     case objectNotFound
     case corruptedData
