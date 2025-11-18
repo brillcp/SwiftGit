@@ -14,11 +14,11 @@ enum ObjectType: String {
 }
 
 protocol PackFileReaderProtocol: Actor {
-    /// Read object at a specific offset in pack file
-    func readObject(at location: PackObjectLocation) throws -> PackObject
-    
     /// Check if pack file is memory-mapped
     var isMapped: Bool { get }
+
+    /// Read object at a specific offset in pack file
+    func readObject(at location: PackObjectLocation) throws -> PackObject
     
     /// Unmap pack file if mapped (to reduce memory pressure)
     func unmap()
@@ -83,7 +83,7 @@ extension PackFileReader: PackFileReaderProtocol {
 
 // MARK: - Private Helpers
 private extension PackFileReader {
-    func getPackData(for url: URL) throws -> Data {        
+    func getPackData(for url: URL) throws -> Data {
         if let cached = packCache[url] {
             return cached
         }
@@ -140,7 +140,6 @@ private extension PackFileReader {
             }
             cache[offset] = (typeStr, Data(actualData))
             return (typeStr, Data(actualData))
-            
         case 6: // OFS_DELTA
             var basePos = pos
             var c = Int(packData[basePos])
@@ -166,7 +165,6 @@ private extension PackFileReader {
             let result = try deltaResolver.apply(delta: deltaData, to: base.1)
             cache[offset] = (base.0, result)
             return (base.0, result)
-            
         case 7: // REF_DELTA
             guard pos + 20 <= packData.count else { return nil }
             let baseHashData = packData[pos..<(pos+20)]
@@ -187,7 +185,6 @@ private extension PackFileReader {
             let result = try deltaResolver.apply(delta: deltaData, to: base.1)
             cache[offset] = (base.0, result)
             return (base.0, result)
-            
         default:
             return nil
         }
