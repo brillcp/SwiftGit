@@ -4,9 +4,8 @@ public protocol PackIndexManagerProtocol: Actor {
     /// Find object in any loaded pack file
     func findObject(_ hash: String) async throws -> PackObjectLocation?
     
-    /// Get all hashes across all pack files
-    func getAllHashes() async throws -> Set<String>
-    
+    func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
+
     /// Invalidate cached pack indexes
     func invalidate()
 }
@@ -41,15 +40,18 @@ extension PackIndexManager: PackIndexManagerProtocol {
         return nil
     }
     
-    public func getAllHashes() async throws -> Set<String> {
+    public func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
         try await ensureIndexesLoaded()
         
-        var allHashes = Set<String>()
         for packIndex in packIndexes {
-            allHashes.formUnion(packIndex.getAllHashes())
+            for hash in packIndex.getAllHashes() {
+                let shouldContinue = try await visitor(hash)
+                if !shouldContinue {
+                    return false // Signal to stop
+                }
+            }
         }
-        
-        return allHashes
+        return true
     }
     
     public func invalidate() {

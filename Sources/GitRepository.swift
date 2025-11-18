@@ -46,7 +46,7 @@ public protocol GitRepositoryProtocol: Actor {
     /// Check if an object exists (without loading it)
     func objectExists(_ hash: String) async throws -> Bool
     
-    func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws
+    func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws
 }
 
 // MARK: -
@@ -311,15 +311,17 @@ extension GitRepository: GitRepositoryProtocol {
         try await locator.exists(hash)
     }
     
-    public func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws {
-        let allHashes = try await locator.getAllHashes()
-        
-        for hash in allHashes {
-            let shouldContinue = try await visitor(hash)
-            if !shouldContinue {
-                break
-            }
+    public func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws {
+        // Enumerate loose objects
+        let looseResult = try await locator.enumerateLooseHashes { hash in
+            try await visitor(hash)
         }
+        
+        // If loose enumeration returned false, stop
+        if looseResult == false { return }
+        
+        // Enumerate packed objects
+        try await packIndexManager.enumeratePackedHashes(visitor)
     }
 }
 

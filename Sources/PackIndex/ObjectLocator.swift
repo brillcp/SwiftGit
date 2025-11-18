@@ -13,11 +13,10 @@ public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
     /// Check if object exists without determining location
     func exists(_ hash: String) async throws -> Bool
     
-    /// Get all available object hashes
-    func getAllHashes() async throws -> Set<String>
+    func enumerateLooseHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
     
     /// Invalidate location cache (when repo changes)
-    func invalidate() async  // Make this async
+    func invalidate() async
 }
 
 // MARK: -
@@ -59,18 +58,18 @@ extension ObjectLocator: ObjectLocatorProtocol {
         try await locate(hash) != nil
     }
     
-    public func getAllHashes() async throws -> Set<String> {
-        var hashes = Set<String>()
-        
+    public func enumerateLooseHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
         try await ensureLooseIndexBuilt()
-        if let looseIndex = looseObjectIndex {
-            hashes.formUnion(looseIndex.keys)
+        
+        guard let index = looseObjectIndex else { return true }
+        
+        for hash in index.keys {
+            let shouldContinue = try await visitor(hash)
+            if !shouldContinue {
+                return false // Signal to stop
+            }
         }
-        
-        let packedHashes = try await packIndexManager.getAllHashes()
-        hashes.formUnion(packedHashes)
-        
-        return hashes
+        return true
     }
     
     public func invalidate() async {
