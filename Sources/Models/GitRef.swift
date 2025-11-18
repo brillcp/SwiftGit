@@ -5,7 +5,7 @@ public enum RefType: Sendable {
 }
 
 public struct GitRef: Sendable {
-    let name: String
-    let hash: String
-    let type: RefType
+    public let name: String
+    public let hash: String
+    public let type: RefType
 }

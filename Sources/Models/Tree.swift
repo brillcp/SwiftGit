@@ -8,17 +8,17 @@
 import Foundation
 
 public struct Tree: Sendable {
-    let id: String
-    let entries: [Entry]
+    public let id: String
+    public let entries: [Entry]
     
     public struct Entry: Sendable {
-        let mode: String
-        let type: EntryType
-        let hash: String
-        let name: String
-        let path: String // full path from root
+        public let mode: String
+        public let type: EntryType
+        public let hash: String
+        public let name: String
+        public let path: String // full path from root
         
-        enum EntryType {
+        public enum EntryType: Sendable {
             case blob
             case tree
             case symlink

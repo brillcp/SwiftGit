@@ -2,11 +2,11 @@ import SwiftUI
 
 public struct Commit: Identifiable, Sendable {
     public let id: String
-    let title: String
-    let body: String
-    let author: Author
-    let parents: [String]
-    let tree: String
+    public let title: String
+    public let body: String
+    public let author: Author
+    public let parents: [String]
+    public let tree: String
 }
 
 // MARK: - Equatable
