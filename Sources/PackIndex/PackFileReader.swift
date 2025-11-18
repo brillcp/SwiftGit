@@ -36,6 +36,12 @@ public actor PackFileReader: @unchecked Sendable {
         let commit: any CommitParserProtocol
         let tree: any TreeParserProtocol
         let blob: any BlobParserProtocol
+
+        public init(commit: any CommitParserProtocol, tree: any TreeParserProtocol, blob: any BlobParserProtocol) {
+            self.commit = commit
+            self.tree = tree
+            self.blob = blob
+        }
     }
     
     public var isMapped: Bool {
