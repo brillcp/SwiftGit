@@ -18,8 +18,8 @@ protocol PackFileReaderProtocol: Actor {
     var isMapped: Bool { get }
 
     /// Read object at a specific offset in pack file
-    func readObject(at location: PackObjectLocation) throws -> PackObject
-    
+    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject
+
     /// Unmap pack file if mapped (to reduce memory pressure)
     func unmap()
 }
@@ -53,12 +53,19 @@ actor PackFileReader: @unchecked Sendable {
 
 // MARK: - PackFileReaderProtocol
 extension PackFileReader: PackFileReaderProtocol {
-    func readObject(at location: PackObjectLocation) throws -> PackObject {
+    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
         let packData = try getPackData(for: location.packURL)
+        
+        // Build hash->offset map from pack index for REF_DELTA resolution
+        var hashToOffset: [String: Int] = [:]
+        for hash in packIndex.getAllHashes() {
+            if let loc = packIndex.findObject(hash) {
+                hashToOffset[hash] = loc.offset
+            }
+        }
         
         // Read and resolve the object (handles deltas recursively)
         var cache: [Int: (type: String, data: Data)] = [:]
-        let hashToOffset: [String: Int] = [location.hash: location.offset]
         
         guard let (typeStr, data) = try readPackObjectAtOffset(
             packData: packData,
@@ -66,7 +73,7 @@ extension PackFileReader: PackFileReaderProtocol {
             hashToOffset: hashToOffset,
             cache: &cache
         ) else {
-            throw PackIndexError.objectNotFound
+            throw PackError.objectNotFound
         }
         
         guard let type = ObjectType(rawValue: typeStr) else {
@@ -170,7 +177,11 @@ private extension PackFileReader {
             let baseHashData = packData[pos..<(pos+20)]
             pos += 20
             let baseHash = baseHashData.map { String(format: "%02x", $0) }.joined()
-            guard let baseOffset = hashToOffset[baseHash] else { return nil }
+            
+            // Look up base object offset in the pack index
+            guard let baseOffset = hashToOffset[baseHash] else {
+                throw PackError.baseObjectNotFound(baseHash)
+            }
             
             let compressedData = packData.subdata(in: pos..<packData.count)
             let deltaData = compressedData.decompressed
@@ -194,6 +205,7 @@ private extension PackFileReader {
 // MARK: - Pack Errors
 enum PackError: Error {
     case objectNotFound
+    case baseObjectNotFound(String)
     case unsupportedObjectType(String)
     case corruptedData
     case invalidPackFile
