@@ -218,7 +218,6 @@ extension GitRepository: GitRepositoryProtocol {
         }
         
         var refs: [GitRef] = []
-        let gitURL = url.appendingPathComponent(".git")
         
         // Read loose refs
         refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/heads", type: .localBranch))
@@ -238,7 +237,6 @@ extension GitRepository: GitRepositoryProtocol {
             return cached
         }
         
-        let gitURL = url.appendingPathComponent(".git")
         let headFile = gitURL.appendingPathComponent("HEAD")
         
         guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
@@ -266,7 +264,6 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getHEADBranch() async throws -> String? {
-        let gitURL = url.appendingPathComponent(".git")
         let headFile = gitURL.appendingPathComponent("HEAD")
         
         guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
