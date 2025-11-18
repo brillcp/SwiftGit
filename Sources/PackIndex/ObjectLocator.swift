@@ -53,7 +53,7 @@ actor ObjectLocator: ObjectLocatorProtocol {
     }
     
     func exists(_ hash: String) async throws -> Bool {
-        return try await locate(hash) != nil
+        try await locate(hash) != nil
     }
     
     func getAllHashes() async throws -> Set<String> {
