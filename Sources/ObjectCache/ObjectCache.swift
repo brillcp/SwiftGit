@@ -53,7 +53,7 @@ public actor ObjectCache {
     private let maxObjects: Int
     private let maxMemory: Int
     
-    init(maxObjects: Int = 1000, maxMemory: Int = 100_000_000) {
+    public init(maxObjects: Int = 1000, maxMemory: Int = 100_000_000) {
         self.maxObjects = maxObjects
         self.maxMemory = maxMemory
     }

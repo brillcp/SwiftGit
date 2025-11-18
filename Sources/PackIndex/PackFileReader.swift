@@ -1,19 +1,19 @@
 import Foundation
 
-struct PackObject {
+public struct PackObject: Sendable {
     let hash: String
     let type: ObjectType
     let data: Data
 }
 
-enum ObjectType: String {
+public enum ObjectType: String, Sendable {
     case commit
     case tree
     case blob
     case tag
 }
 
-protocol PackFileReaderProtocol: Actor {
+public protocol PackFileReaderProtocol: Actor {
     /// Check if pack file is memory-mapped
     var isMapped: Bool { get }
 
@@ -25,24 +25,24 @@ protocol PackFileReaderProtocol: Actor {
 }
 
 // MARK: -
-actor PackFileReader: @unchecked Sendable {
+public actor PackFileReader: @unchecked Sendable {
     private let deltaResolver: DeltaResolverProtocol
     private let parsers: PackParsers
     
     // Pack file cache (URL -> Data)
     private var packCache: [URL: Data] = [:]
     
-    struct PackParsers {
+    public struct PackParsers {
         let commit: any CommitParserProtocol
         let tree: any TreeParserProtocol
         let blob: any BlobParserProtocol
     }
     
-    var isMapped: Bool {
+    public var isMapped: Bool {
         !packCache.isEmpty
     }
     
-    init(
+    public init(
         deltaResolver: DeltaResolverProtocol,
         parsers: PackParsers
     ) {
@@ -53,7 +53,7 @@ actor PackFileReader: @unchecked Sendable {
 
 // MARK: - PackFileReaderProtocol
 extension PackFileReader: PackFileReaderProtocol {
-    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
+    public func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
         let packData = try getPackData(for: location.packURL)
         
         // Build hash->offset map from pack index for REF_DELTA resolution
@@ -83,7 +83,7 @@ extension PackFileReader: PackFileReaderProtocol {
         return PackObject(hash: location.hash, type: type, data: data)
     }
     
-    func unmap() {
+    public func unmap() {
         packCache.removeAll()
     }
 }

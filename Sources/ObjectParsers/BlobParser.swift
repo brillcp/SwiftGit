@@ -3,7 +3,9 @@ import Foundation
 public protocol BlobParserProtocol: ObjectParserProtocol where Output == Blob {}
 
 // MARK: -
-public final class BlobParser {}
+public final class BlobParser {
+    public init() {}
+}
 
 // MARK: - BlobParserProtocol
 extension BlobParser: BlobParserProtocol {

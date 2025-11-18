@@ -1,6 +1,6 @@
 import Foundation
 
-protocol PackIndexManagerProtocol: Actor {
+public protocol PackIndexManagerProtocol: Actor {
     /// Find object in any loaded pack file
     func findObject(_ hash: String) async throws -> PackObjectLocation?
     
@@ -12,8 +12,7 @@ protocol PackIndexManagerProtocol: Actor {
 }
 
 // MARK: - PackIndexManager Implementation
-
-actor PackIndexManager: PackIndexManagerProtocol {
+actor PackIndexManager {
     private let gitURL: URL
     private let fileManager: FileManager
     
@@ -21,12 +20,15 @@ actor PackIndexManager: PackIndexManagerProtocol {
     private var packIndexes: [PackIndexProtocol] = []
     private var indexesLoaded = false
     
-    init(gitURL: URL, fileManager: FileManager = .default) {
+    public init(gitURL: URL, fileManager: FileManager = .default) {
         self.gitURL = gitURL
         self.fileManager = fileManager
     }
-    
-    func findObject(_ hash: String) async throws -> PackObjectLocation? {
+}
+
+// MARK: - PackIndexManagerProtocol
+extension PackIndexManager: PackIndexManagerProtocol {
+    public func findObject(_ hash: String) async throws -> PackObjectLocation? {
         try await ensureIndexesLoaded()
         
         // Search across all pack indexes
@@ -39,7 +41,7 @@ actor PackIndexManager: PackIndexManagerProtocol {
         return nil
     }
     
-    func getAllHashes() async throws -> Set<String> {
+    public func getAllHashes() async throws -> Set<String> {
         try await ensureIndexesLoaded()
         
         var allHashes = Set<String>()
@@ -50,7 +52,7 @@ actor PackIndexManager: PackIndexManagerProtocol {
         return allHashes
     }
     
-    func invalidate() {
+    public func invalidate() {
         packIndexes.forEach { $0.clear() }
         packIndexes.removeAll()
         indexesLoaded = false

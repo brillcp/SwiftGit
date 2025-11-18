@@ -4,7 +4,9 @@ import Foundation
 public protocol TreeParserProtocol: ObjectParserProtocol where Output == Tree {}
 
 // MARK: -
-public final class TreeParser {}
+public final class TreeParser {
+    public init() {}
+}
 
 // MARK: - TreeParserProtocol
 extension TreeParser: TreeParserProtocol {

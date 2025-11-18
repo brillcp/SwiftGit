@@ -64,7 +64,7 @@ public actor GitRepository {
 
     public let url: URL
 
-    init(
+    public init(
         url: URL,
         cache: ObjectCacheProtocol,
         locator: ObjectLocatorProtocol,

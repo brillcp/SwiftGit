@@ -30,7 +30,7 @@ public actor ObjectLocator {
     private var looseObjectIndex: [String: URL]?
     private var indexBuilt = false
     
-    init(
+    public init(
         gitURL: URL,
         fileManager: FileManager = .default,
         packIndexManager: PackIndexManagerProtocol
