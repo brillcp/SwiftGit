@@ -15,10 +15,3 @@ extension Commit: Equatable {
         lhs.id == rhs.id
     }
 }
-
-// MARK: -
-extension String {
-    public var shortHash: String {
-        String(prefix(6))
-    }
-}

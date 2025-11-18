@@ -69,14 +69,14 @@ public actor GitRepository {
 
     public init(
         url: URL,
-        cache: ObjectCacheProtocol,
+        cache: ObjectCacheProtocol = ObjectCache(),
         locator: ObjectLocatorProtocol,
-        looseParser: LooseObjectParserProtocol,
-        packReader: PackFileReaderProtocol,
+        looseParser: LooseObjectParserProtocol = LooseObjectParser(),
+        packReader: PackFileReaderProtocol = PackFileReader(),
         packIndexManager: PackIndexManagerProtocol,
-        commitParser: any CommitParserProtocol,
-        treeParser: any TreeParserProtocol,
-        blobParser: any BlobParserProtocol,
+        commitParser: any CommitParserProtocol = CommitParser(),
+        treeParser: any TreeParserProtocol = TreeParser(),
+        blobParser: any BlobParserProtocol = BlobParser(),
         fileManager: FileManager = .default
     ) {
         self.url = url
@@ -372,17 +372,6 @@ private extension GitRepository {
                 return nil
             }
         }
-    }
-    
-    /// Get pack index for a pack file
-    func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol? {
-        // PackIndexManager already loaded all indexes, just find the right one
-        let location = PackObjectLocation(hash: "", offset: 0, packURL: packURL)
-        
-        // This is a bit hacky - we need a way to get the specific pack index
-        // For now, we'll rely on the pack index manager having it loaded
-        // TODO: Improve this API
-        return nil
     }
     
     /// Recursive tree walking helper

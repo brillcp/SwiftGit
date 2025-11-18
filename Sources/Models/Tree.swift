@@ -1,10 +1,3 @@
-//
-//  Tree.swift
-//  Odin
-//
-//  Created by Viktor Gidlöf on 2025-11-07.
-//
-
 import Foundation
 
 public struct Tree: Sendable {

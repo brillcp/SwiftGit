@@ -15,16 +15,14 @@ public protocol PackIndexManagerProtocol: Actor {
 // MARK: - PackIndexManager Implementation
 public actor PackIndexManager {
     private let gitURL: URL
-    private let fileManager: FileManager
     
     // Lazy-loaded pack indexes
     private var packIndexes: [PackIndexProtocol] = []
     private var packIndexByURL: [URL: PackIndexProtocol] = [:]
     private var indexesLoaded = false
     
-    public init(gitURL: URL, fileManager: FileManager = .default) {
+    public init(gitURL: URL) {
         self.gitURL = gitURL
-        self.fileManager = fileManager
     }
 }
 

@@ -35,7 +35,7 @@ public actor PackFileReader: @unchecked Sendable {
         !packCache.isEmpty
     }
     
-    public init(deltaResolver: DeltaResolverProtocol) {
+    public init(deltaResolver: DeltaResolverProtocol = DeltaResolver()) {
         self.deltaResolver = deltaResolver
     }
 }

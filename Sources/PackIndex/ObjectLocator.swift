@@ -22,7 +22,6 @@ public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
 // MARK: -
 public actor ObjectLocator {
     private let gitURL: URL
-    private let fileManager: FileManager
     private let packIndexManager: PackIndexManagerProtocol
     
     // Caches
@@ -31,11 +30,9 @@ public actor ObjectLocator {
     
     public init(
         gitURL: URL,
-        fileManager: FileManager = .default,
         packIndexManager: PackIndexManagerProtocol
     ) {
         self.gitURL = gitURL
-        self.fileManager = fileManager
         self.packIndexManager = packIndexManager
     }
 }

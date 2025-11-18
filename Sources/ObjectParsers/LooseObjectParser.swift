@@ -19,9 +19,9 @@ public final class LooseObjectParser {
     private let blobParser: any BlobParserProtocol
     
     public init(
-        commitParser: any CommitParserProtocol,
-        treeParser: any TreeParserProtocol,
-        blobParser: any BlobParserProtocol
+        commitParser: any CommitParserProtocol = CommitParser(),
+        treeParser: any TreeParserProtocol = TreeParser(),
+        blobParser: any BlobParserProtocol = BlobParser()
     ) {
         self.commitParser = commitParser
         self.treeParser = treeParser
