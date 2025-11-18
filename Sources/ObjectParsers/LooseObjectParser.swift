@@ -13,14 +13,14 @@ protocol LooseObjectParserProtocol {
 }
 
 final class LooseObjectParser: LooseObjectParserProtocol {
-    private let commitParser: CommitParserProtocol
-    private let treeParser: TreeParserProtocol
-    private let blobParser: BlobParserProtocol
+    private let commitParser: any CommitParserProtocol
+    private let treeParser: any TreeParserProtocol
+    private let blobParser: any BlobParserProtocol
     
     init(
-        commitParser: CommitParserProtocol,
-        treeParser: TreeParserProtocol,
-        blobParser: BlobParserProtocol
+        commitParser: any CommitParserProtocol,
+        treeParser: any TreeParserProtocol,
+        blobParser: any BlobParserProtocol
     ) {
         self.commitParser = commitParser
         self.treeParser = treeParser
