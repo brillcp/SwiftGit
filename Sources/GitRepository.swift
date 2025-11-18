@@ -45,6 +45,8 @@ public protocol GitRepositoryProtocol: Actor {
     
     /// Check if an object exists (without loading it)
     func objectExists(_ hash: String) async throws -> Bool
+    
+    func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws
 }
 
 // MARK: -
@@ -307,7 +309,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func objectExists(_ hash: String) async throws -> Bool {
-        return try await locator.exists(hash)
+        try await locator.exists(hash)
     }
     
     public func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws {
