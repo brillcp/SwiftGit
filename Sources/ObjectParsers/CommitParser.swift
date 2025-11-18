@@ -3,7 +3,9 @@ import Foundation
 public protocol CommitParserProtocol: ObjectParserProtocol where Output == Commit {}
 
 // MARK: -
-public final class CommitParser {}
+public final class CommitParser {
+    public init() {}
+}
 
 // MARK: - CommitParserProtocol
 extension CommitParser: CommitParserProtocol {
