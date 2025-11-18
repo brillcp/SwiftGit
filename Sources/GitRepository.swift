@@ -62,6 +62,7 @@ public actor GitRepository {
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
     
+    private var securityScopeStarted: Bool = false
     private let fileManager: FileManager
 
     public let url: URL
@@ -88,6 +89,13 @@ public actor GitRepository {
         self.treeParser = treeParser
         self.blobParser = blobParser
         self.fileManager = fileManager
+        self.securityScopeStarted = url.startAccessingSecurityScopedResource()
+    }
+
+    deinit {
+        if securityScopeStarted {
+            url.stopAccessingSecurityScopedResource()
+        }
     }
 }
 
@@ -238,11 +246,8 @@ extension GitRepository: GitRepositoryProtocol {
         }
         
         let headFile = gitURL.appendingPathComponent("HEAD")
-        
-        guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines) else {
-            return nil
-        }
+        let headContent = try String(contentsOf: headFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         
         // If HEAD points to a ref, resolve it
         if headContent.starts(with: "ref: ") {
@@ -265,11 +270,8 @@ extension GitRepository: GitRepositoryProtocol {
     
     public func getHEADBranch() async throws -> String? {
         let headFile = gitURL.appendingPathComponent("HEAD")
-        
-        guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines) else {
-            return nil
-        }
+        let headContent = try String(contentsOf: headFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         
         if headContent.starts(with: "ref: refs/heads/") {
             return String(headContent.dropFirst("ref: refs/heads/".count))
@@ -334,6 +336,12 @@ private extension GitRepository {
         url.appendingPathComponent(".git")
     }
     
+    func withSecurityScope<T>(_ block: () throws -> T) throws -> T {
+        let started = url.startAccessingSecurityScopedResource()
+        defer { if started { url.stopAccessingSecurityScopedResource() } }
+        return try block()
+    }
+
     /// Load an object from storage (loose or packed)
     func loadObject(hash: String) async throws -> ParsedObject? {
         guard let location = try await locator.locate(hash) else {
