@@ -1,6 +1,6 @@
 import Foundation
 
-protocol GitRepositoryProtocol {
+protocol GitRepositoryProtocol: Actor {
     /// Repository URL
     var url: URL { get }
     
@@ -48,11 +48,486 @@ protocol GitRepositoryProtocol {
 }
 
 // MARK: -
-final class Repository {
+actor Repository {
+    private let cache: ObjectCacheProtocol
+    private let locator: ObjectLocatorProtocol
+    private let looseParser: LooseObjectParserProtocol
+    private let packReader: PackFileReaderProtocol
+    private let packIndexManager: PackIndexManagerProtocol
     
+    // Parsers
+    private let commitParser: any CommitParserProtocol
+    private let treeParser: any TreeParserProtocol
+    private let blobParser: any BlobParserProtocol
+    
+    private let fileManager: FileManager
+
+    let url: URL
+
+    init(
+        url: URL,
+        cache: ObjectCacheProtocol,
+        locator: ObjectLocatorProtocol,
+        looseParser: LooseObjectParserProtocol,
+        packReader: PackFileReaderProtocol,
+        packIndexManager: PackIndexManagerProtocol,
+        commitParser: any CommitParserProtocol,
+        treeParser: any TreeParserProtocol,
+        blobParser: any BlobParserProtocol,
+        fileManager: FileManager = .default
+    ) {
+        self.url = url
+        self.cache = cache
+        self.locator = locator
+        self.looseParser = looseParser
+        self.packReader = packReader
+        self.packIndexManager = packIndexManager
+        self.commitParser = commitParser
+        self.treeParser = treeParser
+        self.blobParser = blobParser
+        self.fileManager = fileManager
+    }
 }
 
 // MARK: -
-extension Repository {
+extension Repository: GitRepositoryProtocol {
+    func getCommit(_ hash: String) async throws -> Commit? {
+        // Check cache first
+        if let cached: Commit = await cache.get(.commit(hash: hash)) {
+            return cached
+        }
+        
+        // Load from storage
+        guard let parsedObject = try await loadObject(hash: hash) else {
+            return nil
+        }
+        
+        guard case .commit(let commit) = parsedObject else {
+            return nil
+        }
+        
+        // Cache it
+        await cache.set(.commit(hash: hash), value: commit)
+        return commit
+    }
     
+    func getTree(_ hash: String) async throws -> Tree? {
+        // Check cache
+        if let cached: Tree = await cache.get(.tree(hash: hash)) {
+            return cached
+        }
+        
+        // Load from storage
+        guard let parsedObject = try await loadObject(hash: hash) else {
+            return nil
+        }
+        
+        guard case .tree(let tree) = parsedObject else {
+            return nil
+        }
+        
+        // Cache it
+        await cache.set(.tree(hash: hash), value: tree)
+        return tree
+    }
+    
+    func getBlob(_ hash: String) async throws -> Blob? {
+        // Check cache (only cache small blobs)
+        if let cached: Blob = await cache.get(.blob(hash: hash)) {
+            return cached
+        }
+        
+        // Load from storage
+        guard let parsedObject = try await loadObject(hash: hash) else {
+            return nil
+        }
+        
+        guard case .blob(let blob) = parsedObject else {
+            return nil
+        }
+        
+        // Cache only if < 100KB
+        if blob.data.count < 100_000 {
+            await cache.set(.blob(hash: hash), value: blob)
+        }
+        
+        return blob
+    }
+    
+    func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, any Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // For now, just load the whole blob and stream it in chunks
+                    // TODO: Implement true streaming for large blobs
+                    guard let blob = try await getBlob(hash) else {
+                        continuation.finish(throwing: RepositoryError.objectNotFound(hash))
+                        return
+                    }
+                    
+                    let chunkSize = 8192
+                    var offset = 0
+                    
+                    while offset < blob.data.count {
+                        let end = min(offset + chunkSize, blob.data.count)
+                        let chunk = blob.data[offset..<end]
+                        continuation.yield(Data(chunk))
+                        offset = end
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
+        try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
+    }
+    
+    func getTreePaths(_ treeHash: String) async throws -> [String : String] {
+        // Check cache
+        if let cached: [String: String] = await cache.get(.treePaths(hash: treeHash)) {
+            return cached
+        }
+        
+        var paths: [String: String] = [:]
+        
+        try await walkTree(treeHash) { entry in
+            if entry.type == .blob {
+                paths[entry.path] = entry.hash
+            }
+            return true
+        }
+        
+        // Cache the result
+        await cache.set(.treePaths(hash: treeHash), value: paths)
+        return paths
+    }
+    
+    // MARK: - References
+    
+    func getRefs() async throws -> [Ref] {
+        // Check cache
+        if let cached: [Ref] = await cache.get(.refs) {
+            return cached
+        }
+        
+        var refs: [Ref] = []
+        let gitURL = url.appendingPathComponent(".git")
+        
+        // Read loose refs
+        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/heads", type: .localBranch))
+        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/remotes", type: .remoteBranch))
+        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/tags", type: .tag))
+        
+        // Read packed refs
+        refs.append(contentsOf: try readPackedRefs(gitURL: gitURL))
+        
+        // Cache refs
+        await cache.set(.refs, value: refs)
+        return refs
+    }
+    
+    func getHEAD() async throws -> String? {
+        if let cached: String = await cache.get(.head) {
+            return cached
+        }
+        
+        let gitURL = url.appendingPathComponent(".git")
+        let headFile = gitURL.appendingPathComponent("HEAD")
+        
+        guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
+        }
+        
+        // If HEAD points to a ref, resolve it
+        if headContent.starts(with: "ref: ") {
+            let refPath = String(headContent.dropFirst(5))
+            let refFile = gitURL.appendingPathComponent(refPath)
+            
+            if let commitHash = try? String(contentsOf: refFile, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines) {
+                await cache.set(.head, value: commitHash)
+                return commitHash
+            }
+        } else {
+            // Detached HEAD - return the commit hash directly
+            await cache.set(.head, value: headContent)
+            return headContent
+        }
+        
+        return nil
+    }
+    
+    func getHEADBranch() async throws -> String? {
+        let gitURL = url.appendingPathComponent(".git")
+        let headFile = gitURL.appendingPathComponent("HEAD")
+        
+        guard let headContent = try? String(contentsOf: headFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return nil
+        }
+        
+        if headContent.starts(with: "ref: refs/heads/") {
+            return String(headContent.dropFirst("ref: refs/heads/".count))
+        }
+        
+        return nil // Detached HEAD
+    }
+    
+    // MARK: - History & Graph
+    
+    func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
+        var history: [Commit] = []
+        var visited = Set<String>()
+        var queue = [commitHash]
+        
+        while !queue.isEmpty {
+            if let limit = limit, history.count >= limit {
+                break
+            }
+            
+            let hash = queue.removeFirst()
+            
+            guard !visited.contains(hash) else { continue }
+            visited.insert(hash)
+            
+            guard let commit = try await getCommit(hash) else { continue }
+            history.append(commit)
+            
+            // Add parents to queue
+            queue.append(contentsOf: commit.parents)
+        }
+        
+        return history
+    }
+    
+    func objectExists(_ hash: String) async throws -> Bool {
+        return try await locator.exists(hash)
+    }
+    
+    func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws {
+        let allHashes = try await locator.getAllHashes()
+        
+        for hash in allHashes {
+            let shouldContinue = try await visitor(hash)
+            if !shouldContinue {
+                break
+            }
+        }
+    }
+}
+
+// MARK: - Repository error
+enum RepositoryError: Error {
+    case objectNotFound(String)
+    case invalidObjectType
+    case corruptedRepository
+}
+
+// MARK: - Private functions
+private extension Repository {
+    var gitURL: URL {
+        url.appendingPathComponent(".git")
+    }
+    
+    /// Load an object from storage (loose or packed)
+    func loadObject(hash: String) async throws -> ParsedObject? {
+        guard let location = try await locator.locate(hash) else {
+            return nil
+        }
+        
+        switch location {
+        case .loose(let fileURL):
+            // Load loose object
+            let data = try Data(contentsOf: fileURL)
+            return try looseParser.parse(hash: hash, data: data)
+            
+        case .packed(let packLocation):
+            // Load from pack file
+            guard let packIndex = try await getPackIndex(for: packLocation.packURL) else {
+                return nil
+            }
+            
+            let packObject = try await packReader.readObject(at: packLocation, packIndex: packIndex)
+            
+            // Parse based on type
+            switch packObject.type {
+            case .commit:
+                let commit = try commitParser.parse(hash: hash, data: packObject.data)
+                return .commit(commit)
+            case .tree:
+                let tree = try treeParser.parse(hash: hash, data: packObject.data)
+                return .tree(tree)
+            case .blob:
+                let blob = try blobParser.parse(hash: hash, data: packObject.data)
+                return .blob(blob)
+            case .tag:
+                // TODO: Implement tag parsing
+                return nil
+            }
+        }
+    }
+    
+    /// Get pack index for a pack file
+    func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol? {
+        // PackIndexManager already loaded all indexes, just find the right one
+        let location = PackObjectLocation(hash: "", offset: 0, packURL: packURL)
+        
+        // This is a bit hacky - we need a way to get the specific pack index
+        // For now, we'll rely on the pack index manager having it loaded
+        // TODO: Improve this API
+        return nil
+    }
+    
+    /// Recursive tree walking helper
+    func walkTreeRecursive(
+        treeHash: String,
+        currentPath: String,
+        visitor: (Tree.Entry) async throws -> Bool
+    ) async throws {
+        guard let tree = try await getTree(treeHash) else { return }
+        
+        for entry in tree.entries {
+            let fullPath = currentPath.isEmpty ? entry.name : "\(currentPath)/\(entry.name)"
+            let entryType: Tree.Entry.EntryType
+            
+            if entry.mode.hasPrefix("40") || entry.mode == "040000" {
+                entryType = .tree
+            } else if entry.mode == "120000" {
+                entryType = .symlink
+            } else if entry.mode == "160000" {
+                entryType = .gitlink
+            } else {
+                entryType = .blob
+            }
+            
+            let treeEntry = Tree.Entry(
+                mode: entry.mode,
+                type: entryType,
+                hash: entry.hash,
+                name: entry.name,
+                path: fullPath
+            )
+            
+            let shouldContinue = try await visitor(treeEntry)
+            if !shouldContinue {
+                return
+            }
+            
+            // Recurse into subdirectories
+            if entryType == .tree {
+                try await walkTreeRecursive(
+                    treeHash: entry.hash,
+                    currentPath: fullPath,
+                    visitor: visitor
+                )
+            }
+        }
+    }
+    
+    /// Read refs from a directory
+    func readRefs(from gitURL: URL, relativePath: String, type: RefType) throws -> [Ref] {
+        let baseURL = gitURL.appendingPathComponent(relativePath)
+        
+        guard fileManager.fileExists(atPath: baseURL.path) else {
+            return []
+        }
+        
+        var refs: [Ref] = []
+        
+        guard let enumerator = fileManager.enumerator(
+            at: baseURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        
+        for case let fileURL as URL in enumerator {
+            let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            guard resourceValues.isRegularFile == true else { continue }
+            
+            let name = fileURL.path.replacingOccurrences(of: baseURL.path + "/", with: "")
+            let hash = try String(contentsOf: fileURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            refs.append(Ref(name: name, hash: hash, type: type))
+        }
+        
+        return refs
+    }
+    
+    /// Read packed-refs file
+    func readPackedRefs(gitURL: URL) throws -> [Ref] {
+        let packedURL = gitURL.appendingPathComponent("packed-refs")
+        
+        guard fileManager.fileExists(atPath: packedURL.path) else {
+            return []
+        }
+        
+        let content = try String(contentsOf: packedURL, encoding: .utf8)
+        var refs: [Ref] = []
+        var peeledMap: [String: String] = [:]
+        
+        let lines = content.split(whereSeparator: \.isNewline)
+        
+        for line in lines {
+            let s = line.trimmingCharacters(in: .whitespaces)
+            
+            if s.isEmpty || s.hasPrefix("#") { continue }
+            
+            // Peeled tag line
+            if s.first == "^" {
+                let peeledID = String(s.dropFirst())
+                if let last = refs.last {
+                    peeledMap[last.hash] = peeledID
+                }
+                continue
+            }
+            
+            let parts = s.split(separator: " ")
+            guard parts.count == 2 else { continue }
+            
+            let sha = String(parts[0])
+            let name = String(parts[1])
+            
+            if name.hasPrefix("refs/heads/") {
+                refs.append(Ref(
+                    name: String(name.dropFirst("refs/heads/".count)),
+                    hash: sha,
+                    type: .localBranch
+                ))
+            } else if name.hasPrefix("refs/remotes/") {
+                refs.append(Ref(
+                    name: String(name.dropFirst("refs/remotes/".count)),
+                    hash: sha,
+                    type: .remoteBranch
+                ))
+            } else if name.hasPrefix("refs/tags/") {
+                refs.append(Ref(
+                    name: String(name.dropFirst("refs/tags/".count)),
+                    hash: sha,
+                    type: .tag
+                ))
+            }
+        }
+        
+        // Replace annotated tag SHAs with peeled commit SHAs
+        for i in refs.indices where refs[i].type == .tag {
+            if let peeled = peeledMap[refs[i].hash] {
+                refs[i] = Ref(
+                    name: refs[i].name,
+                    hash: peeled,
+                    type: .tag
+                )
+            }
+        }
+        
+        return refs
+    }
 }
