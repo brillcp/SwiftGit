@@ -38,6 +38,7 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get HEAD branch name (nil if detached)
     func getHEADBranch() async throws -> String?
     
+    func getBranches() async throws -> Branches
     // MARK: - History & Graph
     
     /// Get commit history starting from a commit
@@ -55,7 +56,6 @@ public actor GitRepository {
     private let locator: ObjectLocatorProtocol
     private let looseParser: LooseObjectParserProtocol
     private let packReader: PackFileReaderProtocol
-    private let packIndexManager: PackIndexManagerProtocol
     
     // Parsers
     private let commitParser: any CommitParserProtocol
@@ -73,7 +73,6 @@ public actor GitRepository {
         locator: ObjectLocatorProtocol,
         looseParser: LooseObjectParserProtocol = LooseObjectParser(),
         packReader: PackFileReaderProtocol = PackFileReader(),
-        packIndexManager: PackIndexManagerProtocol,
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
@@ -84,7 +83,6 @@ public actor GitRepository {
         self.locator = locator
         self.looseParser = looseParser
         self.packReader = packReader
-        self.packIndexManager = packIndexManager
         self.commitParser = commitParser
         self.treeParser = treeParser
         self.blobParser = blobParser
@@ -280,6 +278,16 @@ extension GitRepository: GitRepositoryProtocol {
         return nil // Detached HEAD
     }
     
+    public func getBranches() async throws -> Branches {
+        let allRefs = try await getRefs()
+        
+        return Branches(
+            local: allRefs.filter { $0.type == .localBranch },
+            remote: allRefs.filter { $0.type == .remoteBranch },
+            current: try await getHEADBranch()
+        )
+    }
+    
     // MARK: - History & Graph
     
     public func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
@@ -315,7 +323,7 @@ extension GitRepository: GitRepositoryProtocol {
         let shouldContinue = try await locator.enumerateLooseHashes(visitor)
         guard shouldContinue else { return }
         
-        _ = try await packIndexManager.enumeratePackedHashes(visitor)
+        _ = try await locator.enumeratePackedHashes(visitor)
     }
 }
 
@@ -351,8 +359,7 @@ private extension GitRepository {
             return try looseParser.parse(hash: hash, data: data)
             
         case .packed(let packLocation):
-            // Get the pack index from the manager
-            guard let packIndex = try await packIndexManager.getPackIndex(for: packLocation.packURL) else {
+            guard let packIndex = try await locator.getPackIndex(for: packLocation.packURL) else {
                 throw RepositoryError.packIndexNotFound
             }
             

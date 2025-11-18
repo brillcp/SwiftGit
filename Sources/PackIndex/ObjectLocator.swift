@@ -14,7 +14,10 @@ public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
     func exists(_ hash: String) async throws -> Bool
     
     func enumerateLooseHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
-    
+    func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
+
+    func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol?
+
     /// Invalidate location cache (when repo changes)
     func invalidate() async
 }
@@ -55,6 +58,10 @@ extension ObjectLocator: ObjectLocatorProtocol {
         try await locate(hash) != nil
     }
     
+    public func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol? {
+        try await packIndexManager.getPackIndex(for: packURL)
+    }
+    
     public func enumerateLooseHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
         try await ensureLooseIndexBuilt()
         
@@ -68,7 +75,11 @@ extension ObjectLocator: ObjectLocatorProtocol {
         }
         return true
     }
-    
+
+    public func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
+        try await packIndexManager.enumeratePackedHashes(visitor)
+    }
+
     public func invalidate() async {
         looseObjectIndex = nil
         indexBuilt = false
