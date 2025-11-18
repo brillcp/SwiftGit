@@ -12,7 +12,7 @@ protocol LooseObjectParserProtocol {
     func parse(hash: String, data: Data) throws -> ParsedObject
 }
 
-final class LooseObjectParser: LooseObjectParserProtocol {
+final class LooseObjectParser {
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
@@ -26,7 +26,10 @@ final class LooseObjectParser: LooseObjectParserProtocol {
         self.treeParser = treeParser
         self.blobParser = blobParser
     }
-    
+}
+
+// MARK: - LooseObjectParserProtocol
+extension LooseObjectParser: LooseObjectParserProtocol {
     func parse(hash: String, data: Data) throws -> ParsedObject {
         let decompressed = data.decompressed
         let (type, objectData) = try splitHeader(decompressed)

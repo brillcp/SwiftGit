@@ -3,6 +3,7 @@ import Foundation
 
 protocol TreeParserProtocol: ObjectParserProtocol where Output == Tree {}
 
+// MARK: -
 final class TreeParser {}
 
 // MARK: - TreeParserProtocol

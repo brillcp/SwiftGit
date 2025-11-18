@@ -2,7 +2,11 @@ import Foundation
 
 protocol BlobParserProtocol: ObjectParserProtocol where Output == Blob {}
 
-final class BlobParser: BlobParserProtocol {
+// MARK: -
+final class BlobParser {}
+
+// MARK: - BlobParserProtocol
+extension BlobParser: BlobParserProtocol {
     func parse(hash: String, data: Data) throws -> Blob {
         Blob(id: hash, data: data)
     }

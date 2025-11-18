@@ -2,6 +2,7 @@ import Foundation
 
 protocol CommitParserProtocol: ObjectParserProtocol where Output == Commit {}
 
+// MARK: -
 final class CommitParser {}
 
 // MARK: - CommitParserProtocol
