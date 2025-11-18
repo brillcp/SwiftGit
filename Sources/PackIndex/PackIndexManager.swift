@@ -6,6 +6,8 @@ public protocol PackIndexManagerProtocol: Actor {
     
     func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
 
+    func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol?
+
     /// Invalidate cached pack indexes
     func invalidate()
 }
@@ -17,6 +19,7 @@ public actor PackIndexManager {
     
     // Lazy-loaded pack indexes
     private var packIndexes: [PackIndexProtocol] = []
+    private var packIndexByURL: [URL: PackIndexProtocol] = [:]
     private var indexesLoaded = false
     
     public init(gitURL: URL, fileManager: FileManager = .default) {
@@ -38,6 +41,11 @@ extension PackIndexManager: PackIndexManagerProtocol {
         }
         
         return nil
+    }
+    
+    public func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol? {
+        try await ensureIndexesLoaded()
+        return packIndexByURL[packURL]
     }
     
     public func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
@@ -72,20 +80,21 @@ private extension PackIndexManager {
         guard !indexesLoaded else { return }
         
         let gitURL = self.gitURL
-        let indexes = try await Task.detached {
+        let (indexes, indexByURL) = try await Task.detached {
             try Self.loadAllPackIndexes(gitURL: gitURL, fileManager: .default)
         }.value
 
         packIndexes = indexes
+        packIndexByURL = indexByURL
         indexesLoaded = true
     }
     
     /// Scan pack directory and load all .idx files
-    private static func loadAllPackIndexes(gitURL: URL, fileManager: FileManager) throws -> [PackIndexProtocol] {
+    static func loadAllPackIndexes(gitURL: URL, fileManager: FileManager) throws -> ([PackIndexProtocol], [URL: PackIndexProtocol]) {
         let packURL = gitURL.appendingPathComponent("objects/pack")
         
         guard fileManager.fileExists(atPath: packURL.path) else {
-            return []
+            return ([], [:])
         }
         
         let packFiles = try fileManager.contentsOfDirectory(
@@ -95,12 +104,11 @@ private extension PackIndexManager {
         )
         
         var indexes: [PackIndexProtocol] = []
+        var indexByURL: [URL: PackIndexProtocol] = [:]
         
-        // Find all .idx files
         let idxFiles = packFiles.filter { $0.pathExtension == "idx" }
         
         for idxFile in idxFiles {
-            // Find corresponding .pack file
             let packFile = idxFile
                 .deletingPathExtension()
                 .appendingPathExtension("pack")
@@ -109,12 +117,12 @@ private extension PackIndexManager {
                 continue
             }
             
-            // Load the index
             let packIndex = PackIndex()
             try packIndex.load(idxURL: idxFile, packURL: packFile)
             indexes.append(packIndex)
+            indexByURL[packFile] = packIndex
         }
         
-        return indexes
+        return (indexes, indexByURL)
     }
 }

@@ -1,8 +1,8 @@
 import Foundation
 
 public struct Author: Sendable {
-    let name: String
-    let email: String
-    let timestamp: Date
-    let timezone: String
+    public let name: String
+    public let email: String
+    public let timestamp: Date
+    public let timezone: String
 }

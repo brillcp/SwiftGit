@@ -324,6 +324,7 @@ public enum RepositoryError: Error {
     case objectNotFound(String)
     case invalidObjectType
     case corruptedRepository
+    case packIndexNotFound
 }
 
 // MARK: - Private functions
@@ -346,19 +347,17 @@ private extension GitRepository {
         
         switch location {
         case .loose(let fileURL):
-            // Load loose object
             let data = try Data(contentsOf: fileURL)
             return try looseParser.parse(hash: hash, data: data)
             
         case .packed(let packLocation):
-            // Load from pack file
-            guard let packIndex = try await getPackIndex(for: packLocation.packURL) else {
-                return nil
+            // Get the pack index from the manager
+            guard let packIndex = try await packIndexManager.getPackIndex(for: packLocation.packURL) else {
+                throw RepositoryError.packIndexNotFound
             }
             
             let packObject = try await packReader.readObject(at: packLocation, packIndex: packIndex)
             
-            // Parse based on type
             switch packObject.type {
             case .commit:
                 let commit = try commitParser.parse(hash: hash, data: packObject.data)
@@ -370,7 +369,6 @@ private extension GitRepository {
                 let blob = try blobParser.parse(hash: hash, data: packObject.data)
                 return .blob(blob)
             case .tag:
-                // TODO: Implement tag parsing
                 return nil
             }
         }
