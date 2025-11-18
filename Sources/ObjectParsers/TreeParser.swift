@@ -38,7 +38,11 @@ extension TreeParser: TreeParserProtocol {
             let entryHash = hashData.map { String(format: "%02x", $0) }.joined()
             entries.append(
                 Tree.Entry(
-                    mode: mode, type: .tree, hash: entryHash, name: name, path: ""
+                    mode: mode,
+                    type: .tree,
+                    hash: entryHash,
+                    name: name,
+                    path: ""
                 )
             )
         }
