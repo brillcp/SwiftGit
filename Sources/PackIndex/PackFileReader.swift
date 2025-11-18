@@ -27,33 +27,16 @@ public protocol PackFileReaderProtocol: Actor {
 // MARK: -
 public actor PackFileReader: @unchecked Sendable {
     private let deltaResolver: DeltaResolverProtocol
-    private let parsers: PackParsers
     
     // Pack file cache (URL -> Data)
     private var packCache: [URL: Data] = [:]
-    
-    public struct PackParsers {
-        let commit: any CommitParserProtocol
-        let tree: any TreeParserProtocol
-        let blob: any BlobParserProtocol
-
-        public init(commit: any CommitParserProtocol, tree: any TreeParserProtocol, blob: any BlobParserProtocol) {
-            self.commit = commit
-            self.tree = tree
-            self.blob = blob
-        }
-    }
     
     public var isMapped: Bool {
         !packCache.isEmpty
     }
     
-    public init(
-        deltaResolver: DeltaResolverProtocol,
-        parsers: PackParsers
-    ) {
+    public init(deltaResolver: DeltaResolverProtocol) {
         self.deltaResolver = deltaResolver
-        self.parsers = parsers
     }
 }
 
