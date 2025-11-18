@@ -12,7 +12,7 @@ public protocol PackIndexManagerProtocol: Actor {
 }
 
 // MARK: - PackIndexManager Implementation
-actor PackIndexManager {
+public actor PackIndexManager {
     private let gitURL: URL
     private let fileManager: FileManager
     

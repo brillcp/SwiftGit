@@ -6,7 +6,9 @@ public protocol DeltaResolverProtocol {
 }
 
 // MARK: -
-public final class DeltaResolver {}
+public final class DeltaResolver {
+    public init() {}
+}
 
 // MARK: - DeltaResolverProtocol
 extension DeltaResolver: DeltaResolverProtocol {
