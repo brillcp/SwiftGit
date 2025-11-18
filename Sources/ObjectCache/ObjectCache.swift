@@ -1,6 +1,6 @@
 import Foundation
 
-enum CacheKey: Hashable {
+public enum CacheKey: Hashable {
     case commit(hash: String)
     case tree(hash: String)
     case blob(hash: String)
@@ -10,7 +10,7 @@ enum CacheKey: Hashable {
     case objectLocation(hash: String)
 }
 
-struct CacheStats {
+public struct CacheStats {
     let hits: Int
     let misses: Int
     let evictions: Int
@@ -18,7 +18,7 @@ struct CacheStats {
     let memoryUsage: Int // bytes
 }
 
-protocol ObjectCacheProtocol: Actor {
+public protocol ObjectCacheProtocol: Actor {
     /// Get an object from cache
     func get<T>(_ key: CacheKey) -> T?
     
@@ -41,7 +41,7 @@ protocol ObjectCacheProtocol: Actor {
     func stats() -> CacheStats
 }
 
-actor ObjectCache: ObjectCacheProtocol {
+public actor ObjectCache {
     private var storage: [CacheKey: CacheEntry] = [:]
     private var accessOrder: LinkedList<CacheKey> = LinkedList()
     
@@ -57,8 +57,11 @@ actor ObjectCache: ObjectCacheProtocol {
         self.maxObjects = maxObjects
         self.maxMemory = maxMemory
     }
-    
-    func get<T>(_ key: CacheKey) -> T? {
+}
+
+// MARK: - ObjectCacheProtocol
+extension ObjectCache: ObjectCacheProtocol {
+    public func get<T>(_ key: CacheKey) -> T? {
         guard let entry = storage[key] else {
             missCount += 1
             return nil
@@ -72,7 +75,7 @@ actor ObjectCache: ObjectCacheProtocol {
         return entry.value as? T
     }
     
-    func set<T>(_ key: CacheKey, value: T) {
+    public func set<T>(_ key: CacheKey, value: T) {
         let estimatedSize = estimateSize(value)
         
         // If object already exists, update it
@@ -101,7 +104,7 @@ actor ObjectCache: ObjectCacheProtocol {
         evictIfNeeded()
     }
     
-    func remove(_ key: CacheKey) {
+    public func remove(_ key: CacheKey) {
         if let entry = storage[key] {
             currentMemoryUsage -= entry.estimatedSize
             storage.removeValue(forKey: key)
@@ -109,17 +112,17 @@ actor ObjectCache: ObjectCacheProtocol {
         }
     }
     
-    func contains(_ key: CacheKey) -> Bool {
+    public func contains(_ key: CacheKey) -> Bool {
         storage[key] != nil
     }
     
-    func clear() {
+    public func clear() {
         storage.removeAll()
         accessOrder.removeAll()
         currentMemoryUsage = 0
     }
     
-    func clear(where predicate: (CacheKey) -> Bool) {
+    public func clear(where predicate: (CacheKey) -> Bool) {
         let keysToRemove = storage.keys.filter(predicate)
         for key in keysToRemove {
             if let entry = storage[key] {
@@ -130,7 +133,7 @@ actor ObjectCache: ObjectCacheProtocol {
         }
     }
     
-    func stats() -> CacheStats {
+    public func stats() -> CacheStats {
         CacheStats(
             hits: hitCount,
             misses: missCount,

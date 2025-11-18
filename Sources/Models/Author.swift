@@ -1,6 +1,6 @@
 import Foundation
 
-struct Author {
+public struct Author: Sendable {
     let name: String
     let email: String
     let timestamp: Date

@@ -1,13 +1,13 @@
 import Foundation
 
-protocol CommitParserProtocol: ObjectParserProtocol where Output == Commit {}
+public protocol CommitParserProtocol: ObjectParserProtocol where Output == Commit {}
 
 // MARK: -
-final class CommitParser {}
+public final class CommitParser {}
 
 // MARK: - CommitParserProtocol
 extension CommitParser: CommitParserProtocol {
-    func parse(hash: String, data: Data) throws -> Commit {
+    public func parse(hash: String, data: Data) throws -> Commit {
         // Check if data starts with valid commit markers
         guard let content = String(data: data, encoding: .utf8) else {
             throw ParseError.invalidEncoding

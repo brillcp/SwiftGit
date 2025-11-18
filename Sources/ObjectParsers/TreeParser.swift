@@ -1,14 +1,14 @@
 
 import Foundation
 
-protocol TreeParserProtocol: ObjectParserProtocol where Output == Tree {}
+public protocol TreeParserProtocol: ObjectParserProtocol where Output == Tree {}
 
 // MARK: -
-final class TreeParser {}
+public final class TreeParser {}
 
 // MARK: - TreeParserProtocol
 extension TreeParser: TreeParserProtocol {
-    func parse(hash: String, data: Data) throws -> Tree {
+    public func parse(hash: String, data: Data) throws -> Tree {
         var entries: [Tree.Entry] = []
         var index = data.startIndex
         let end = data.endIndex

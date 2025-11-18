@@ -1,13 +1,13 @@
 import Foundation
 
-struct PackObjectLocation: Sendable {
+public struct PackObjectLocation: Sendable {
     let hash: String
     let offset: Int
     let packURL: URL
 }
 
 // MARK: -
-protocol PackIndexProtocol: Sendable {
+public protocol PackIndexProtocol: Sendable {
     /// Load and parse a pack index file
     func load(idxURL: URL, packURL: URL) throws
     
@@ -22,13 +22,13 @@ protocol PackIndexProtocol: Sendable {
 }
 
 // MARK: -
-final class PackIndex: @unchecked Sendable {
+public final class PackIndex: @unchecked Sendable {
     private var entries: [String: PackObjectLocation] = [:]
 }
 
 // MARK: - PackIndexProtocol
 extension PackIndex: PackIndexProtocol {
-    func load(idxURL: URL, packURL: URL) throws {
+    public func load(idxURL: URL, packURL: URL) throws {
         let idxData = try Data(contentsOf: idxURL)
         
         guard idxData.count > 8 else { return }
@@ -91,21 +91,21 @@ extension PackIndex: PackIndexProtocol {
         }
     }
     
-    func findObject(_ hash: String) -> PackObjectLocation? {
+    public func findObject(_ hash: String) -> PackObjectLocation? {
         entries[hash]
     }
     
-    func getAllHashes() -> Set<String> {
+    public func getAllHashes() -> Set<String> {
         Set(entries.keys)
     }
     
-    func clear() {
+    public func clear() {
         entries.removeAll()
     }
 }
 
 // MARK: - Git Error
-enum PackIndexError: Error {
+public enum PackIndexError: Error {
     case unsupportedPackVersion
     case objectNotFound
     case corruptedData

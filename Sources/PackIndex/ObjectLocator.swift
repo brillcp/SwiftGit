@@ -1,12 +1,12 @@
 import Foundation
 
-enum ObjectLocation {
+public enum ObjectLocation: Sendable {
     case loose(url: URL)
     case packed(location: PackObjectLocation)
 }
 
 // MARK: - Protocol
-protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
+public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
     /// Find where an object is stored (loose or packed)
     func locate(_ hash: String) async throws -> ObjectLocation?
     
@@ -21,7 +21,7 @@ protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
 }
 
 // MARK: -
-actor ObjectLocator: ObjectLocatorProtocol {
+public actor ObjectLocator {
     private let gitURL: URL
     private let fileManager: FileManager
     private let packIndexManager: PackIndexManagerProtocol
@@ -39,8 +39,11 @@ actor ObjectLocator: ObjectLocatorProtocol {
         self.fileManager = fileManager
         self.packIndexManager = packIndexManager
     }
-    
-    func locate(_ hash: String) async throws -> ObjectLocation? {
+}
+
+// MARK: - ObjectLocatorProtocol
+extension ObjectLocator: ObjectLocatorProtocol {
+    public func locate(_ hash: String) async throws -> ObjectLocation? {
         if let looseURL = try await findLooseObject(hash) {
             return .loose(url: looseURL)
         }
@@ -52,11 +55,11 @@ actor ObjectLocator: ObjectLocatorProtocol {
         return nil
     }
     
-    func exists(_ hash: String) async throws -> Bool {
+    public func exists(_ hash: String) async throws -> Bool {
         try await locate(hash) != nil
     }
     
-    func getAllHashes() async throws -> Set<String> {
+    public func getAllHashes() async throws -> Set<String> {
         var hashes = Set<String>()
         
         try await ensureLooseIndexBuilt()
@@ -70,7 +73,7 @@ actor ObjectLocator: ObjectLocatorProtocol {
         return hashes
     }
     
-    func invalidate() async {
+    public func invalidate() async {
         looseObjectIndex = nil
         indexBuilt = false
         await packIndexManager.invalidate()

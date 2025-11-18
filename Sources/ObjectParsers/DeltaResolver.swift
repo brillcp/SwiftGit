@@ -1,16 +1,16 @@
 import Foundation
 
-protocol DeltaResolverProtocol {
+public protocol DeltaResolverProtocol {
     /// Apply delta instructions to base data
     func apply(delta: Data, to base: Data) throws -> Data
 }
 
 // MARK: -
-final class DeltaResolver {}
+public final class DeltaResolver {}
 
 // MARK: - DeltaResolverProtocol
 extension DeltaResolver: DeltaResolverProtocol {
-    func apply(delta: Data, to base: Data) throws -> Data {
+    public func apply(delta: Data, to base: Data) throws -> Data {
         var idx = 0
         // Read source (base) size and target size (both varints)
         let _ = readGitVarInt(delta, start: &idx) // source size (can be ignored for safety)

@@ -7,11 +7,11 @@
 
 import Foundation
 
-struct Tree {
+public struct Tree: Sendable {
     let id: String
     let entries: [Entry]
     
-    struct Entry {
+    public struct Entry: Sendable {
         let mode: String
         let type: EntryType
         let hash: String

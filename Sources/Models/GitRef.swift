@@ -1,10 +1,10 @@
 import Foundation
 
-enum RefType {
+public enum RefType: Sendable {
     case localBranch, remoteBranch, stash, tag
 }
 
-struct GitRef {
+public struct GitRef: Sendable {
     let name: String
     let hash: String
     let type: RefType

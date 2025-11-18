@@ -1,6 +1,6 @@
 import Foundation
 
-protocol GitRepositoryProtocol: Actor {
+public protocol GitRepositoryProtocol: Actor {
     /// Repository URL
     var url: URL { get }
     
@@ -48,7 +48,7 @@ protocol GitRepositoryProtocol: Actor {
 }
 
 // MARK: -
-actor GitRepository {
+public actor GitRepository {
     private let cache: ObjectCacheProtocol
     private let locator: ObjectLocatorProtocol
     private let looseParser: LooseObjectParserProtocol
@@ -62,7 +62,7 @@ actor GitRepository {
     
     private let fileManager: FileManager
 
-    let url: URL
+    public let url: URL
 
     init(
         url: URL,
@@ -91,7 +91,7 @@ actor GitRepository {
 
 // MARK: -
 extension GitRepository: GitRepositoryProtocol {
-    func getCommit(_ hash: String) async throws -> Commit? {
+    public func getCommit(_ hash: String) async throws -> Commit? {
         // Check cache first
         if let cached: Commit = await cache.get(.commit(hash: hash)) {
             return cached
@@ -111,7 +111,7 @@ extension GitRepository: GitRepositoryProtocol {
         return commit
     }
     
-    func getTree(_ hash: String) async throws -> Tree? {
+    public func getTree(_ hash: String) async throws -> Tree? {
         // Check cache
         if let cached: Tree = await cache.get(.tree(hash: hash)) {
             return cached
@@ -131,7 +131,7 @@ extension GitRepository: GitRepositoryProtocol {
         return tree
     }
     
-    func getBlob(_ hash: String) async throws -> Blob? {
+    public func getBlob(_ hash: String) async throws -> Blob? {
         // Check cache (only cache small blobs)
         if let cached: Blob = await cache.get(.blob(hash: hash)) {
             return cached
@@ -154,7 +154,7 @@ extension GitRepository: GitRepositoryProtocol {
         return blob
     }
     
-    func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, any Error> {
+    public func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, any Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -183,11 +183,11 @@ extension GitRepository: GitRepositoryProtocol {
         }
     }
     
-    func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
+    public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
         try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
     }
     
-    func getTreePaths(_ treeHash: String) async throws -> [String : String] {
+    public func getTreePaths(_ treeHash: String) async throws -> [String : String] {
         // Check cache
         if let cached: [String: String] = await cache.get(.treePaths(hash: treeHash)) {
             return cached
@@ -209,7 +209,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     // MARK: - References
     
-    func getRefs() async throws -> [GitRef] {
+    public func getRefs() async throws -> [GitRef] {
         // Check cache
         if let cached: [GitRef] = await cache.get(.refs) {
             return cached
@@ -231,7 +231,7 @@ extension GitRepository: GitRepositoryProtocol {
         return refs
     }
     
-    func getHEAD() async throws -> String? {
+    public func getHEAD() async throws -> String? {
         if let cached: String = await cache.get(.head) {
             return cached
         }
@@ -263,7 +263,7 @@ extension GitRepository: GitRepositoryProtocol {
         return nil
     }
     
-    func getHEADBranch() async throws -> String? {
+    public func getHEADBranch() async throws -> String? {
         let gitURL = url.appendingPathComponent(".git")
         let headFile = gitURL.appendingPathComponent("HEAD")
         
@@ -281,7 +281,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     // MARK: - History & Graph
     
-    func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
+    public func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
         var history: [Commit] = []
         var visited = Set<String>()
         var queue = [commitHash]
@@ -306,11 +306,11 @@ extension GitRepository: GitRepositoryProtocol {
         return history
     }
     
-    func objectExists(_ hash: String) async throws -> Bool {
+    public func objectExists(_ hash: String) async throws -> Bool {
         return try await locator.exists(hash)
     }
     
-    func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws {
+    public func enumerateObjects(_ visitor: (String) async throws -> Bool) async throws {
         let allHashes = try await locator.getAllHashes()
         
         for hash in allHashes {
@@ -323,7 +323,7 @@ extension GitRepository: GitRepositoryProtocol {
 }
 
 // MARK: - Repository error
-enum RepositoryError: Error {
+public enum RepositoryError: Error {
     case objectNotFound(String)
     case invalidObjectType
     case corruptedRepository

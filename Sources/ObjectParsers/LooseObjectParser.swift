@@ -1,18 +1,19 @@
 import Foundation
 
-enum ParsedObject {
+public enum ParsedObject: Sendable {
     case commit(Commit)
     case tree(Tree)
     case blob(Blob)
     case tag // not implemented yet
 }
 
-protocol LooseObjectParserProtocol {
+public protocol LooseObjectParserProtocol {
     /// Parse a loose object file (decompresses and parses header)
     func parse(hash: String, data: Data) throws -> ParsedObject
 }
 
-final class LooseObjectParser {
+// MARK: -
+public final class LooseObjectParser {
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
@@ -30,7 +31,7 @@ final class LooseObjectParser {
 
 // MARK: - LooseObjectParserProtocol
 extension LooseObjectParser: LooseObjectParserProtocol {
-    func parse(hash: String, data: Data) throws -> ParsedObject {
+    public func parse(hash: String, data: Data) throws -> ParsedObject {
         let decompressed = data.decompressed
         let (type, objectData) = try splitHeader(decompressed)
 

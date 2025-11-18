@@ -1,6 +1,6 @@
 import Foundation
 
-protocol ObjectParserProtocol {
+public protocol ObjectParserProtocol {
     associatedtype Output
     
     /// Parse raw object data
