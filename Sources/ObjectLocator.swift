@@ -75,7 +75,6 @@ actor ObjectLocator: ObjectLocatorProtocol {
         indexBuilt = false
         await packIndexManager.invalidate()
     }
-    
 }
 
 // MARK: - Private
@@ -92,11 +91,10 @@ private extension ObjectLocator {
     func ensureLooseIndexBuilt() async throws {
         guard !indexBuilt else { return }
         
-        // Capture only what we need, create new FileManager in the task
         let gitURL = self.gitURL
         
         let index = try await Task.detached {
-            return try Self.scanLooseObjects(gitURL: gitURL, fileManager: .default)
+            try Self.scanLooseObjects(gitURL: gitURL, fileManager: .default)
         }.value
         
         looseObjectIndex = index

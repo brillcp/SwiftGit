@@ -1,13 +1,13 @@
 import Foundation
 
-struct PackObjectLocation {
+struct PackObjectLocation: Sendable {
     let hash: String
     let offset: Int
     let packURL: URL
 }
 
 // MARK: -
-protocol PackIndexProtocol {
+protocol PackIndexProtocol: Sendable {
     /// Load and parse a pack index file
     func load(idxURL: URL, packURL: URL) throws
     
@@ -22,7 +22,7 @@ protocol PackIndexProtocol {
 }
 
 // MARK: -
-final class PackIndex {
+final class PackIndex: @unchecked Sendable {
     private var entries: [String: PackObjectLocation] = [:]
 }
 

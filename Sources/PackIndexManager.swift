@@ -67,11 +67,12 @@ private extension PackIndexManager {
     func ensureIndexesLoaded() async throws {
         guard !indexesLoaded else { return }
         
-//        let indexes = try await Task.detached {
-//            try Self.loadAllPackIndexes(gitURL: gitURL, fileManager: .default)
-//        }.value
-//
-//        packIndexes = indexes
+        let gitURL = self.gitURL
+        let indexes = try await Task.detached {
+            try Self.loadAllPackIndexes(gitURL: gitURL, fileManager: .default)
+        }.value
+
+        packIndexes = indexes
         indexesLoaded = true
     }
     

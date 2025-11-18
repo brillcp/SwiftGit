@@ -44,7 +44,6 @@ extension DeltaResolver: DeltaResolverProtocol {
                 output.append(delta.subdata(in: idx..<(idx+insertSize)))
                 idx += insertSize
             } else {
-                // opcode == 0 is reserved/invalid
                 throw DeltaError.invalidHeader
             }
         }
