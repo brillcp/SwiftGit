@@ -312,16 +312,10 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws {
-        // Enumerate loose objects
-        let looseResult = try await locator.enumerateLooseHashes { hash in
-            try await visitor(hash)
-        }
+        let shouldContinue = try await locator.enumerateLooseHashes(visitor)
+        guard shouldContinue else { return }
         
-        // If loose enumeration returned false, stop
-        if looseResult == false { return }
-        
-        // Enumerate packed objects
-        try await packIndexManager.enumeratePackedHashes(visitor)
+        _ = try await packIndexManager.enumeratePackedHashes(visitor)
     }
 }
 
