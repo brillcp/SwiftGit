@@ -55,9 +55,9 @@ extension HunkGenerator: DiffGeneratorProtocol {
             return [makeBinaryPlaceholder()]
         }
         
-        // Split into lines
-        let oldLines = oldContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let newLines = newContent.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // Split into lines (keep as Substring for memory efficiency)
+        let oldLines = oldContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let newLines = newContent.split(separator: "\n", omittingEmptySubsequences: false)
         
         // Generate diff
         let diff = makeDiff(oldLines: oldLines, newLines: newLines)
@@ -114,8 +114,13 @@ private extension HunkGenerator {
     }
     
     /// Generate line-by-line diff using Myers' algorithm
-    func makeDiff(oldLines: [String], newLines: [String]) -> [DiffLine] {
-        let difference = newLines.difference(from: oldLines)
+    func makeDiff(oldLines: [Substring], newLines: [Substring]) -> [DiffLine] {
+        // Convert to arrays for difference (still views, not copies)
+        let oldArray = Array(oldLines)
+        let newArray = Array(newLines)
+        
+        // Use Swift's built-in Myers' algorithm
+        let difference = newArray.difference(from: oldArray)
         
         var results: [DiffLine] = []
         var lineId = 0
@@ -123,8 +128,8 @@ private extension HunkGenerator {
         var newIndex = 0
         
         // Build a map of changes for efficient lookup
-        var removals: [Int: String] = [:]
-        var insertions: [Int: String] = [:]
+        var removals: [Int: Substring] = [:]
+        var insertions: [Int: Substring] = [:]
         
         for change in difference {
             switch change {
@@ -158,13 +163,13 @@ private extension HunkGenerator {
                     results.append(DiffLine(
                         id: lineId,
                         type: .removed,
-                        segments: [Segment(id: 0, text: oldLine, isHighlighted: false)]
+                        segments: [Segment(id: 0, text: String(oldLine), isHighlighted: false)]
                     ))
                     lineId += 1
                     results.append(DiffLine(
                         id: lineId,
                         type: .added,
-                        segments: [Segment(id: 0, text: newLine, isHighlighted: false)]
+                        segments: [Segment(id: 0, text: String(newLine), isHighlighted: false)]
                     ))
                     lineId += 1
                 }
@@ -175,7 +180,7 @@ private extension HunkGenerator {
                 results.append(DiffLine(
                     id: lineId,
                     type: .removed,
-                    segments: [Segment(id: 0, text: oldLines[oldIndex], isHighlighted: false)]
+                    segments: [Segment(id: 0, text: String(oldLines[oldIndex]), isHighlighted: false)]
                 ))
                 lineId += 1
                 oldIndex += 1
@@ -184,7 +189,7 @@ private extension HunkGenerator {
                 results.append(DiffLine(
                     id: lineId,
                     type: .added,
-                    segments: [Segment(id: 0, text: newLines[newIndex], isHighlighted: false)]
+                    segments: [Segment(id: 0, text: String(newLines[newIndex]), isHighlighted: false)]
                 ))
                 lineId += 1
                 newIndex += 1
@@ -194,7 +199,7 @@ private extension HunkGenerator {
                     results.append(DiffLine(
                         id: lineId,
                         type: .unchanged,
-                        segments: [Segment(id: 0, text: oldLines[oldIndex], isHighlighted: false)]
+                        segments: [Segment(id: 0, text: String(oldLines[oldIndex]), isHighlighted: false)]
                     ))
                     lineId += 1
                     oldIndex += 1
@@ -205,7 +210,7 @@ private extension HunkGenerator {
         
         return results
     }
-    
+
     /// Group diff lines into hunks with context
     func groupIntoHunks(diff: [DiffLine], contextLines: Int) -> [DiffHunk] {
         var hunks: [DiffHunk] = []
@@ -287,53 +292,51 @@ private extension HunkGenerator {
         return hunks
     }
     
-    /// Word-level diff for a single line
-    func wordDiff(old: String, new: String, forOld: Bool) -> [Segment] {
-        let oldWords = old.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        let newWords = new.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    /// Word-level diff using Myers' algorithm (via difference)
+    func wordDiff(old: Substring, new: Substring, forOld: Bool) -> [Segment] {
+        // Split into words (keep as Substring views)
+        let oldWords = old.split(whereSeparator: { $0.isWhitespace })
+        let newWords = new.split(whereSeparator: { $0.isWhitespace })
         
-        let lcs = longestCommonSubsequence(oldWords, newWords)
+        // Use Myers' algorithm for word diff too
+        let difference = Array(newWords).difference(from: Array(oldWords))
+        
         var segments: [Segment] = []
         var segmentId = 0
-        var i = 0, j = 0, lcsIndex = 0
         
-        while (forOld && i < oldWords.count) || (!forOld && j < newWords.count) {
-            if lcsIndex < lcs.count {
-                if forOld && i < oldWords.count && oldWords[i] == lcs[lcsIndex] {
-                    // Common word in old line
-                    segments.append(Segment(id: segmentId, text: oldWords[i], isHighlighted: false))
-                    segmentId += 1
-                    i += 1
-                    lcsIndex += 1
-                } else if !forOld && j < newWords.count && newWords[j] == lcs[lcsIndex] {
-                    // Common word in new line
-                    segments.append(Segment(id: segmentId, text: newWords[j], isHighlighted: false))
-                    segmentId += 1
-                    j += 1
-                    lcsIndex += 1
-                } else {
-                    // Changed/removed/added word
-                    if forOld && i < oldWords.count {
-                        segments.append(Segment(id: segmentId, text: oldWords[i], isHighlighted: true))
-                        segmentId += 1
-                        i += 1
-                    } else if !forOld && j < newWords.count {
-                        segments.append(Segment(id: segmentId, text: newWords[j], isHighlighted: true))
-                        segmentId += 1
-                        j += 1
-                    }
-                }
-            } else {
-                // Past LCS, everything is changed
-                if forOld && i < oldWords.count {
-                    segments.append(Segment(id: segmentId, text: oldWords[i], isHighlighted: true))
-                    segmentId += 1
-                    i += 1
-                } else if !forOld && j < newWords.count {
-                    segments.append(Segment(id: segmentId, text: newWords[j], isHighlighted: true))
-                    segmentId += 1
-                    j += 1
-                }
+        // Build change maps
+        var removals = Set<Int>()
+        var insertions = Set<Int>()
+        
+        for change in difference {
+            switch change {
+            case .remove(let offset, _, _):
+                removals.insert(offset)
+            case .insert(let offset, _, _):
+                insertions.insert(offset)
+            }
+        }
+        
+        // Generate segments based on which version we're building
+        if forOld {
+            for (index, word) in oldWords.enumerated() {
+                let isHighlighted = removals.contains(index)
+                segments.append(Segment(
+                    id: segmentId,
+                    text: String(word),
+                    isHighlighted: isHighlighted
+                ))
+                segmentId += 1
+            }
+        } else {
+            for (index, word) in newWords.enumerated() {
+                let isHighlighted = insertions.contains(index)
+                segments.append(Segment(
+                    id: segmentId,
+                    text: String(word),
+                    isHighlighted: isHighlighted
+                ))
+                segmentId += 1
             }
         }
         
