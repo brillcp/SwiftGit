@@ -165,7 +165,7 @@ private extension PackFileReader {
             guard pos + 20 <= packData.count else { return nil }
             let baseHashData = packData[pos..<(pos+20)]
             pos += 20
-            let baseHash = baseHashData.map { String(format: "%02x", $0) }.joined()
+            let baseHash = baseHashData.sha1()
             
             // Look up base object offset in the pack index
             guard let baseOffset = hashToOffset[baseHash] else {

@@ -51,7 +51,7 @@ extension PackIndex: PackIndexProtocol {
         var hashes: [String] = []
         for _ in 0..<objectCount {
             let hashData = idxData[offset..<offset+20]
-            hashes.append(hashData.map { String(format: "%02x", $0) }.joined())
+            hashes.append(hashData.sha1())
             offset += 20
         }
         

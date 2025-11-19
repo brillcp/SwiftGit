@@ -38,7 +38,7 @@ extension TreeParser: TreeParserProtocol {
             // Convert to displayable fields
             let mode = String(decoding: modeData, as: UTF8.self)
             let name = String(decoding: nameData, as: UTF8.self)
-            let entryHash = hashData.map { String(format: "%02x", $0) }.joined()
+            let entryHash = hashData.sha1()
             entries.append(
                 Tree.Entry(
                     mode: mode,

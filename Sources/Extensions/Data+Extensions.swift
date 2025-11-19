@@ -45,7 +45,7 @@ extension Data {
     func readHex20(at offset: inout Int) -> String {
         let bytes = self[offset..<offset+20]
         offset += 20
-        return bytes.map { String(format: "%02x", $0) }.joined()
+        return bytes.sha1()
     }
 
     func readUInt32(at offset: inout Int) -> UInt32 {
