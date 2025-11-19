@@ -5,6 +5,7 @@ public enum GitChangeType: Hashable, Sendable {
     case modified
     case deleted
     case renamed(from: String)
+    case untracked
 }
 
 // MARK: - File (for commits/diffs)
