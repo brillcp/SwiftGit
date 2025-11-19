@@ -5,3 +5,34 @@ public struct DiffHunk: Hashable, Sendable {
     public let header: String
     public let lines: [DiffLine]
 }
+
+// Add this extension to DiffHunk
+public extension DiffHunk {
+    func displayRows() -> [DiffLine] {
+        var result: [DiffLine] = []
+        var removedBuffer: [DiffLine] = []
+        var addedBuffer: [DiffLine] = []
+        
+        func flush() {
+            result.append(contentsOf: removedBuffer)  // All removed first
+            result.append(contentsOf: addedBuffer)    // Then all added
+            removedBuffer.removeAll()
+            addedBuffer.removeAll()
+        }
+        
+        for line in lines {
+            switch line.type {
+            case .unchanged:
+                flush()
+                result.append(line)
+            case .removed:
+                removedBuffer.append(line)
+            case .added:
+                addedBuffer.append(line)
+            }
+        }
+        
+        flush()
+        return result
+    }
+}
