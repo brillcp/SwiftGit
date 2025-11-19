@@ -9,6 +9,9 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get a commit by hash (lazy loaded)
     func getCommit(_ hash: String) async throws -> Commit?
     
+    /// Get changed files for a commit
+    func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
+
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
     
@@ -56,7 +59,8 @@ public actor GitRepository {
     private let locator: ObjectLocatorProtocol
     private let looseParser: LooseObjectParserProtocol
     private let packReader: PackFileReaderProtocol
-    
+    private let diffCalculator: DiffCalculatorProtocol
+
     // Parsers
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
@@ -73,6 +77,7 @@ public actor GitRepository {
         locator: ObjectLocatorProtocol,
         looseParser: LooseObjectParserProtocol = LooseObjectParser(),
         packReader: PackFileReaderProtocol = PackFileReader(),
+        diffCalculator: DiffCalculatorProtocol,
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
@@ -83,6 +88,7 @@ public actor GitRepository {
         self.locator = locator
         self.looseParser = looseParser
         self.packReader = packReader
+        self.diffCalculator = diffCalculator
         self.commitParser = commitParser
         self.treeParser = treeParser
         self.blobParser = blobParser
@@ -118,7 +124,28 @@ extension GitRepository: GitRepositoryProtocol {
         await cache.set(.commit(hash: hash), value: commit)
         return commit
     }
-    
+
+    /// Get changed files for a commit
+    public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
+        guard let commit = try await getCommit(commitId) else { return [:] }
+        
+        let currentTree = try await getTreePaths(commit.tree)
+        
+        var parentTree: [String: String]? = nil
+        if let parentId = commit.parents.first,
+           let parentCommit = try await getCommit(parentId) {
+            parentTree = try await getTreePaths(parentCommit.tree)
+        }
+        
+        return try await diffCalculator.calculateDiff(
+            currentTree: currentTree,
+            parentTree: parentTree,
+            blobLoader: { [weak self] blobHash in
+                try await self?.getBlob(blobHash)
+            }
+        )
+    }
+
     public func getTree(_ hash: String) async throws -> Tree? {
         // Check cache
         if let cached: Tree = await cache.get(.tree(hash: hash)) {

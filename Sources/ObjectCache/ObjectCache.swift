@@ -2,6 +2,8 @@ import Foundation
 
 public enum CacheKey: Hashable {
     case commit(hash: String)
+    case commitSummary(hash: String)
+    case commitDetails(hash: String)
     case tree(hash: String)
     case blob(hash: String)
     case treePaths(hash: String)

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Blob: Sendable {
+public struct Blob: Hashable, Sendable {
     public let id: String
     public let data: Data
 }
