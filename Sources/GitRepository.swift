@@ -276,18 +276,15 @@ extension GitRepository: GitRepositoryProtocol {
             let refPath = String(headContent.dropFirst(5))
             let refFile = gitURL.appendingPathComponent(refPath)
             
-            if let commitHash = try? String(contentsOf: refFile, encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines) {
-                await cache.set(.head, value: commitHash)
-                return commitHash
-            }
+            let commitHash = try String(contentsOf: refFile, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            await cache.set(.head, value: commitHash)
+            return commitHash
         } else {
             // Detached HEAD - return the commit hash directly
             await cache.set(.head, value: headContent)
             return headContent
         }
-        
-        return nil
     }
     
     public func getHEADBranch() async throws -> String? {
