@@ -265,33 +265,50 @@ extension GitRepository: GitRepositoryProtocol {
     public func getHEAD() async throws -> String? {
         if let cached: String = await cache.get(.head) { return cached }
 
-        let headFile = gitURL.appendingPathComponent("HEAD")
-        let raw = try String(contentsOf: headFile, encoding: .utf8)
+        let headURL = gitURL.appendingPathComponent("HEAD")
+        let raw = try String(contentsOf: headURL, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         if raw.hasPrefix("ref: ") {
-            let refPath = String(raw.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
-            let refFile = gitURL.appendingPathComponent(refPath)
+            let refPath = String(raw.dropFirst(5))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
 
-            if fileManager.fileExists(atPath: refFile.path),
-               let refHash = try? String(contentsOf: refFile, encoding: .utf8)
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-               !refHash.isEmpty,
-               try await objectExists(refHash)
-            {
-                await cache.set(.head, value: refHash)
-                return refHash
+            let refURL = gitURL.appendingPathComponent(refPath)
+
+            var candidate: String?
+
+            // Try reading the ref file *if it exists*
+            if fileManager.fileExists(atPath: refURL.path) {
+                let value = try String(contentsOf: refURL, encoding: .utf8)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if value.isValidSHA {
+                    candidate = value
+                }
             }
 
-            if raw.isValidSHA {
-                await cache.set(.head, value: raw)
-                return raw
+            // If ref file missing or unreadable, fall back to HEAD literal
+            if candidate == nil {
+                let fallback = raw.replacingOccurrences(of: "ref:", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if fallback.isValidSHA {
+                    candidate = fallback
+                }
             }
 
+            guard let sha = candidate,
+                  try await objectExists(sha) else { return nil }
+
+            await cache.set(.head, value: sha)
+            return sha
+        }
+
+        // Detached HEAD
+        guard raw.isValidSHA, try await objectExists(raw) else {
             return nil
         }
 
-        guard raw.isValidSHA else { return nil }
         await cache.set(.head, value: raw)
         return raw
     }
