@@ -10,6 +10,8 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get changed files for a commit
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
 
+    func getFileDiff(commitId: String, filePath: String) async throws -> [DiffHunk]
+
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
     
@@ -53,6 +55,7 @@ public actor GitRepository {
     private let looseParser: LooseObjectParserProtocol
     private let packReader: PackFileReaderProtocol
     private let diffCalculator: DiffCalculatorProtocol
+    private let diffGenerator: DiffGeneratorProtocol
 
     // Parsers
     private let commitParser: any CommitParserProtocol
@@ -71,6 +74,7 @@ public actor GitRepository {
         looseParser: LooseObjectParserProtocol = LooseObjectParser(),
         packReader: PackFileReaderProtocol = PackFileReader(),
         diffCalculator: DiffCalculatorProtocol = DiffCalculator(),
+        diffGenerator: DiffGeneratorProtocol = HunkGenerator(),
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
@@ -82,6 +86,7 @@ public actor GitRepository {
         self.looseParser = looseParser
         self.packReader = packReader
         self.diffCalculator = diffCalculator
+        self.diffGenerator = diffGenerator
         self.commitParser = commitParser
         self.treeParser = treeParser
         self.blobParser = blobParser
@@ -130,6 +135,27 @@ extension GitRepository: GitRepositoryProtocol {
             blobLoader: { [weak self] blobHash in
                 try await self?.getBlob(blobHash)
             }
+        )
+    }
+
+    public func getFileDiff(commitId: String, filePath: String) async throws -> [DiffHunk] {
+        guard let commit = try await getCommit(commitId) else { return [] }
+        
+        let newBlob = try await getBlob(at: filePath, treeHash: commit.tree)
+
+        var oldBlob: Blob? = nil
+        if let parentId = commit.parents.first,
+           let parentCommit = try await getCommit(parentId) {
+            oldBlob = try await getBlob(at: filePath, treeHash: parentCommit.tree)
+        }
+        
+        let oldContent = oldBlob.flatMap { String(data: $0.data, encoding: .utf8) } ?? ""
+        let newContent = newBlob.flatMap { String(data: $0.data, encoding: .utf8) } ?? ""
+        
+        return try await diffGenerator.generateHunks(
+            oldContent: oldContent,
+            newContent: newContent,
+            contextLines: 3
         )
     }
 
@@ -370,6 +396,12 @@ private extension GitRepository {
         }
     }
     
+    func getBlob(at path: String, treeHash: String) async throws -> Blob? {
+        let paths = try await getTreePaths(treeHash)
+        guard let blobHash = paths[path] else { return nil }
+        return try await getBlob(blobHash)
+    }
+
     /// Recursive tree walking helper
     func walkTreeRecursive(
         treeHash: String,
