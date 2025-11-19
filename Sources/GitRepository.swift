@@ -269,7 +269,6 @@ extension GitRepository: GitRepositoryProtocol {
         let raw = try String(contentsOf: headFile, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Case 1: symbolic ref
         if raw.hasPrefix("ref: ") {
             let refPath = String(raw.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
             let refFile = gitURL.appendingPathComponent(refPath)
@@ -284,7 +283,6 @@ extension GitRepository: GitRepositoryProtocol {
                 return refHash
             }
 
-            // Symbolic ref exists but is stale or unreadable → treat HEAD as detached SHA
             if raw.isValidSHA {
                 await cache.set(.head, value: raw)
                 return raw
@@ -293,7 +291,6 @@ extension GitRepository: GitRepositoryProtocol {
             return nil
         }
 
-        // Case 2: HEAD already contains a raw SHA
         guard raw.isValidSHA else { return nil }
         await cache.set(.head, value: raw)
         return raw
