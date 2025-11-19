@@ -1,7 +1,7 @@
 import Foundation
 
 public struct DiffHunk: Hashable, Sendable {
-    let id: Int
-    let header: String
-    let lines: [DiffLine]
+    public let id: Int
+    public let header: String
+    public let lines: [DiffLine]
 }
