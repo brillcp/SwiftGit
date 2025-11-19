@@ -4,8 +4,6 @@ public protocol GitRepositoryProtocol: Actor {
     /// Repository URL
     var url: URL { get }
     
-    // MARK: - Object Access
-    
     /// Get a commit by hash (lazy loaded)
     func getCommit(_ hash: String) async throws -> Commit?
     
@@ -21,16 +19,12 @@ public protocol GitRepositoryProtocol: Actor {
     /// Stream a large blob without loading entirely into memory
     func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, Error>
     
-    // MARK: - Tree Walking
-    
     /// Walk a tree recursively, calling visitor for each entry
     /// Visitor returns true to continue, false to stop
     func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws
     
     /// Get all file paths in a tree (flattened)
     func getTreePaths(_ treeHash: String) async throws -> [String: String] // path -> blob hash
-    
-    // MARK: - References
     
     /// Get all refs (branches, tags, etc.)
     func getRefs() async throws -> [GitRef]
@@ -42,7 +36,6 @@ public protocol GitRepositoryProtocol: Actor {
     func getHEADBranch() async throws -> String?
     
     func getBranches() async throws -> Branches
-    // MARK: - History & Graph
     
     /// Get commit history starting from a commit
     func getHistory(from commitHash: String, limit: Int?) async throws -> [Commit]
@@ -77,7 +70,7 @@ public actor GitRepository {
         locator: ObjectLocatorProtocol,
         looseParser: LooseObjectParserProtocol = LooseObjectParser(),
         packReader: PackFileReaderProtocol = PackFileReader(),
-        diffCalculator: DiffCalculatorProtocol,
+        diffCalculator: DiffCalculatorProtocol = DiffCalculator(),
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
@@ -103,22 +96,16 @@ public actor GitRepository {
     }
 }
 
-// MARK: -
+// MARK: - GitRepositoryProtocol
 extension GitRepository: GitRepositoryProtocol {
     public func getCommit(_ hash: String) async throws -> Commit? {
         // Check cache first
-        if let cached: Commit = await cache.get(.commit(hash: hash)) {
-            return cached
-        }
+        if let cached: Commit = await cache.get(.commit(hash: hash)) { return cached }
         
         // Load from storage
-        guard let parsedObject = try await loadObject(hash: hash) else {
-            return nil
-        }
-        
-        guard case .commit(let commit) = parsedObject else {
-            return nil
-        }
+        guard let parsedObject = try await loadObject(hash: hash),
+              case .commit(let commit) = parsedObject
+        else { return nil }
         
         // Cache it
         await cache.set(.commit(hash: hash), value: commit)
@@ -148,18 +135,12 @@ extension GitRepository: GitRepositoryProtocol {
 
     public func getTree(_ hash: String) async throws -> Tree? {
         // Check cache
-        if let cached: Tree = await cache.get(.tree(hash: hash)) {
-            return cached
-        }
+        if let cached: Tree = await cache.get(.tree(hash: hash)) { return cached }
         
         // Load from storage
-        guard let parsedObject = try await loadObject(hash: hash) else {
-            return nil
-        }
-        
-        guard case .tree(let tree) = parsedObject else {
-            return nil
-        }
+        guard let parsedObject = try await loadObject(hash: hash),
+              case .tree(let tree) = parsedObject
+        else { return nil }
         
         // Cache it
         await cache.set(.tree(hash: hash), value: tree)
@@ -168,18 +149,12 @@ extension GitRepository: GitRepositoryProtocol {
     
     public func getBlob(_ hash: String) async throws -> Blob? {
         // Check cache (only cache small blobs)
-        if let cached: Blob = await cache.get(.blob(hash: hash)) {
-            return cached
-        }
+        if let cached: Blob = await cache.get(.blob(hash: hash)) { return cached }
         
         // Load from storage
-        guard let parsedObject = try await loadObject(hash: hash) else {
-            return nil
-        }
-        
-        guard case .blob(let blob) = parsedObject else {
-            return nil
-        }
+        guard let parsedObject = try await loadObject(hash: hash),
+              case .blob(let blob) = parsedObject
+        else { return nil }
         
         // Cache only if < 100KB
         if blob.data.count < 100_000 {
@@ -224,9 +199,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     public func getTreePaths(_ treeHash: String) async throws -> [String : String] {
         // Check cache
-        if let cached: [String: String] = await cache.get(.treePaths(hash: treeHash)) {
-            return cached
-        }
+        if let cached: [String: String] = await cache.get(.treePaths(hash: treeHash)) { return cached }
         
         var paths: [String: String] = [:]
         
@@ -246,9 +219,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     public func getRefs() async throws -> [GitRef] {
         // Check cache
-        if let cached: [GitRef] = await cache.get(.refs) {
-            return cached
-        }
+        if let cached: [GitRef] = await cache.get(.refs) { return cached }
         
         var refs: [GitRef] = []
         
@@ -316,7 +287,6 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     // MARK: - History & Graph
-    
     public func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
         var history: [Commit] = []
         var visited = Set<String>()
@@ -367,18 +337,10 @@ private extension GitRepository {
     var gitURL: URL {
         url.appendingPathComponent(".git")
     }
-    
-    func withSecurityScope<T>(_ block: () throws -> T) throws -> T {
-        let started = url.startAccessingSecurityScopedResource()
-        defer { if started { url.stopAccessingSecurityScopedResource() } }
-        return try block()
-    }
 
     /// Load an object from storage (loose or packed)
     func loadObject(hash: String) async throws -> ParsedObject? {
-        guard let location = try await locator.locate(hash) else {
-            return nil
-        }
+        guard let location = try await locator.locate(hash) else { return nil }
         
         switch location {
         case .loose(let fileURL):
@@ -458,9 +420,7 @@ private extension GitRepository {
     func readRefs(from gitURL: URL, relativePath: String, type: RefType) throws -> [GitRef] {
         let baseURL = gitURL.appendingPathComponent(relativePath)
         
-        guard fileManager.fileExists(atPath: baseURL.path) else {
-            return []
-        }
+        guard fileManager.fileExists(atPath: baseURL.path) else { return [] }
         
         var refs: [GitRef] = []
         
@@ -490,9 +450,7 @@ private extension GitRepository {
     func readPackedRefs(gitURL: URL) throws -> [GitRef] {
         let packedURL = gitURL.appendingPathComponent("packed-refs")
         
-        guard fileManager.fileExists(atPath: packedURL.path) else {
-            return []
-        }
+        guard fileManager.fileExists(atPath: packedURL.path) else { return [] }
         
         let content = try String(contentsOf: packedURL, encoding: .utf8)
         var refs: [GitRef] = []
