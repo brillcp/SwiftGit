@@ -113,50 +113,42 @@ private extension HunkGenerator {
         )
     }
     
-    /// Generate line-by-line diff
+    /// Generate line-by-line diff using Myers' algorithm
     func makeDiff(oldLines: [String], newLines: [String]) -> [DiffLine] {
-        let lcs = longestCommonSubsequence(oldLines, newLines)
+        let difference = newLines.difference(from: oldLines)
         
         var results: [DiffLine] = []
-        var i = 0, j = 0, lcsIndex = 0
         var lineId = 0
+        var oldIndex = 0
+        var newIndex = 0
         
-        while i < oldLines.count || j < newLines.count {
-            if lcsIndex < lcs.count && i < oldLines.count && oldLines[i] == lcs[lcsIndex] && j < newLines.count && newLines[j] == lcs[lcsIndex] {
-                // Unchanged line
-                results.append(DiffLine(
-                    id: lineId,
-                    type: .unchanged,
-                    segments: [Segment(id: 0, text: oldLines[i], isHighlighted: false)]
-                ))
-                lineId += 1
-                i += 1
-                j += 1
-                lcsIndex += 1
-            } else if lcsIndex < lcs.count && j < newLines.count && newLines[j] == lcs[lcsIndex] {
-                // Removed line
-                results.append(DiffLine(
-                    id: lineId,
-                    type: .removed,
-                    segments: [Segment(id: 0, text: oldLines[i], isHighlighted: false)]
-                ))
-                lineId += 1
-                i += 1
-            } else if lcsIndex < lcs.count && i < oldLines.count && oldLines[i] == lcs[lcsIndex] {
-                // Added line
-                results.append(DiffLine(
-                    id: lineId,
-                    type: .added,
-                    segments: [Segment(id: 0, text: newLines[j], isHighlighted: false)]
-                ))
-                lineId += 1
-                j += 1
-            } else if i < oldLines.count && j < newLines.count {
+        // Build a map of changes for efficient lookup
+        var removals: [Int: String] = [:]
+        var insertions: [Int: String] = [:]
+        
+        for change in difference {
+            switch change {
+            case .remove(let offset, let element, _):
+                removals[offset] = element
+            case .insert(let offset, let element, _):
+                insertions[offset] = element
+            }
+        }
+        
+        // Walk through both arrays and generate diff lines
+        while oldIndex < oldLines.count || newIndex < newLines.count {
+            let isRemoved = removals[oldIndex] != nil
+            let isInserted = insertions[newIndex] != nil
+            
+            if isRemoved && isInserted {
                 // Modified line - check if we should do word diff
-                if oldLines[i].count <= maxLineLength && newLines[j].count <= maxLineLength {
+                let oldLine = oldLines[oldIndex]
+                let newLine = newLines[newIndex]
+                
+                if oldLine.count <= maxLineLength && newLine.count <= maxLineLength {
                     // Word-level diff for reasonable line lengths
-                    let oldSegments = wordDiff(old: oldLines[i], new: newLines[j], forOld: true)
-                    let newSegments = wordDiff(old: oldLines[i], new: newLines[j], forOld: false)
+                    let oldSegments = wordDiff(old: oldLine, new: newLine, forOld: true)
+                    let newSegments = wordDiff(old: oldLine, new: newLine, forOld: false)
                     results.append(DiffLine(id: lineId, type: .removed, segments: oldSegments))
                     lineId += 1
                     results.append(DiffLine(id: lineId, type: .added, segments: newSegments))
@@ -166,36 +158,48 @@ private extension HunkGenerator {
                     results.append(DiffLine(
                         id: lineId,
                         type: .removed,
-                        segments: [Segment(id: 0, text: oldLines[i], isHighlighted: false)]
+                        segments: [Segment(id: 0, text: oldLine, isHighlighted: false)]
                     ))
                     lineId += 1
                     results.append(DiffLine(
                         id: lineId,
                         type: .added,
-                        segments: [Segment(id: 0, text: newLines[j], isHighlighted: false)]
+                        segments: [Segment(id: 0, text: newLine, isHighlighted: false)]
                     ))
                     lineId += 1
                 }
-                i += 1
-                j += 1
-            } else if i < oldLines.count {
-                // Remaining removed lines
+                oldIndex += 1
+                newIndex += 1
+            } else if isRemoved {
+                // Removed line
                 results.append(DiffLine(
                     id: lineId,
                     type: .removed,
-                    segments: [Segment(id: 0, text: oldLines[i], isHighlighted: false)]
+                    segments: [Segment(id: 0, text: oldLines[oldIndex], isHighlighted: false)]
                 ))
                 lineId += 1
-                i += 1
-            } else {
-                // Remaining added lines
+                oldIndex += 1
+            } else if isInserted {
+                // Added line
                 results.append(DiffLine(
                     id: lineId,
                     type: .added,
-                    segments: [Segment(id: 0, text: newLines[j], isHighlighted: false)]
+                    segments: [Segment(id: 0, text: newLines[newIndex], isHighlighted: false)]
                 ))
                 lineId += 1
-                j += 1
+                newIndex += 1
+            } else {
+                // Unchanged line
+                if oldIndex < oldLines.count && newIndex < newLines.count {
+                    results.append(DiffLine(
+                        id: lineId,
+                        type: .unchanged,
+                        segments: [Segment(id: 0, text: oldLines[oldIndex], isHighlighted: false)]
+                    ))
+                    lineId += 1
+                    oldIndex += 1
+                    newIndex += 1
+                }
             }
         }
         
