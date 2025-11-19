@@ -274,16 +274,38 @@ extension GitRepository: GitRepositoryProtocol {
         // If HEAD points to a ref, resolve it
         if headContent.starts(with: "ref: ") {
             let refPath = String(headContent.dropFirst(5))
-            let refFile = gitURL.appendingPathComponent(refPath)
-            
-            let commitHash = try String(contentsOf: refFile, encoding: .utf8)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            await cache.set(.head, value: commitHash)
-            return commitHash
+            let refFile = gitURL.appendingPathComponent(refPath)
+
+            // Guard existence and readability of the ref file
+            if fileManager.fileExists(atPath: refFile.path) {
+                do {
+                    let commitHash = try String(contentsOf: refFile, encoding: .utf8)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !commitHash.isEmpty {
+                        await cache.set(.head, value: commitHash)
+                        return commitHash
+                    }
+                } catch {
+                    // Fall through to attempt using the raw HEAD content below
+                }
+            }
+
+            // If we couldn't resolve the ref (missing or unreadable), attempt to treat HEAD as detached content
+            let detached = headContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !detached.isEmpty, !detached.hasPrefix("ref:") {
+                await cache.set(.head, value: detached)
+                return detached
+            }
+
+            // As a last resort, return nil to indicate unresolved HEAD instead of throwing
+            return nil
         } else {
             // Detached HEAD - return the commit hash directly
-            await cache.set(.head, value: headContent)
-            return headContent
+            let detached = headContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !detached.isEmpty else { return nil }
+            await cache.set(.head, value: detached)
+            return detached
         }
     }
     
