@@ -263,50 +263,40 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getHEAD() async throws -> String? {
-        if let cached: String = await cache.get(.head) {
-            return cached
-        }
-        
+        if let cached: String = await cache.get(.head) { return cached }
+
         let headFile = gitURL.appendingPathComponent("HEAD")
-        let headContent = try String(contentsOf: headFile, encoding: .utf8)
+        let raw = try String(contentsOf: headFile, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // If HEAD points to a ref, resolve it
-        if headContent.starts(with: "ref: ") {
-            let refPath = String(headContent.dropFirst(5))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Case 1: symbolic ref
+        if raw.hasPrefix("ref: ") {
+            let refPath = String(raw.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
             let refFile = gitURL.appendingPathComponent(refPath)
 
-            // Guard existence and readability of the ref file
-            if fileManager.fileExists(atPath: refFile.path) {
-                do {
-                    let commitHash = try String(contentsOf: refFile, encoding: .utf8)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !commitHash.isEmpty {
-                        await cache.set(.head, value: commitHash)
-                        return commitHash
-                    }
-                } catch {
-                    // Fall through to attempt using the raw HEAD content below
-                }
+            if fileManager.fileExists(atPath: refFile.path),
+               let refHash = try? String(contentsOf: refFile, encoding: .utf8)
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+               !refHash.isEmpty,
+               try await objectExists(refHash)
+            {
+                await cache.set(.head, value: refHash)
+                return refHash
             }
 
-            // If we couldn't resolve the ref (missing or unreadable), attempt to treat HEAD as detached content
-            let detached = headContent.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !detached.isEmpty, !detached.hasPrefix("ref:") {
-                await cache.set(.head, value: detached)
-                return detached
+            // Symbolic ref exists but is stale or unreadable → treat HEAD as detached SHA
+            if raw.isValidSHA {
+                await cache.set(.head, value: raw)
+                return raw
             }
 
-            // As a last resort, return nil to indicate unresolved HEAD instead of throwing
             return nil
-        } else {
-            // Detached HEAD - return the commit hash directly
-            let detached = headContent.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !detached.isEmpty else { return nil }
-            await cache.set(.head, value: detached)
-            return detached
         }
+
+        // Case 2: HEAD already contains a raw SHA
+        guard raw.isValidSHA else { return nil }
+        await cache.set(.head, value: raw)
+        return raw
     }
     
     public func getHEADBranch() async throws -> String? {
