@@ -56,6 +56,7 @@ public actor GitRepository {
     private let packReader: PackFileReaderProtocol
     private let diffCalculator: DiffCalculatorProtocol
     private let diffGenerator: DiffGeneratorProtocol
+    private let refReader: RefReaderProtocol
 
     // Parsers
     private let commitParser: any CommitParserProtocol
@@ -78,6 +79,7 @@ public actor GitRepository {
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
+        refReader: RefReaderProtocol,
         fileManager: FileManager = .default
     ) {
         self.url = url
@@ -90,6 +92,7 @@ public actor GitRepository {
         self.commitParser = commitParser
         self.treeParser = treeParser
         self.blobParser = blobParser
+        self.refReader = refReader
         self.fileManager = fileManager
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
     }
@@ -242,87 +245,16 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     // MARK: - References
-    
     public func getRefs() async throws -> [GitRef] {
-        // Check cache
-        if let cached: [GitRef] = await cache.get(.refs) { return cached }
-        
-        var refs: [GitRef] = []
-        
-        // Read loose refs
-        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/heads", type: .localBranch))
-        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/remotes", type: .remoteBranch))
-        refs.append(contentsOf: try readRefs(from: gitURL, relativePath: "refs/tags", type: .tag))
-        
-        // Read packed refs
-        refs.append(contentsOf: try readPackedRefs(gitURL: gitURL))
-        
-        // Cache refs
-        await cache.set(.refs, value: refs)
-        return refs
+        try await refReader.getRefs()
     }
     
     public func getHEAD() async throws -> String? {
-        if let cached: String = await cache.get(.head) { return cached }
-
-        let headURL = gitURL.appendingPathComponent("HEAD")
-        let raw = try String(contentsOf: headURL, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if raw.hasPrefix("ref: ") {
-            let refPath = String(raw.dropFirst(5))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            let refURL = gitURL.appendingPathComponent(refPath)
-
-            var candidate: String?
-
-            // Try reading the ref file *if it exists*
-            if fileManager.fileExists(atPath: refURL.path) {
-                let value = try String(contentsOf: refURL, encoding: .utf8)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if value.isValidSHA {
-                    candidate = value
-                }
-            }
-
-            // If ref file missing or unreadable, fall back to HEAD literal
-            if candidate == nil {
-                let fallback = raw.replacingOccurrences(of: "ref:", with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if fallback.isValidSHA {
-                    candidate = fallback
-                }
-            }
-
-            guard let sha = candidate,
-                  try await objectExists(sha) else { return nil }
-
-            await cache.set(.head, value: sha)
-            return sha
-        }
-
-        // Detached HEAD
-        guard raw.isValidSHA, try await objectExists(raw) else {
-            return nil
-        }
-
-        await cache.set(.head, value: raw)
-        return raw
+        try await refReader.getHEAD()
     }
-    
+        
     public func getHEADBranch() async throws -> String? {
-        let headFile = gitURL.appendingPathComponent("HEAD")
-        let headContent = try String(contentsOf: headFile, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if headContent.starts(with: "ref: refs/heads/") {
-            return String(headContent.dropFirst("ref: refs/heads/".count))
-        }
-        
-        return nil // Detached HEAD
+        try await refReader.getHEADBranch()
     }
     
     public func getBranches() async throws -> Branches {
@@ -469,102 +401,5 @@ private extension GitRepository {
                 )
             }
         }
-    }
-    
-    /// Read refs from a directory
-    func readRefs(from gitURL: URL, relativePath: String, type: RefType) throws -> [GitRef] {
-        let baseURL = gitURL.appendingPathComponent(relativePath)
-        
-        guard fileManager.fileExists(atPath: baseURL.path) else { return [] }
-        
-        var refs: [GitRef] = []
-        
-        guard let enumerator = fileManager.enumerator(
-            at: baseURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-        
-        for case let fileURL as URL in enumerator {
-            let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
-            guard resourceValues.isRegularFile == true else { continue }
-            
-            let name = fileURL.path.replacingOccurrences(of: baseURL.path + "/", with: "")
-            let hash = try String(contentsOf: fileURL, encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            refs.append(GitRef(name: name, hash: hash, type: type))
-        }
-        
-        return refs
-    }
-    
-    /// Read packed-refs file
-    func readPackedRefs(gitURL: URL) throws -> [GitRef] {
-        let packedURL = gitURL.appendingPathComponent("packed-refs")
-        
-        guard fileManager.fileExists(atPath: packedURL.path) else { return [] }
-        
-        let content = try String(contentsOf: packedURL, encoding: .utf8)
-        var refs: [GitRef] = []
-        var peeledMap: [String: String] = [:]
-        
-        let lines = content.split(whereSeparator: \.isNewline)
-        
-        for line in lines {
-            let s = line.trimmingCharacters(in: .whitespaces)
-            
-            if s.isEmpty || s.hasPrefix("#") { continue }
-            
-            // Peeled tag line
-            if s.first == "^" {
-                let peeledID = String(s.dropFirst())
-                if let last = refs.last {
-                    peeledMap[last.hash] = peeledID
-                }
-                continue
-            }
-            
-            let parts = s.split(separator: " ")
-            guard parts.count == 2 else { continue }
-            
-            let sha = String(parts[0])
-            let name = String(parts[1])
-            
-            if name.hasPrefix("refs/heads/") {
-                refs.append(GitRef(
-                    name: String(name.dropFirst("refs/heads/".count)),
-                    hash: sha,
-                    type: .localBranch
-                ))
-            } else if name.hasPrefix("refs/remotes/") {
-                refs.append(GitRef(
-                    name: String(name.dropFirst("refs/remotes/".count)),
-                    hash: sha,
-                    type: .remoteBranch
-                ))
-            } else if name.hasPrefix("refs/tags/") {
-                refs.append(GitRef(
-                    name: String(name.dropFirst("refs/tags/".count)),
-                    hash: sha,
-                    type: .tag
-                ))
-            }
-        }
-        
-        // Replace annotated tag SHAs with peeled commit SHAs
-        for i in refs.indices where refs[i].type == .tag {
-            if let peeled = peeledMap[refs[i].hash] {
-                refs[i] = GitRef(
-                    name: refs[i].name,
-                    hash: peeled,
-                    type: .tag
-                )
-            }
-        }
-        
-        return refs
     }
 }

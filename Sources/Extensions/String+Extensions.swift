@@ -6,7 +6,9 @@ extension String {
     }
 
     public var isValidSHA: Bool {
-        let hex = CharacterSet(charactersIn: "0123456789abcdef")
-        return count == 40 && CharacterSet(charactersIn: self).isSubset(of: hex)
+        // SHA-1 is 40 hex characters, SHA-256 is 64
+        let validLengths = [40, 64]
+        guard validLengths.contains(count) else { return false }
+        return allSatisfy { $0.isHexDigit }
     }
 }

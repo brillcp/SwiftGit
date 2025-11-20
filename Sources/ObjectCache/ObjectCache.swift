@@ -7,8 +7,6 @@ public enum CacheKey: Hashable {
     case tree(hash: String)
     case blob(hash: String)
     case treePaths(hash: String)
-    case refs
-    case head
     case objectLocation(hash: String)
 }
 
