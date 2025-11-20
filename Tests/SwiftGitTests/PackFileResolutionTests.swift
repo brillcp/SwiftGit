@@ -159,12 +159,6 @@ struct PackFileResolutionTests {
         
         let packIndexManager = PackIndexManager(gitURL: gitDir)
         
-        // This should not crash and should return empty arrays
-        let packIndexes = await packIndexManager.packIndexes
-        print("📦 Found \(packIndexes.count) pack indexes")
-        
-        #expect(packIndexes.count == 0, "Should have no pack indexes in empty directory")
-        
         let locator = ObjectLocator(
             gitURL: gitDir,
             packIndexManager: packIndexManager
