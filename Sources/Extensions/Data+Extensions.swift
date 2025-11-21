@@ -3,8 +3,13 @@ import Compression
 import CryptoKit
 
 extension Data {
+    func toHexString() -> String {
+        map { String(format: "%02x", $0) }.joined()
+    }
+
     func sha1() -> String {
-        Insecure.SHA1.hash(data: self).map { String(format: "%02x", $0) }.joined()
+        let hash = Insecure.SHA1.hash(data: self)
+        return hash.map { String(format: "%02x", $0) }.joined()
     }
 
     var decompressed: Data {
@@ -45,7 +50,7 @@ extension Data {
     func readHex20(at offset: inout Int) -> String {
         let bytes = self[offset..<offset+20]
         offset += 20
-        return bytes.sha1()
+        return bytes.toHexString()
     }
 
     func readUInt32(at offset: inout Int) -> UInt32 {

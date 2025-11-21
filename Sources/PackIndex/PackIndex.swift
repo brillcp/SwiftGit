@@ -51,7 +51,8 @@ extension PackIndex: PackIndexProtocol {
         var hashes: [String] = []
         for _ in 0..<objectCount {
             let hashData = idxData[offset..<offset+20]
-            hashes.append(hashData.sha1())
+            let hashString = hashData.toHexString()
+            hashes.append(hashString)
             offset += 20
         }
         
@@ -75,8 +76,12 @@ extension PackIndex: PackIndexProtocol {
         
         // Handle large offsets
         if !largeOffsetIndices.isEmpty {
+            let largeOffsetTableStart = offset
+            
             for (index, largeOffsetIndex) in largeOffsetIndices {
-                let largeOffset = idxData.readUInt64(at: &offset, index: largeOffsetIndex)
+                let largeOffsetPosition = largeOffsetTableStart + (largeOffsetIndex * 8)
+                var tempOffset = largeOffsetPosition
+                let largeOffset = idxData.readUInt64(at: &tempOffset, index: largeOffsetIndex)
                 offsets[index] = Int(largeOffset)
             }
         }
@@ -92,7 +97,7 @@ extension PackIndex: PackIndexProtocol {
     }
     
     public func findObject(_ hash: String) -> PackObjectLocation? {
-        entries[hash]
+        entries[hash.lowercased()]
     }
     
     public func getAllHashes() -> Set<String> {

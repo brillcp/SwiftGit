@@ -28,7 +28,7 @@ extension TreeParser: TreeParserProtocol {
             while index < end, data[index] != 0x00 { index = data.index(after: index) }
             guard index < end else { throw ParseError.malformedTree }
             let nameData = data[nameStart..<index]
-            index = data.index(after: index) // skip NUL
+            index = data.index(after: index)
 
             // Read 20-byte object id
             guard data.distance(from: index, to: end) >= 20 else { throw ParseError.malformedTree }
@@ -38,7 +38,7 @@ extension TreeParser: TreeParserProtocol {
             // Convert to displayable fields
             let mode = String(decoding: modeData, as: UTF8.self)
             let name = String(decoding: nameData, as: UTF8.self)
-            let entryHash = hashData.sha1()
+            let entryHash = hashData.toHexString()
             entries.append(
                 Tree.Entry(
                     mode: mode,
