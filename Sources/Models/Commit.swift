@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 public struct Commit: Identifiable, Sendable {
     public let id: String
