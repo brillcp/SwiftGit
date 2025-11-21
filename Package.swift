@@ -6,6 +6,7 @@ import PackageDescription
 let package = Package(
     name: "SwiftGit",
     platforms: [
+        .iOS(.v26),
         .macOS(.v26)
     ],
     products: [

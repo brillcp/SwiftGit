@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  SwiftGit
-//
-//  Created by Viktor Gidlöf on 2025-11-19.
-//
-
 import Foundation
 
 public enum FileMode: UInt32, Sendable {
