@@ -20,6 +20,11 @@ public protocol PackFileReaderProtocol: Actor {
     /// Read object at a specific offset in pack file
     func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject
 
+    func parseObject(
+        at location: PackObjectLocation,
+        packIndex: PackIndexProtocol
+    ) throws -> ParsedObject
+
     /// Unmap pack file if mapped (to reduce memory pressure)
     func unmap()
 }
@@ -27,7 +32,10 @@ public protocol PackFileReaderProtocol: Actor {
 // MARK: -
 public actor PackFileReader: @unchecked Sendable {
     private let deltaResolver: DeltaResolverProtocol
-    
+    private let commitParser: any CommitParserProtocol
+    private let treeParser: any TreeParserProtocol
+    private let blobParser: any BlobParserProtocol
+
     // Pack file cache (URL -> Data)
     private var packCache: [URL: Data] = [:]
     
@@ -35,13 +43,47 @@ public actor PackFileReader: @unchecked Sendable {
         !packCache.isEmpty
     }
     
-    public init(deltaResolver: DeltaResolverProtocol = DeltaResolver()) {
+    public init(
+        deltaResolver: DeltaResolverProtocol = DeltaResolver(),
+        commitParser: any CommitParserProtocol = CommitParser(),
+        treeParser: any TreeParserProtocol = TreeParser(),
+        blobParser: any BlobParserProtocol = BlobParser()
+    ) {
         self.deltaResolver = deltaResolver
+        self.commitParser = commitParser
+        self.treeParser = treeParser
+        self.blobParser = blobParser
     }
 }
 
 // MARK: - PackFileReaderProtocol
 extension PackFileReader: PackFileReaderProtocol {
+    public func parseObject(
+        at location: PackObjectLocation,
+        packIndex: PackIndexProtocol
+    ) throws -> ParsedObject {
+        // Read the pack object (handles deltas)
+        let packObject = try readObject(at: location, packIndex: packIndex)
+        
+        // Route to appropriate parser based on type
+        switch packObject.type {
+        case .commit:
+            let commit = try commitParser.parse(hash: packObject.hash, data: packObject.data)
+            return .commit(commit)
+            
+        case .tree:
+            let tree = try treeParser.parse(hash: packObject.hash, data: packObject.data)
+            return .tree(tree)
+            
+        case .blob:
+            let blob = try blobParser.parse(hash: packObject.hash, data: packObject.data)
+            return .blob(blob)
+            
+        case .tag:
+            throw PackError.unsupportedObjectType("tag")
+        }
+    }
+
     public func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
         let packData = try getPackData(for: location.packURL)
         

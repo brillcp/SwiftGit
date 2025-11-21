@@ -64,11 +64,6 @@ public actor GitRepository {
     private let diffGenerator: DiffGeneratorProtocol
     private let refReader: RefReaderProtocol
     private let workingTree: WorkingTreeReaderProtocol
-
-    // Parsers
-    private let commitParser: any CommitParserProtocol
-    private let treeParser: any TreeParserProtocol
-    private let blobParser: any BlobParserProtocol
     
     private var securityScopeStarted: Bool = false
     private let fileManager: FileManager
@@ -83,9 +78,6 @@ public actor GitRepository {
         packReader: PackFileReaderProtocol = PackFileReader(),
         diffCalculator: DiffCalculatorProtocol = DiffCalculator(),
         diffGenerator: DiffGeneratorProtocol = DiffGenerator(),
-        commitParser: any CommitParserProtocol = CommitParser(),
-        treeParser: any TreeParserProtocol = TreeParser(),
-        blobParser: any BlobParserProtocol = BlobParser(),
         refReader: RefReaderProtocol,
         workingTree: WorkingTreeReaderProtocol,
         fileManager: FileManager = .default
@@ -97,9 +89,6 @@ public actor GitRepository {
         self.packReader = packReader
         self.diffCalculator = diffCalculator
         self.diffGenerator = diffGenerator
-        self.commitParser = commitParser
-        self.treeParser = treeParser
-        self.blobParser = blobParser
         self.refReader = refReader
         self.workingTree = workingTree
         self.fileManager = fileManager
@@ -389,27 +378,11 @@ private extension GitRepository {
         case .loose(let fileURL):
             let data = try Data(contentsOf: fileURL)
             return try looseParser.parse(hash: hash, data: data)
-            
         case .packed(let packLocation):
             guard let packIndex = try await locator.getPackIndex(for: packLocation.packURL) else {
                 throw RepositoryError.packIndexNotFound
             }
-            
-            let packObject = try await packReader.readObject(at: packLocation, packIndex: packIndex)
-            
-            switch packObject.type {
-            case .commit:
-                let commit = try commitParser.parse(hash: hash, data: packObject.data)
-                return .commit(commit)
-            case .tree:
-                let tree = try treeParser.parse(hash: hash, data: packObject.data)
-                return .tree(tree)
-            case .blob:
-                let blob = try blobParser.parse(hash: hash, data: packObject.data)
-                return .blob(blob)
-            case .tag:
-                return nil
-            }
+            return try await packReader.parseObject(at: packLocation, packIndex: packIndex)
         }
     }
     
