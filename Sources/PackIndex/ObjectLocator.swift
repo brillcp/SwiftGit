@@ -95,7 +95,7 @@ private extension ObjectLocator {
     
     func findLooseObject(_ hash: String) async throws -> URL? {
         try await ensureLooseIndexBuilt()
-        return looseObjectIndex?[hash]
+        return looseObjectIndex?[hash.lowercased()]
     }
     
     func ensureLooseIndexBuilt() async throws {

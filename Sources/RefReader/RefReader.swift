@@ -256,17 +256,28 @@ private extension RefReader {
             // Peeled tag line
             if s.first == "^" {
                 let peeledID = String(s.dropFirst())
+                
+                // Validate peeled hash
+                guard peeledID.count == 40, peeledID.allSatisfy({ $0.isHexDigit }) else {
+                    continue
+                }
+                
                 if let last = refs.last {
                     peeledMap[last.hash] = peeledID
                 }
                 continue
             }
             
-            let parts = s.split(separator: " ")
+            let parts = s.split(separator: " ", maxSplits: 1)
             guard parts.count == 2 else { continue }
             
             let sha = String(parts[0])
             let name = String(parts[1])
+            
+            // Validate SHA-1 hash (40 hex characters)
+            guard sha.count == 40, sha.allSatisfy({ $0.isHexDigit }) else {
+                continue // Skip invalid hash
+            }
             
             if name.hasPrefix("refs/heads/") {
                 refs.append(

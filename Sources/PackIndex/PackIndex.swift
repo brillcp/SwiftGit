@@ -8,6 +8,8 @@ public struct PackObjectLocation: Sendable {
 
 // MARK: -
 public protocol PackIndexProtocol: Sendable {
+    var entries: [String: PackObjectLocation] { get }
+
     /// Load and parse a pack index file
     func load(idxURL: URL, packURL: URL) throws
     
@@ -23,7 +25,7 @@ public protocol PackIndexProtocol: Sendable {
 
 // MARK: -
 public final class PackIndex: @unchecked Sendable {
-    private var entries: [String: PackObjectLocation] = [:]
+    public var entries: [String: PackObjectLocation] = [:]
 }
 
 // MARK: - PackIndexProtocol

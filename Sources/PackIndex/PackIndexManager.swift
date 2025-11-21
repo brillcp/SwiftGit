@@ -1,6 +1,8 @@
 import Foundation
 
 public protocol PackIndexManagerProtocol: Actor {
+    var packIndexes: [PackIndexProtocol] { get }
+
     /// Find object in any loaded pack file
     func findObject(_ hash: String) async throws -> PackObjectLocation?
     
@@ -17,10 +19,11 @@ public actor PackIndexManager {
     private let gitURL: URL
     
     // Lazy-loaded pack indexes
-    private var packIndexes: [PackIndexProtocol] = []
     private var packIndexByURL: [URL: PackIndexProtocol] = [:]
     private var indexesLoaded = false
     
+    public var packIndexes: [PackIndexProtocol] = []
+
     public init(gitURL: URL) {
         self.gitURL = gitURL
     }
