@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol GitIndexReaderProtocol {
+public protocol GitIndexReaderProtocol: Actor {
     /// Read the Git index file
     func readIndex(at url: URL) async throws -> GitIndexSnapshot
     
@@ -9,7 +9,7 @@ public protocol GitIndexReaderProtocol {
 }
 
 // MARK: -
-public actor GitIndex: GitIndexReaderProtocol {
+public actor GitIndexReader: GitIndexReaderProtocol {
     // Cache
     private var cachedSnapshot: GitIndexSnapshot?
     private var cachedModificationDate: Date?
@@ -88,7 +88,7 @@ public enum GitIndexError: Error, CustomStringConvertible {
 
 
 // MARK: - Private Parsing
-private extension GitIndex {
+private extension GitIndexReader {
     static func parse(_ data: Data) throws -> GitIndexSnapshot {
         var offset = 0
         
