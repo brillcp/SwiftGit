@@ -11,6 +11,7 @@ public protocol GitRepositoryProtocol: Actor {
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
 
     func getFileDiff(commitId: String, filePath: String) async throws -> [DiffHunk]
+    func getDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair?
 
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
@@ -167,6 +168,29 @@ extension GitRepository: GitRepositoryProtocol {
             oldContent: oldContent,
             newContent: newContent,
             contextLines: 3
+        )
+    }
+
+    public func getDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair? {
+        guard let head = try await getHEAD(),
+              let commit = try await getCommit(head)
+        else { return nil }
+        
+        let headTree = try await getTreePaths(commit.tree)
+        let indexURL = gitURL.appendingPathComponent("index")
+        let gitIndex = GitIndexReader()
+        let snapshot = try await gitIndex.readIndex(at: indexURL)
+        let indexMap = Dictionary(uniqueKeysWithValues: snapshot.entries.map { ($0.path, $0.sha1) })
+        
+        let resolver = WorkingTreeDiffResolver(
+            repoURL: url,
+            blobLoader: self
+        )
+        
+        return try await resolver.resolveDiff(
+            for: workingFile,
+            headTree: headTree,
+            indexMap: indexMap
         )
     }
 

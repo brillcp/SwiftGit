@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-public struct DiffPair {
+public struct DiffPair: Sendable {
     public let old: Blob?
     public let new: Blob?
     
@@ -12,14 +12,11 @@ public struct DiffPair {
 }
 
 // MARK: - BlobLoaderProtocol
-
-/// Protocol for loading blobs - implemented by GitRepository
 public protocol BlobLoaderProtocol: Actor {
     func loadBlob(hash: String) async throws -> Blob?
 }
 
 // MARK: - GitRepository conformance
-
 extension GitRepository: BlobLoaderProtocol {
     public func loadBlob(hash: String) async throws -> Blob? {
         try await getBlob(hash)
