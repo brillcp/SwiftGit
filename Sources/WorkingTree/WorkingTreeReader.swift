@@ -2,6 +2,8 @@ import Foundation
 import CommonCrypto
 
 public protocol WorkingTreeReaderProtocol: Actor {
+    func readIndex() async throws -> [IndexEntry]
+
     /// Compute the current working tree status
     func computeStatus(headTree: [String: String]) async throws -> WorkingTreeStatus
     
@@ -36,6 +38,18 @@ public actor WorkingTreeReader {
 
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
+    public func readIndex() async throws -> [IndexEntry] {
+        let indexURL = repoURL.appendingPathComponent(".git/index")
+        
+        guard fileManager.fileExists(atPath: indexURL.path) else {
+            return []
+        }
+        
+        let snapshot = try await indexReader.readIndex(at: indexURL)
+        return snapshot.entries
+    }
+    
+
     public func computeStatus(headTree: [String: String]) async throws -> WorkingTreeStatus {
         // 1. Read index
         let indexEntries = try await readIndex()
@@ -108,17 +122,6 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
 
 // MARK: - Private
 private extension WorkingTreeReader {
-    func readIndex() async throws -> [IndexEntry] {
-        let indexURL = repoURL.appendingPathComponent(".git/index")
-        
-        guard fileManager.fileExists(atPath: indexURL.path) else {
-            return []
-        }
-        
-        let snapshot = try await indexReader.readIndex(at: indexURL)
-        return snapshot.entries
-    }
-    
     func checkWorkingTreeAgainstIndex(indexEntries: [IndexEntry]) async throws -> [String: String] {
         var result: [String: String] = [:]
         result.reserveCapacity(indexEntries.count)

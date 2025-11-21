@@ -10,8 +10,8 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get changed files for a commit
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
 
-    func getFileDiff(commitId: String, filePath: String) async throws -> [DiffHunk]
-    func getDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair?
+    func getFileDiff(for commitId: String, at path: String) async throws -> DiffPair?
+    func getFileDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair?
 
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
@@ -150,37 +150,27 @@ extension GitRepository: GitRepositoryProtocol {
         )
     }
 
-    public func getFileDiff(commitId: String, filePath: String) async throws -> [DiffHunk] {
-        guard let commit = try await getCommit(commitId) else { return [] }
+    public func getFileDiff(for commitId: String, at path: String) async throws -> DiffPair? {
+        guard let commit = try await getCommit(commitId) else { return nil }
         
-        let newBlob = try await getBlob(at: filePath, treeHash: commit.tree)
+        let newBlob = try await getBlob(at: path, treeHash: commit.tree)
 
         var oldBlob: Blob? = nil
-        if let parentId = commit.parents.first,
-           let parentCommit = try await getCommit(parentId) {
-            oldBlob = try await getBlob(at: filePath, treeHash: parentCommit.tree)
+        if let parentId = commit.parents.first, let parentCommit = try await getCommit(parentId) {
+            oldBlob = try await getBlob(at: path, treeHash: parentCommit.tree)
         }
         
-        let oldContent = oldBlob.flatMap { String(data: $0.data, encoding: .utf8) } ?? ""
-        let newContent = newBlob.flatMap { String(data: $0.data, encoding: .utf8) } ?? ""
-        
-        return try await diffGenerator.generateHunks(
-            oldContent: oldContent,
-            newContent: newContent,
-            contextLines: 3
-        )
+        return DiffPair(old: oldBlob, new: newBlob)
     }
 
-    public func getDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair? {
+    public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair? {
         guard let head = try await getHEAD(),
               let commit = try await getCommit(head)
         else { return nil }
         
         let headTree = try await getTreePaths(commit.tree)
-        let indexURL = gitURL.appendingPathComponent("index")
-        let gitIndex = GitIndexReader()
-        let snapshot = try await gitIndex.readIndex(at: indexURL)
-        let indexMap = Dictionary(uniqueKeysWithValues: snapshot.entries.map { ($0.path, $0.sha1) })
+        let snapshot = try await workingTree.readIndex()
+        let indexMap = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.path, $0.sha1) })
         
         let resolver = WorkingTreeDiffResolver(
             repoURL: url,
