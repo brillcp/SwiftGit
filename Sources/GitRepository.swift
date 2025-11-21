@@ -82,7 +82,7 @@ public actor GitRepository {
         looseParser: LooseObjectParserProtocol = LooseObjectParser(),
         packReader: PackFileReaderProtocol = PackFileReader(),
         diffCalculator: DiffCalculatorProtocol = DiffCalculator(),
-        diffGenerator: DiffGeneratorProtocol = HunkGenerator(),
+        diffGenerator: DiffGeneratorProtocol = DiffGenerator(),
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),

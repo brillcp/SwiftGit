@@ -9,7 +9,7 @@ public protocol DiffGeneratorProtocol: Actor {
 }
 
 // MARK: -
-public actor HunkGenerator {
+public actor DiffGenerator {
     private let contextLines: Int
     private let maxFileSize: Int
     private let maxLineLength: Int
@@ -26,7 +26,7 @@ public actor HunkGenerator {
 }
 
 // MARK: - DiffGeneratorProtocol
-extension HunkGenerator: DiffGeneratorProtocol {
+extension DiffGenerator: DiffGeneratorProtocol {
     public func generateHunks(
         oldContent: String,
         newContent: String,
@@ -88,7 +88,7 @@ enum DiffError: Error, CustomStringConvertible {
 }
 
 // MARK: - Private functions
-private extension HunkGenerator {
+private extension DiffGenerator {
     /// Check if content is binary (contains null bytes)
     func isBinary(_ content: String) -> Bool {
         // Check first 8KB for null bytes
