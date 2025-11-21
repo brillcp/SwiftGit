@@ -57,6 +57,7 @@ public actor GitRepository {
     private let diffCalculator: DiffCalculatorProtocol
     private let diffGenerator: DiffGeneratorProtocol
     private let refReader: RefReaderProtocol
+    private let workingTree: WorkingTreeReaderProtocol
 
     // Parsers
     private let commitParser: any CommitParserProtocol
@@ -80,6 +81,7 @@ public actor GitRepository {
         treeParser: any TreeParserProtocol = TreeParser(),
         blobParser: any BlobParserProtocol = BlobParser(),
         refReader: RefReaderProtocol,
+        workingTree: WorkingTreeReaderProtocol,
         fileManager: FileManager = .default
     ) {
         self.url = url
@@ -93,6 +95,7 @@ public actor GitRepository {
         self.treeParser = treeParser
         self.blobParser = blobParser
         self.refReader = refReader
+        self.workingTree = workingTree
         self.fileManager = fileManager
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
     }

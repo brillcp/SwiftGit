@@ -53,13 +53,6 @@ public actor GitIndexReader: GitIndexReaderProtocol {
         let snapshot = try await readIndex(at: url)
         return snapshot[path]
     }
-    
-    /// Invalidate cache (call when index is modified)
-    public func invalidateCache() {
-        cachedSnapshot = nil
-        cachedModificationDate = nil
-        cacheURL = nil
-    }
 }
 
 // MARK: - Error
@@ -85,7 +78,6 @@ public enum GitIndexError: Error, CustomStringConvertible {
         }
     }
 }
-
 
 // MARK: - Private Parsing
 private extension GitIndexReader {
@@ -136,17 +128,17 @@ private extension GitIndexReader {
         guard offset + 62 <= data.count else {
             throw GitIndexError.truncatedEntry(at: entryIndex)
         }
-        
+
         // Read timestamps
+        let ctime = data.readUInt32(at: &offset)
+        let ctimeNSec = data.readUInt32(at: &offset)
         let mtime = data.readUInt32(at: &offset)
         let mtimeNSec = data.readUInt32(at: &offset)
-        
-        // Convert to Date
-        let mtimeSeconds = Double(mtime) + (Double(mtimeNSec) / 1_000_000_000.0)
-        let modificationDate = Date(timeIntervalSince1970: mtimeSeconds)
-        
-        // Read metadata
+        let dev = data.readUInt32(at: &offset)
+        let ino = data.readUInt32(at: &offset)
         let mode = data.readUInt32(at: &offset)
+        let uid = data.readUInt32(at: &offset)
+        let gid = data.readUInt32(at: &offset)
         let size = data.readUInt32(at: &offset)
         
         // Read SHA-1 (20 bytes)
@@ -195,7 +187,14 @@ private extension GitIndexReader {
                 path: path,
                 sha1: sha1,
                 size: size,
-                mtime: modificationDate,
+                mtime: Date(timeIntervalSince1970: Double(mtime) + Double(mtimeNSec) / 1_000_000_000.0),
+                mtimeNSec: mtimeNSec,
+                ctime: Date(timeIntervalSince1970: Double(ctime) + Double(ctimeNSec) / 1_000_000_000.0),
+                ctimeNSec: ctimeNSec,
+                dev: dev,
+                ino: ino,
+                uid: uid,
+                gid: gid,
                 fileMode: .regular
             )
         }
@@ -204,7 +203,14 @@ private extension GitIndexReader {
             path: path,
             sha1: sha1,
             size: size,
-            mtime: modificationDate,
+            mtime: Date(timeIntervalSince1970: Double(mtime) + Double(mtimeNSec) / 1_000_000_000.0),
+            mtimeNSec: mtimeNSec,
+            ctime: Date(timeIntervalSince1970: Double(ctime) + Double(ctimeNSec) / 1_000_000_000.0),
+            ctimeNSec: ctimeNSec,
+            dev: dev,
+            ino: ino,
+            uid: uid,
+            gid: gid,
             fileMode: fileMode
         )
     }
