@@ -21,6 +21,11 @@ public protocol GitRepositoryProtocol: Actor {
     /// Stream a large blob without loading entirely into memory
     func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, Error>
     
+    func getWorkingTreeStatus() async throws -> WorkingTreeStatus?
+    func getStagedChanges() async throws -> [String: WorkingTreeFile]
+    func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
+    func getUntrackedFiles() async throws -> [String]
+
     /// Walk a tree recursively, calling visitor for each entry
     /// Visitor returns true to continue, false to stop
     func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws
@@ -225,6 +230,35 @@ extension GitRepository: GitRepositoryProtocol {
         }
     }
     
+    public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
+        guard let head = try await getHEAD(),
+              let commit = try await getCommit(head)
+        else { return nil }
+        
+        let headTree = try await getTreePaths(commit.tree)
+        return try await workingTree.computeStatus(headTree: headTree)
+    }
+
+    /// Get only staged changes (HEAD → Index)
+    public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
+        guard let head = try await getHEAD(),
+              let commit = try await getCommit(head)
+        else { return [:] }
+        
+        let headTree = try await getTreePaths(commit.tree)
+        return try await workingTree.stagedChanges(headTree: headTree)
+    }
+    
+    /// Get only unstaged changes (Index → Working Tree)
+    public func getUnstagedChanges() async throws -> [String: WorkingTreeFile] {
+        try await workingTree.unstagedChanges()
+    }
+    
+    /// Get only untracked files
+    public func getUntrackedFiles() async throws -> [String] {
+        try await workingTree.untrackedFiles()
+    }
+
     public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
         try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
     }
