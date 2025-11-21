@@ -10,8 +10,8 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get changed files for a commit
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
 
-    func getFileDiff(for commitId: String, at path: String) async throws -> DiffPair?
-    func getFileDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair?
+    func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk]
+    func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk]
 
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
@@ -150,8 +150,8 @@ extension GitRepository: GitRepositoryProtocol {
         )
     }
 
-    public func getFileDiff(for commitId: String, at path: String) async throws -> DiffPair? {
-        guard let commit = try await getCommit(commitId) else { return nil }
+    public func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk] {
+        guard let commit = try await getCommit(commitId) else { return [] }
         
         let newBlob = try await getBlob(at: path, treeHash: commit.tree)
 
@@ -160,13 +160,19 @@ extension GitRepository: GitRepositoryProtocol {
             oldBlob = try await getBlob(at: path, treeHash: parentCommit.tree)
         }
         
-        return DiffPair(old: oldBlob, new: newBlob)
+        let diffPair = DiffPair(old: oldBlob, new: newBlob)
+        
+        return try await diffGenerator.generateHunks(
+            oldContent: diffPair.old?.text ?? "",
+            newContent: diffPair.new?.text ?? "",
+            contextLines: 6
+        )
     }
 
-    public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> DiffPair? {
+    public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard let head = try await getHEAD(),
               let commit = try await getCommit(head)
-        else { return nil }
+        else { return [] }
         
         let headTree = try await getTreePaths(commit.tree)
         let snapshot = try await workingTree.readIndex()
@@ -177,10 +183,15 @@ extension GitRepository: GitRepositoryProtocol {
             blobLoader: self
         )
         
-        return try await resolver.resolveDiff(
+        let diffPair = try await resolver.resolveDiff(
             for: workingFile,
             headTree: headTree,
             indexMap: indexMap
+        )
+        return try await diffGenerator.generateHunks(
+            oldContent: diffPair.old?.text ?? "",
+            newContent: diffPair.new?.text ?? "",
+            contextLines: 6
         )
     }
 
