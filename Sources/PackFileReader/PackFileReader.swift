@@ -17,9 +17,7 @@ public protocol PackFileReaderProtocol: Actor {
     /// Check if pack file is memory-mapped
     var isMapped: Bool { get }
 
-    /// Read object at a specific offset in pack file
-    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject
-
+    /// Parse object at a specific offset in pack file
     func parseObject(
         at location: PackObjectLocation,
         packIndex: PackIndexProtocol
@@ -84,7 +82,25 @@ extension PackFileReader: PackFileReaderProtocol {
         }
     }
 
-    public func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
+    public func unmap() {
+        packCache.removeAll()
+    }
+}
+
+// MARK: - Private Helpers
+private extension PackFileReader {
+    func getPackData(for url: URL) throws -> Data {
+        if let cached = packCache[url] {
+            return cached
+        }
+        
+        // Memory-map the pack file
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        packCache[url] = data
+        return data
+    }
+    
+    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
         let packData = try getPackData(for: location.packURL)
         
         // Build hash->offset map from pack index for REF_DELTA resolution
@@ -113,25 +129,7 @@ extension PackFileReader: PackFileReaderProtocol {
         
         return PackObject(hash: location.hash, type: type, data: data)
     }
-    
-    public func unmap() {
-        packCache.removeAll()
-    }
-}
 
-// MARK: - Private Helpers
-private extension PackFileReader {
-    func getPackData(for url: URL) throws -> Data {
-        if let cached = packCache[url] {
-            return cached
-        }
-        
-        // Memory-map the pack file
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        packCache[url] = data
-        return data
-    }
-    
     func readPackObjectAtOffset(
         packData: Data,
         offset: Int,
