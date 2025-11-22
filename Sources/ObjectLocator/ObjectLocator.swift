@@ -27,9 +27,9 @@ public actor ObjectLocator {
     private let repoURL: URL
     private let packIndexManager: PackIndexManagerProtocol
     
-    // Caches
-    private var looseObjectIndex: [String: URL]?
-    private var indexBuilt = false
+    // Lazy caches
+    private var looseObjectCache: [String: URL] = [:]
+    private var scannedPrefixes: Set<String> = []
     
     public init(
         repoURL: URL,
@@ -63,14 +63,13 @@ extension ObjectLocator: ObjectLocatorProtocol {
     }
     
     public func enumerateLooseHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
-        try await ensureLooseIndexBuilt()
+        // Ensure all prefixes are scanned
+        try await scanAllPrefixesIfNeeded()
         
-        guard let index = looseObjectIndex else { return true }
-        
-        for hash in index.keys {
+        for hash in looseObjectCache.keys {
             let shouldContinue = try await visitor(hash)
             if !shouldContinue {
-                return false // Signal to stop
+                return false
             }
         }
         return true
@@ -81,8 +80,8 @@ extension ObjectLocator: ObjectLocatorProtocol {
     }
 
     public func invalidate() async {
-        looseObjectIndex = nil
-        indexBuilt = false
+        looseObjectCache.removeAll()
+        scannedPrefixes.removeAll()
         await packIndexManager.invalidate()
     }
 }
@@ -93,60 +92,117 @@ private extension ObjectLocator {
         repoURL.appendingPathComponent(GitPath.git.rawValue)
     }
     
+    var objectsURL: URL {
+        gitURL.appendingPathComponent(GitPath.objects.rawValue)
+    }
+
     func findLooseObject(_ hash: String) async throws -> URL? {
-        try await ensureLooseIndexBuilt()
-        return looseObjectIndex?[hash.lowercased()]
-    }
-    
-    func ensureLooseIndexBuilt() async throws {
-        guard !indexBuilt else { return }
+        let hashLower = hash.lowercased()
         
-        let gitURL = self.gitURL
-        
-        let index = try await Task.detached {
-            try Self.scanLooseObjects(gitURL: gitURL, fileManager: .default)
-        }.value
-        
-        looseObjectIndex = index
-        indexBuilt = true
-    }
-    
-    // Make static so it can be called from Task.detached
-    static func scanLooseObjects(gitURL: URL, fileManager: FileManager) throws -> [String: URL] {
-        var index: [String: URL] = [:]
-        let objectsURL = gitURL.appendingPathComponent(GitPath.objects.rawValue)
-        
-        guard fileManager.fileExists(atPath: objectsURL.path) else {
-            return [:]
+        // Check cache first
+        if let cached = looseObjectCache[hashLower] {
+            return cached
         }
         
-        let prefixDirs = try fileManager.contentsOfDirectory(
+        // Try direct path (fastest - single file check)
+        let prefix = String(hashLower.prefix(2))
+        let suffix = String(hashLower.dropFirst(2))
+        let directURL = objectsURL.appendingPathComponent("\(prefix)/\(suffix)")
+        
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: directURL.path) {
+            looseObjectCache[hashLower] = directURL
+            return directURL
+        }
+        
+        // Not found via direct path - scan prefix directory if we haven't
+        if !scannedPrefixes.contains(prefix) {
+            try await scanPrefix(prefix)
+        }
+        
+        // Check cache again after scan
+        return looseObjectCache[hashLower]
+    }
+    
+    /// Scan a single prefix directory (e.g., "ab")
+    func scanPrefix(_ prefix: String) async throws {
+        let prefixURL = objectsURL.appendingPathComponent(prefix)
+        
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: prefixURL.path) else {
+            scannedPrefixes.insert(prefix)
+            return
+        }
+        
+        // Scan off main thread
+        let objects = try await Task.detached {
+            try Self.scanPrefixDirectory(prefixURL: prefixURL, prefix: prefix, fileManager: fileManager)
+        }.value
+        
+        // Cache results
+        for (hash, url) in objects {
+            looseObjectCache[hash] = url
+        }
+        
+        scannedPrefixes.insert(prefix)
+    }
+
+    /// Scan all prefixes (for enumeration)
+    func scanAllPrefixesIfNeeded() async throws {
+        // If we've scanned all 256 prefixes, we're done
+        if scannedPrefixes.count == 256 {
+            return
+        }
+        
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: objectsURL.path) else {
+            return
+        }
+        
+        // Get all prefix directories
+        let contents = try fileManager.contentsOfDirectory(
             at: objectsURL,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         )
         
-        for prefixDir in prefixDirs {
-            let prefix = prefixDir.lastPathComponent
+        for item in contents {
+            let prefix = item.lastPathComponent
             
-            guard prefix.count == 2,
-                  prefix.allSatisfy({ $0.isHexDigit }) else {
+            // Only 2-char hex prefixes
+            guard prefix.count == 2, prefix.allSatisfy({ $0.isHexDigit }) else {
                 continue
             }
             
-            let objectFiles = try fileManager.contentsOfDirectory(
-                at: prefixDir,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            for objectFile in objectFiles {
-                let suffix = objectFile.lastPathComponent
-                let hash = prefix + suffix
-                index[hash] = objectFile
+            // Skip if already scanned
+            if scannedPrefixes.contains(prefix) {
+                continue
             }
+            
+            try await scanPrefix(prefix)
+        }
+    }
+    
+    /// Scan a prefix directory - static for Task.detached
+    static func scanPrefixDirectory(
+        prefixURL: URL,
+        prefix: String,
+        fileManager: FileManager
+    ) throws -> [String: URL] {
+        var objects: [String: URL] = [:]
+        
+        let files = try fileManager.contentsOfDirectory(
+            at: prefixURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        
+        for file in files {
+            let suffix = file.lastPathComponent
+            let hash = (prefix + suffix).lowercased()
+            objects[hash] = file
         }
         
-        return index
+        return objects
     }
 }

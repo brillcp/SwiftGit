@@ -110,15 +110,7 @@ private extension PackFileReader {
     }
 
     func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
-        let handle = try getPackHandle(for: location.packURL)  // Changed!
-        
-        // Build hash->offset map from pack index for REF_DELTA resolution
-        var hashToOffset: [String: Int] = [:]
-        for hash in packIndex.getAllHashes() {
-            if let loc = packIndex.findObject(hash) {
-                hashToOffset[hash] = loc.offset
-            }
-        }
+        let handle = try getPackHandle(for: location.packURL)
         
         // Read and resolve the object (handles deltas recursively)
         var cache: [Int: (type: String, data: Data)] = [:]
@@ -126,7 +118,7 @@ private extension PackFileReader {
         guard let (typeStr, data) = try readPackObjectAtOffset(
             handle: handle,
             offset: location.offset,
-            hashToOffset: hashToOffset,
+            packIndex: packIndex,
             cache: &cache
         ) else {
             throw PackError.objectNotFound
@@ -140,9 +132,9 @@ private extension PackFileReader {
     }
 
     func readPackObjectAtOffset(
-        handle: FileHandle,  // Changed from packData: Data!
+        handle: FileHandle,
         offset: Int,
-        hashToOffset: [String: Int],
+        packIndex: PackIndexProtocol,
         cache: inout [Int: (type: String, data: Data)]
     ) throws -> (String, Data)? {
         if let cached = cache[offset] { return cached }
@@ -214,7 +206,7 @@ private extension PackFileReader {
             guard let base = try readPackObjectAtOffset(
                 handle: handle,
                 offset: baseObjectOffset,
-                hashToOffset: hashToOffset,
+                packIndex: packIndex,
                 cache: &cache
             ) else { return nil }
             
@@ -223,12 +215,11 @@ private extension PackFileReader {
             return (base.0, result)
             
         case 7: // REF_DELTA
-            // Read base hash (20 bytes)
             let baseHashData = try readBytes(from: handle, offset: dataOffset, count: 20)
             let baseHash = baseHashData.toHexString()
             
-            // Look up base object offset
-            guard let baseOffset = hashToOffset[baseHash] else {
+            // ✅ Lazy lookup - only loads this hash's range
+            guard let baseLoc = packIndex.findObject(baseHash) else {
                 throw PackError.baseObjectNotFound(baseHash)
             }
             
@@ -241,8 +232,8 @@ private extension PackFileReader {
             // Recursively resolve base
             guard let base = try readPackObjectAtOffset(
                 handle: handle,
-                offset: baseOffset,
-                hashToOffset: hashToOffset,
+                offset: baseLoc.offset,
+                packIndex: packIndex,
                 cache: &cache
             ) else { return nil }
             
