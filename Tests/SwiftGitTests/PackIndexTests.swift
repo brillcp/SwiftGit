@@ -4,7 +4,7 @@ import Foundation
 
 @Suite("PackIndex Tests")
 struct PackIndexTests {
-    @Test func testLoadPackIndexV2() async throws {
+    @Test func testLoadPackIndex() async throws {
         // This test requires a real pack file
         // Skip if not available
         let packIndexPath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.idx"

@@ -34,11 +34,10 @@ public actor PackFileReader: @unchecked Sendable {
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
 
-    // Pack file cache (URL -> Data)
-    private var packCache: [URL: Data] = [:]
+    private var packHandles: [URL: FileHandle] = [:]
     
     public var isMapped: Bool {
-        !packCache.isEmpty
+        !packHandles.isEmpty
     }
     
     public init(
@@ -83,25 +82,35 @@ extension PackFileReader: PackFileReaderProtocol {
     }
 
     public func unmap() {
-        packCache.removeAll()
+        // Close all file handles
+        for handle in packHandles.values {
+            try? handle.close()
+        }
+        packHandles.removeAll()
     }
 }
 
 // MARK: - Private Helpers
 private extension PackFileReader {
-    func getPackData(for url: URL) throws -> Data {
-        if let cached = packCache[url] {
-            return cached
+    func getPackHandle(for url: URL) throws -> FileHandle {
+        if let handle = packHandles[url] {
+            return handle
         }
-        
-        // Memory-map the pack file
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        packCache[url] = data
+        let handle = try FileHandle(forReadingFrom: url)
+        packHandles[url] = handle
+        return handle
+    }
+
+    func readBytes(from handle: FileHandle, offset: Int, count: Int) throws -> Data {
+        try handle.seek(toOffset: UInt64(offset))
+        guard let data = try handle.read(upToCount: count) else {
+            throw PackError.corruptedData
+        }
         return data
     }
-    
+
     func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
-        let packData = try getPackData(for: location.packURL)
+        let handle = try getPackHandle(for: location.packURL)  // Changed!
         
         // Build hash->offset map from pack index for REF_DELTA resolution
         var hashToOffset: [String: Int] = [:]
@@ -115,7 +124,7 @@ private extension PackFileReader {
         var cache: [Int: (type: String, data: Data)] = [:]
         
         guard let (typeStr, data) = try readPackObjectAtOffset(
-            packData: packData,
+            handle: handle,
             offset: location.offset,
             hashToOffset: hashToOffset,
             cache: &cache
@@ -131,18 +140,18 @@ private extension PackFileReader {
     }
 
     func readPackObjectAtOffset(
-        packData: Data,
+        handle: FileHandle,  // Changed from packData: Data!
         offset: Int,
         hashToOffset: [String: Int],
         cache: inout [Int: (type: String, data: Data)]
     ) throws -> (String, Data)? {
         if let cached = cache[offset] { return cached }
         
-        var pos = offset
-        guard pos < packData.count else { return nil }
+        // Read header bytes (up to 10 bytes for variable-length encoding)
+        let headerData = try readBytes(from: handle, offset: offset, count: 10)
         
-        // Read object header (variable length)
-        var byte = packData[pos]
+        var pos = 0
+        var byte = headerData[pos]
         pos += 1
         
         let type = Int((byte >> 4) & 0x07)
@@ -151,18 +160,21 @@ private extension PackFileReader {
         
         // Read variable-length size
         while byte & 0x80 != 0 {
-            guard pos < packData.count else { return nil }
-            byte = packData[pos]
+            guard pos < headerData.count else { throw PackError.corruptedData }
+            byte = headerData[pos]
             pos += 1
             size |= Int(byte & 0x7f) << shift
             shift += 7
         }
         
+        let dataOffset = offset + pos
+        
         switch type {
         case 1, 2, 3, 4:
             // Non-delta types: decompress and return
-            guard pos < packData.count else { return nil }
-            let compressedData = packData.subdata(in: pos..<packData.count)
+            // Estimate compressed size (usually 50-70% of uncompressed)
+            let estimatedCompressed = Int(Double(size) * 1.5) + 1024
+            let compressedData = try readBytes(from: handle, offset: dataOffset, count: estimatedCompressed)
             let decompressed = compressedData.decompressed
             let actualData = decompressed.prefix(size)
             
@@ -176,23 +188,31 @@ private extension PackFileReader {
             }
             cache[offset] = (typeStr, Data(actualData))
             return (typeStr, Data(actualData))
+            
         case 6: // OFS_DELTA
-            var basePos = pos
-            var c = Int(packData[basePos])
+            // Read offset encoding
+            let offsetData = try readBytes(from: handle, offset: dataOffset, count: 10)
+            var basePos = 0
+            var c = Int(offsetData[basePos])
             basePos += 1
             var baseOffset = c & 0x7f
             while c & 0x80 != 0 {
                 baseOffset += 1
-                c = Int(packData[basePos])
+                c = Int(offsetData[basePos])
                 basePos += 1
                 baseOffset = (baseOffset << 7) + (c & 0x7f)
             }
             let baseObjectOffset = offset - baseOffset
-            let compressedData = packData.subdata(in: basePos..<packData.count)
-            let deltaData = compressedData.decompressed
             
+            // Read delta data
+            let deltaOffset = dataOffset + basePos
+            let estimatedDeltaSize = Int(Double(size) * 1.5) + 1024
+            let compressedDelta = try readBytes(from: handle, offset: deltaOffset, count: estimatedDeltaSize)
+            let deltaData = compressedDelta.decompressed
+            
+            // Recursively resolve base
             guard let base = try readPackObjectAtOffset(
-                packData: packData,
+                handle: handle,
                 offset: baseObjectOffset,
                 hashToOffset: hashToOffset,
                 cache: &cache
@@ -201,22 +221,26 @@ private extension PackFileReader {
             let result = try deltaResolver.apply(delta: deltaData, to: base.1)
             cache[offset] = (base.0, result)
             return (base.0, result)
+            
         case 7: // REF_DELTA
-            guard pos + 20 <= packData.count else { return nil }
-            let baseHashData = packData[pos..<(pos+20)]
-            pos += 20
+            // Read base hash (20 bytes)
+            let baseHashData = try readBytes(from: handle, offset: dataOffset, count: 20)
             let baseHash = baseHashData.sha1()
             
-            // Look up base object offset in the pack index
+            // Look up base object offset
             guard let baseOffset = hashToOffset[baseHash] else {
                 throw PackError.baseObjectNotFound(baseHash)
             }
             
-            let compressedData = packData.subdata(in: pos..<packData.count)
-            let deltaData = compressedData.decompressed
+            // Read delta data
+            let deltaOffset = dataOffset + 20
+            let estimatedDeltaSize = Int(Double(size) * 1.5) + 1024
+            let compressedDelta = try readBytes(from: handle, offset: deltaOffset, count: estimatedDeltaSize)
+            let deltaData = compressedDelta.decompressed
             
+            // Recursively resolve base
             guard let base = try readPackObjectAtOffset(
-                packData: packData,
+                handle: handle,
                 offset: baseOffset,
                 hashToOffset: hashToOffset,
                 cache: &cache
