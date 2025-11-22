@@ -10,7 +10,7 @@ struct EdgeCasesTests {
         
         try createTestRepo(in: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         
         let refs = try await refReader.getRefs()
         #expect(refs.count == 0)
@@ -43,7 +43,7 @@ struct EdgeCasesTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         try writeHEAD("ref: refs/heads/main", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         
         let refs = try await refReader.getRefs()
         #expect(refs.count == 1)
@@ -53,7 +53,8 @@ struct EdgeCasesTests {
         // HEAD resolution without objectExistsCheck
         let refReaderNoCheck = RefReader(
             repoURL: tempDir,
-            objectExistsCheck: nil
+            objectExistsCheck: nil,
+            cache: ObjectCache()
         )
         
         let head = try await refReaderNoCheck.getHEAD()
@@ -75,8 +76,8 @@ struct EdgeCasesTests {
         """
         try writePackedRefs(packedRefsContent, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
-        
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
+
         // Should not crash, should skip invalid lines
         let refs = try await refReader.getRefs()
         #expect(refs.count == 0) // All lines were invalid
@@ -91,7 +92,7 @@ struct EdgeCasesTests {
         // Invalid HEAD content
         try writeHEAD("this is not a valid ref or hash", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         
         let head = try await refReader.getHEAD()
         #expect(head == nil) // Should handle gracefully

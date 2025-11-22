@@ -19,31 +19,26 @@ public actor RefReader {
     private let repoURL: URL
     private let fileManager: FileManager
     private let objectExistsCheck: ((String) async throws -> Bool)?
-    
-    // Optional cache
-    private var cachedRefs: [GitRef]?
-    private var cachedHEAD: String?
-    private var cacheTime: Date?
-    private let cacheTimeout: TimeInterval = 1.0 // 1 second cache
+    private let cache: ObjectCacheProtocol
     
     public init(
         repoURL: URL,
         fileManager: FileManager = .default,
-        objectExistsCheck: ((String) async throws -> Bool)? = nil
+        objectExistsCheck: ((String) async throws -> Bool)? = nil,
+        cache: ObjectCacheProtocol
     ) {
         self.repoURL = repoURL
         self.fileManager = fileManager
         self.objectExistsCheck = objectExistsCheck
+        self.cache = cache
     }
 }
 
 // MARK: - RefReaderProtocol
 extension RefReader: RefReaderProtocol {
     public func getRefs() async throws -> [GitRef] {
-        // Check cache
-        if let cached = cachedRefs,
-           let cacheTime = cacheTime,
-           Date().timeIntervalSince(cacheTime) < cacheTimeout {
+        // Check unified cache
+        if let cached: [GitRef] = await cache.get(.refs) {
             return cached
         }
         
@@ -58,8 +53,7 @@ extension RefReader: RefReaderProtocol {
         refs.append(contentsOf: try readPackedRefs())
         
         // Cache the result
-        cachedRefs = refs
-        self.cacheTime = Date()
+        await cache.set(.refs, value: refs)
         
         return refs
     }
@@ -119,9 +113,7 @@ extension RefReader: RefReaderProtocol {
     
     public func getHEAD() async throws -> String? {
         // Check cache
-        if let cached = cachedHEAD,
-           let cacheTime = cacheTime,
-           Date().timeIntervalSince(cacheTime) < cacheTimeout {
+        if let cached: String = await cache.get(.head) {
             return cached
         }
         
@@ -157,9 +149,8 @@ extension RefReader: RefReaderProtocol {
         }
         
         // Cache if successful
-        if let result = result {
-            cachedHEAD = result
-            self.cacheTime = Date()
+        if let result {
+            await cache.set(.head, value: result)
         }
         
         return result

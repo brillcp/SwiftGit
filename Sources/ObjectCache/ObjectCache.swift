@@ -6,6 +6,10 @@ public enum CacheKey: Hashable {
     case blob(hash: String)
     case treePaths(hash: String)
     case objectLocation(hash: String)
+    case refs
+    case head
+    case indexSnapshot(url: URL)
+    case fileHash(identity: FileIdentity)
 }
 
 public struct CacheStats {
@@ -51,7 +55,7 @@ public actor ObjectCache {
     private let maxObjects: Int
     private let maxMemory: Int
     
-    public init(maxObjects: Int = 1000, maxMemory: Int = 100_000_000) {
+    public init(maxObjects: Int = 5000, maxMemory: Int = 200_000_000) {
         self.maxObjects = maxObjects
         self.maxMemory = maxMemory
     }
@@ -167,30 +171,20 @@ private extension ObjectCache {
     func estimateSize(_ value: Any) -> Int {
         switch value {
         case let commit as Commit:
-            // Estimate: title + body + author + parents
             return commit.title.count + commit.body.count + 200
-            
         case let tree as Tree:
-            // Estimate: ~100 bytes per entry
             return tree.entries.count * 100
-            
         case let blob as Blob:
-            // Actual blob data size
             return blob.data.count
-            
         case let dict as [String: String]:
-            // For treePaths cache
             return dict.keys.reduce(0) { $0 + $1.count } + dict.values.reduce(0) { $0 + $1.count }
-            
         case let array as [GitRef]:
-            // For refs cache
             return array.count * 100
-            
         case let string as String:
             return string.count
-            
+        case let tuple as (snapshot: GitIndexSnapshot, modDate: Date):
+            return tuple.snapshot.entries.count * 150
         default:
-            // Default estimate
             return 500
         }
     }

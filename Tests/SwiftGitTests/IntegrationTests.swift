@@ -37,7 +37,8 @@ struct IntegrationTests {
             repoURL: tempDir,
             objectExistsCheck: { hash in
                 try await locator.exists(hash)
-            }
+            },
+            cache: ObjectCache()
         )
         
         // Step 1: Get HEAD
@@ -77,7 +78,8 @@ struct IntegrationTests {
             repoURL: repoURL,
             objectExistsCheck: { hash in
                 try await locator.exists(hash)
-            }
+            },
+            cache: ObjectCache()
         )
         
         // Get HEAD

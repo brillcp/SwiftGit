@@ -16,7 +16,7 @@ struct RefReaderTests {
         try writeRef(name: "main", hash: mainHash, to: tempDir)
         try writeRef(name: "develop", hash: devHash, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let refs = try await refReader.getRefs()
         
         #expect(refs.count == 2)
@@ -41,7 +41,7 @@ struct RefReaderTests {
         
         try writePackedRefs(packedRefsContent, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let refs = try await refReader.getRefs()
         
         #expect(refs.count == 2)
@@ -66,7 +66,7 @@ struct RefReaderTests {
         
         try writePackedRefs(packedRefsContent, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let refs = try await refReader.getRefs()
         
         #expect(refs.count == 1)
@@ -91,7 +91,7 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         try writeRef(name: "main", hash: looseHash, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         try writeHEAD("ref: refs/heads/main", to: tempDir)
         
         let head = try await refReader.getHEAD()
@@ -109,7 +109,7 @@ struct RefReaderTests {
         try writeRef(name: "main", hash: commitHash, to: tempDir)
         try writeHEAD("ref: refs/heads/main", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let head = try await refReader.getHEAD()
         
         #expect(head == commitHash)
@@ -130,7 +130,7 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         try writeHEAD("ref: refs/heads/main", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let head = try await refReader.getHEAD()
         
         #expect(head == commitHash)
@@ -145,7 +145,7 @@ struct RefReaderTests {
         let commitHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         try writeHEAD(commitHash, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let head = try await refReader.getHEAD()
         
         #expect(head == commitHash)
@@ -166,7 +166,7 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         try writeHEAD("ref: refs/remotes/origin/main", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let head = try await refReader.getHEAD()
         
         #expect(head == commitHash)
@@ -179,7 +179,7 @@ struct RefReaderTests {
         try createTestRepo(in: tempDir)
         try writeHEAD("ref: refs/heads/develop", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let branch = try await refReader.getHEADBranch()
         
         #expect(branch == "develop")
@@ -194,7 +194,7 @@ struct RefReaderTests {
         let commitHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         try writeHEAD(commitHash, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let branch = try await refReader.getHEADBranch()
         
         #expect(branch == nil)
@@ -207,7 +207,7 @@ struct RefReaderTests {
         try createTestRepo(in: tempDir)
         try writeHEAD("ref: refs/remotes/origin/main", to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let branch = try await refReader.getHEADBranch()
         
         #expect(branch == nil)
@@ -229,7 +229,7 @@ struct RefReaderTests {
         """
         try writePackedRefs(packedRefsContent, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let refs = try await refReader.getRefs()
         
         #expect(refs.count == 2)
@@ -246,8 +246,8 @@ struct RefReaderTests {
         let mainHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         try writeRef(name: "main", hash: mainHash, to: tempDir)
         
-        let refReader = RefReader(repoURL: tempDir)
-        
+        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
+
         // First call
         let refs1 = try await refReader.getRefs()
         #expect(refs1.count == 1)

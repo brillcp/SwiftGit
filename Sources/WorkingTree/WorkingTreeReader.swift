@@ -22,17 +22,18 @@ public actor WorkingTreeReader {
     private let repoURL: URL
     private let fileManager: FileManager
     private let indexReader: GitIndexReaderProtocol
-    private var fileHashCache: [FileIdentity: String] = [:]
-    private let hashCacheLimit = 10_000
-    
+    private let cache: ObjectCacheProtocol
+
     public init(
         repoURL: URL,
-        indexReader: GitIndexReaderProtocol = GitIndexReader(),
-        fileManager: FileManager = .default
+        indexReader: GitIndexReaderProtocol,
+        fileManager: FileManager = .default,
+        cache: ObjectCacheProtocol
     ) {
         self.repoURL = repoURL
         self.fileManager = fileManager
         self.indexReader = indexReader
+        self.cache = cache
     }
 }
 
@@ -135,7 +136,7 @@ private extension WorkingTreeReader {
         for entry in indexEntries {
             let fileURL = repoURL.appendingPathComponent(entry.path)
             
-            if let hash = try checkFile(entry: entry, fileURL: fileURL) {
+            if let hash = try await checkFile(entry: entry, fileURL: fileURL) {
                 result[entry.path] = hash
             }
             // If nil, file was deleted - don't add to result
@@ -144,7 +145,7 @@ private extension WorkingTreeReader {
         return result
     }
     
-    func checkFile(entry: IndexEntry, fileURL: URL) throws -> String? {
+    func checkFile(entry: IndexEntry, fileURL: URL) async throws -> String? {
         guard fileManager.fileExists(atPath: fileURL.path) else {
             return nil // File deleted
         }
@@ -171,7 +172,7 @@ private extension WorkingTreeReader {
         let mtimeNs = UInt64(entry.mtimeNSec)
         let identity = FileIdentity(dev: dev, ino: ino, size: sizeNum, mtimeNs: mtimeNs)
         
-        if let cached = fileHashCache[identity] {
+        if let cached: String = await cache.get(.fileHash(identity: identity)) {
             return cached
         }
         
@@ -179,10 +180,7 @@ private extension WorkingTreeReader {
         let computed = try computeFileHash(at: fileURL)
         
         // Cache with eviction
-        if fileHashCache.count > hashCacheLimit {
-            fileHashCache.removeAll(keepingCapacity: true)
-        }
-        fileHashCache[identity] = computed
+        await cache.set(.fileHash(identity: identity), value: computed)
         
         return computed
     }
@@ -351,12 +349,4 @@ private extension WorkingTreeReader {
         
         return WorkingTreeStatus(files: files)
     }
-}
-
-// MARK: - FileIdentity
-private struct FileIdentity: Hashable {
-    let dev: UInt64
-    let ino: UInt64
-    let size: UInt64
-    let mtimeNs: UInt64
 }

@@ -10,12 +10,11 @@ public protocol GitIndexReaderProtocol: Actor {
 
 // MARK: -
 public actor GitIndexReader {
-    // Cache
-    private var cachedSnapshot: GitIndexSnapshot?
-    private var cachedModificationDate: Date?
-    private var cacheURL: URL?
+    private let cache: ObjectCacheProtocol
     
-    public init() {}
+    public init(cache: ObjectCacheProtocol) {
+        self.cache = cache
+    }
 }
 
 // MARK: -  GitIndexReaderProtocol
@@ -30,12 +29,10 @@ extension GitIndexReader: GitIndexReaderProtocol {
         let modDate = try url.resourceValues(forKeys: [.contentModificationDateKey])
             .contentModificationDate
         
-        if let cached = cachedSnapshot,
-           let cachedDate = cachedModificationDate,
-           let cachedURL = cacheURL,
-           cachedURL == url,
-           cachedDate == modDate {
-            return cached
+        if let cached: (snapshot: GitIndexSnapshot, modDate: Date) = await cache.get(.indexSnapshot(url: url)) {
+            if cached.modDate == modDate {
+                return cached.snapshot
+            }
         }
         
         // Parse index off main thread
@@ -45,9 +42,7 @@ extension GitIndexReader: GitIndexReaderProtocol {
         }.value
         
         // Cache result
-        cachedSnapshot = snapshot
-        cachedModificationDate = modDate
-        cacheURL = url
+        await cache.set(.indexSnapshot(url: url), value: (snapshot: snapshot, modDate: modDate))
         
         return snapshot
     }

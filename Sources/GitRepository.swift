@@ -73,24 +73,27 @@ public actor GitRepository {
     public init(
         url: URL,
         cache: ObjectCacheProtocol = ObjectCache(),
-        locator: ObjectLocatorProtocol,
-        looseParser: LooseObjectParserProtocol = LooseObjectParser(),
-        packReader: PackFileReaderProtocol = PackFileReader(),
-        diffCalculator: DiffCalculatorProtocol = DiffCalculator(),
-        diffGenerator: DiffGeneratorProtocol = DiffGenerator(),
-        refReader: RefReaderProtocol,
-        workingTree: WorkingTreeReaderProtocol,
         fileManager: FileManager = .default
     ) {
         self.url = url
         self.cache = cache
-        self.locator = locator
-        self.looseParser = looseParser
-        self.packReader = packReader
-        self.diffCalculator = diffCalculator
-        self.diffGenerator = diffGenerator
-        self.refReader = refReader
-        self.workingTree = workingTree
+        self.locator = ObjectLocator(
+            repoURL: url,
+            packIndexManager: PackIndexManager(repoURL: url)
+        )
+        self.looseParser = LooseObjectParser()
+        self.packReader = PackFileReader()
+        self.diffCalculator = DiffCalculator()
+        self.diffGenerator = DiffGenerator()
+        self.refReader = RefReader(
+            repoURL: url,
+            cache: cache
+        )
+        self.workingTree = WorkingTreeReader(
+            repoURL: url,
+            indexReader: GitIndexReader(cache: cache),
+            cache: cache
+        )
         self.fileManager = fileManager
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
     }
