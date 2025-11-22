@@ -225,7 +225,7 @@ private extension PackFileReader {
         case 7: // REF_DELTA
             // Read base hash (20 bytes)
             let baseHashData = try readBytes(from: handle, offset: dataOffset, count: 20)
-            let baseHash = baseHashData.sha1()
+            let baseHash = baseHashData.toHexString()
             
             // Look up base object offset
             guard let baseOffset = hashToOffset[baseHash] else {
