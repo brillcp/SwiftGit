@@ -28,10 +28,9 @@ struct IntegrationTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         try writeHEAD("ref: refs/heads/main", to: tempDir)
         
-        let gitDir = tempDir.appendingPathComponent(".git")
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
         
         let refReader = RefReader(
@@ -64,15 +63,14 @@ struct IntegrationTests {
         // Point to your actual repo - update this path
         let repoPath = "/Users/vg/Documents/Dev/Odin"
         let repoURL = URL(fileURLWithPath: repoPath)
-        let gitDir = repoURL.appendingPathComponent(".git")
         
-        guard FileManager.default.fileExists(atPath: gitDir.path) else {
+        guard FileManager.default.fileExists(atPath: repoURL.path) else {
             return // Skip if repo not found
         }
         
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: repoURL,
+            packIndexManager: PackIndexManager(repoURL: repoURL)
         )
         
         let refReader = RefReader(
@@ -105,28 +103,28 @@ struct IntegrationTests {
 // MARK: - Private helpers
 private extension IntegrationTests {
     func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
         let refsDir = gitDir.appendingPathComponent("refs/heads")
         try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: refsDir, withIntermediateDirectories: true)
     }
     
     func writePackedRefs(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let packedFile = gitDir.appendingPathComponent("packed-refs")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let packedFile = gitDir.appendingPathComponent(GitPath.packedRefs.rawValue)
         try content.write(to: packedFile, atomically: true, encoding: .utf8)
     }
     
     func writeHEAD(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let headFile = gitDir.appendingPathComponent("HEAD")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let headFile = gitDir.appendingPathComponent(GitPath.head.rawValue)
         try content.write(to: headFile, atomically: true, encoding: .utf8)
     }
     
     func writeLooseObject(commitContent: String, to repoURL: URL) throws -> String {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
         
         let commitData = Data(commitContent.utf8)
         let header = "commit \(commitData.count)\0"

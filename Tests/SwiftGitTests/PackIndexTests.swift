@@ -57,11 +57,11 @@ struct PackIndexTests {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        let gitDir = tempDir.appendingPathComponent(".git")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
         let packDir = gitDir.appendingPathComponent("objects/pack")
         try FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
         
-        let packIndexManager = PackIndexManager(gitURL: gitDir)
+        let packIndexManager = PackIndexManager(repoURL: tempDir)
         let indexes = await packIndexManager.packIndexes
         
         #expect(indexes.count == 0) // No pack files in empty dir

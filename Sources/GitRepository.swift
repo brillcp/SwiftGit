@@ -366,10 +366,6 @@ public enum RepositoryError: Error {
 
 // MARK: - Private functions
 private extension GitRepository {
-    var gitURL: URL {
-        url.appendingPathComponent(".git")
-    }
-
     /// Load an object from storage (loose or packed)
     func loadObject(hash: String) async throws -> ParsedObject? {
         guard let location = try await locator.locate(hash) else { return nil }

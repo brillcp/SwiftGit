@@ -1,10 +1,10 @@
 import Foundation
 
 public enum FileMode: UInt32, Sendable {
-    case regular = 0o100644      // Regular file
-    case executable = 0o100755   // Executable file
-    case symlink = 0o120000       // Symbolic link
-    case gitlink = 0o160000       // Git submodule
+    case regular = 0o100644     // Regular file
+    case executable = 0o100755  // Executable file
+    case symlink = 0o120000     // Symbolic link
+    case gitlink = 0o160000     // Git submodule
     
     public var isExecutable: Bool {
         self == .executable

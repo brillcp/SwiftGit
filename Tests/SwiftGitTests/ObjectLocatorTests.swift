@@ -13,10 +13,9 @@ struct ObjectLocatorTests {
         
         let hash = try writeLooseObject(content: "test content", to: tempDir)
         
-        let gitDir = tempDir.appendingPathComponent(".git")
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
         
         let location = try await locator.locate(hash)
@@ -36,12 +35,11 @@ struct ObjectLocatorTests {
         
         try createTestRepo(in: tempDir)
         
-        let gitDir = tempDir.appendingPathComponent(".git")
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
-        
+
         let fakeHash = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
         let location = try await locator.locate(fakeHash)
         
@@ -56,12 +54,11 @@ struct ObjectLocatorTests {
         
         let hash = try writeLooseObject(content: "case test", to: tempDir)
         
-        let gitDir = tempDir.appendingPathComponent(".git")
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
-        
+
         // Test lowercase
         let locationLower = try await locator.locate(hash.lowercased())
         #expect(locationLower != nil)
@@ -82,15 +79,15 @@ struct ObjectLocatorTests {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        let gitDir = tempDir.appendingPathComponent(".git")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
         let packDir = gitDir.appendingPathComponent("objects/pack")
         try FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
         
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
-        
+
         let fakeHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         let location = try await locator.locate(fakeHash)
         
@@ -101,9 +98,9 @@ struct ObjectLocatorTests {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         
-        let gitDir = tempDir.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
-        let packDir = objectsDir.appendingPathComponent("pack")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
+        let packDir = objectsDir.appendingPathComponent(GitPath.pack.rawValue)
         try FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
         
         // Create loose objects
@@ -111,8 +108,8 @@ struct ObjectLocatorTests {
         let hash2 = try writeLooseObject(content: "loose object 2", to: tempDir)
         
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
         
         // Should find loose objects
@@ -139,14 +136,14 @@ struct ObjectLocatorTests {
 // MARK: - Private helpers
 private extension ObjectLocatorTests {
     func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
         try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
     }
     
     func writeLooseObject(content: String, to repoURL: URL) throws -> String {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
         
         let data = Data(content.utf8)
         let header = "blob \(data.count)\0"

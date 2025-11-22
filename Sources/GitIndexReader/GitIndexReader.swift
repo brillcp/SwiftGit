@@ -9,14 +9,17 @@ public protocol GitIndexReaderProtocol: Actor {
 }
 
 // MARK: -
-public actor GitIndexReader: GitIndexReaderProtocol {
+public actor GitIndexReader {
     // Cache
     private var cachedSnapshot: GitIndexSnapshot?
     private var cachedModificationDate: Date?
     private var cacheURL: URL?
     
     public init() {}
-    
+}
+
+// MARK: -  GitIndexReaderProtocol
+extension GitIndexReader: GitIndexReaderProtocol {
     public func readIndex(at url: URL) async throws -> GitIndexSnapshot {
         // Check if file exists
         guard FileManager.default.fileExists(atPath: url.path) else {

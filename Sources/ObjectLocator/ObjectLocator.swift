@@ -6,7 +6,7 @@ public enum ObjectLocation: Sendable {
 }
 
 // MARK: - Protocol
-public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
+public protocol ObjectLocatorProtocol: Actor {
     /// Find where an object is stored (loose or packed)
     func locate(_ hash: String) async throws -> ObjectLocation?
     
@@ -24,7 +24,7 @@ public protocol ObjectLocatorProtocol: Actor {  // Add : Actor here
 
 // MARK: -
 public actor ObjectLocator {
-    private let gitURL: URL
+    private let repoURL: URL
     private let packIndexManager: PackIndexManagerProtocol
     
     // Caches
@@ -32,10 +32,10 @@ public actor ObjectLocator {
     private var indexBuilt = false
     
     public init(
-        gitURL: URL,
+        repoURL: URL,
         packIndexManager: PackIndexManagerProtocol
     ) {
-        self.gitURL = gitURL
+        self.repoURL = repoURL
         self.packIndexManager = packIndexManager
     }
 }
@@ -89,8 +89,8 @@ extension ObjectLocator: ObjectLocatorProtocol {
 
 // MARK: - Private
 private extension ObjectLocator {
-    var objectsURL: URL {
-        gitURL.appendingPathComponent("objects")
+    var gitURL: URL {
+        repoURL.appendingPathComponent(GitPath.git.rawValue)
     }
     
     func findLooseObject(_ hash: String) async throws -> URL? {
@@ -114,7 +114,7 @@ private extension ObjectLocator {
     // Make static so it can be called from Task.detached
     static func scanLooseObjects(gitURL: URL, fileManager: FileManager) throws -> [String: URL] {
         var index: [String: URL] = [:]
-        let objectsURL = gitURL.appendingPathComponent("objects")
+        let objectsURL = gitURL.appendingPathComponent(GitPath.objects.rawValue)
         
         guard fileManager.fileExists(atPath: objectsURL.path) else {
             return [:]

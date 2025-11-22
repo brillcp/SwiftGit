@@ -16,7 +16,7 @@ public protocol PackIndexManagerProtocol: Actor {
 
 // MARK: - PackIndexManager Implementation
 public actor PackIndexManager {
-    private let gitURL: URL
+    private let repoURL: URL
     
     // Lazy-loaded pack indexes
     private var packIndexByURL: [URL: PackIndexProtocol] = [:]
@@ -24,8 +24,8 @@ public actor PackIndexManager {
     
     public var packIndexes: [PackIndexProtocol] = []
 
-    public init(gitURL: URL) {
-        self.gitURL = gitURL
+    public init(repoURL: URL) {
+        self.repoURL = repoURL
     }
 }
 
@@ -72,8 +72,8 @@ extension PackIndexManager: PackIndexManagerProtocol {
 
 // MARK: - Private Helpers
 private extension PackIndexManager {
-    var packURL: URL {
-        gitURL.appendingPathComponent("objects/pack")
+    var gitURL: URL {
+        repoURL.appendingPathComponent(GitPath.git.rawValue)
     }
     
     /// Load all pack indexes lazily on first access
@@ -92,7 +92,7 @@ private extension PackIndexManager {
     
     /// Scan pack directory and load all .idx files
     static func loadAllPackIndexes(gitURL: URL, fileManager: FileManager) throws -> ([PackIndexProtocol], [URL: PackIndexProtocol]) {
-        let packURL = gitURL.appendingPathComponent("objects/pack")
+        let packURL = gitURL.appendingPathComponent(GitPath.objects.rawValue + "/" + GitPath.pack.rawValue)
         
         guard fileManager.fileExists(atPath: packURL.path) else {
             return ([], [:])
@@ -112,7 +112,7 @@ private extension PackIndexManager {
         for idxFile in idxFiles {
             let packFile = idxFile
                 .deletingPathExtension()
-                .appendingPathExtension("pack")
+                .appendingPathExtension(GitPath.pack.rawValue)
             
             guard fileManager.fileExists(atPath: packFile.path) else {
                 continue

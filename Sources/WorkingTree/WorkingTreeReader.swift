@@ -39,8 +39,6 @@ public actor WorkingTreeReader {
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
     public func readIndex() async throws -> [IndexEntry] {
-        let indexURL = repoURL.appendingPathComponent(".git/index")
-        
         guard fileManager.fileExists(atPath: indexURL.path) else {
             return []
         }
@@ -122,6 +120,14 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
 
 // MARK: - Private
 private extension WorkingTreeReader {
+    var gitURL: URL {
+        repoURL.appendingPathComponent(GitPath.git.rawValue)
+    }
+
+    var indexURL: URL {
+        gitURL.appendingPathComponent(GitPath.index.rawValue)
+    }
+
     func checkWorkingTreeAgainstIndex(indexEntries: [IndexEntry]) async throws -> [String: String] {
         var result: [String: String] = [:]
         result.reserveCapacity(indexEntries.count)
@@ -260,7 +266,7 @@ private extension WorkingTreeReader {
         for itemURL in contents {
             let name = itemURL.lastPathComponent
             
-            if name == ".git" { continue }
+            if name == GitPath.git.rawValue { continue }
             
             let fullPath = relativePath.isEmpty ? name : "\(relativePath)/\(name)"
             

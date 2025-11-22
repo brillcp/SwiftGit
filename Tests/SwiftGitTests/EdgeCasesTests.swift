@@ -10,7 +10,6 @@ struct EdgeCasesTests {
         
         try createTestRepo(in: tempDir)
         
-        let gitDir = tempDir.appendingPathComponent(".git")
         let refReader = RefReader(repoURL: tempDir)
         
         let refs = try await refReader.getRefs()
@@ -20,8 +19,8 @@ struct EdgeCasesTests {
         #expect(head == nil)
         
         let locator = ObjectLocator(
-            gitURL: gitDir,
-            packIndexManager: PackIndexManager(gitURL: gitDir)
+            repoURL: tempDir,
+            packIndexManager: PackIndexManager(repoURL: tempDir)
         )
         
         let fakeHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
@@ -102,20 +101,20 @@ struct EdgeCasesTests {
 // MARK: - Private helpers
 private extension EdgeCasesTests {
     func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(".git")
-        let objectsDir = gitDir.appendingPathComponent("objects")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
         try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
     }
     
     func writePackedRefs(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let packedFile = gitDir.appendingPathComponent("packed-refs")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let packedFile = gitDir.appendingPathComponent(GitPath.packedRefs.rawValue)
         try content.write(to: packedFile, atomically: true, encoding: .utf8)
     }
     
     func writeHEAD(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(".git")
-        let headFile = gitDir.appendingPathComponent("HEAD")
+        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
+        let headFile = gitDir.appendingPathComponent(GitPath.head.rawValue)
         try content.write(to: headFile, atomically: true, encoding: .utf8)
     }
 }

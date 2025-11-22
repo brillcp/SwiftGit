@@ -272,7 +272,7 @@ struct RefReaderTests {
 // MARK: - Private helpers
 private extension RefReaderTests {
     func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(".git")
+        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
         let refsDir = gitDir.appendingPathComponent("refs/heads")
         try FileManager.default.createDirectory(at: refsDir, withIntermediateDirectories: true)
     }

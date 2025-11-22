@@ -81,7 +81,7 @@ extension RefReader: RefReaderProtocol {
         }
         
         // 2. Search packed-refs directly (single file read, linear scan)
-        let packedURL = gitURL.appendingPathComponent("packed-refs")
+        let packedURL = gitURL.appendingPathComponent(GitPath.packedRefs.rawValue)
         
         guard fileManager.fileExists(atPath: packedURL.path) else {
             return nil
@@ -125,7 +125,7 @@ extension RefReader: RefReaderProtocol {
             return cached
         }
         
-        let headURL = gitURL.appendingPathComponent("HEAD")
+        let headURL = gitURL.appendingPathComponent(GitPath.head.rawValue)
         
         guard fileManager.fileExists(atPath: headURL.path) else {
             return nil
@@ -166,7 +166,7 @@ extension RefReader: RefReaderProtocol {
     }
     
     public func getHEADBranch() async throws -> String? {
-        let headURL = gitURL.appendingPathComponent("HEAD")
+        let headURL = gitURL.appendingPathComponent(GitPath.head.rawValue)
         
         guard fileManager.fileExists(atPath: headURL.path) else {
             return nil
@@ -186,7 +186,7 @@ extension RefReader: RefReaderProtocol {
 // MARK: - Private Methods
 private extension RefReader {
     var gitURL: URL {
-        repoURL.appendingPathComponent(".git")
+        repoURL.appendingPathComponent(GitPath.git.rawValue)
     }
 
     /// Read loose refs from a directory
@@ -238,7 +238,7 @@ private extension RefReader {
     
     /// Read packed-refs file
     func readPackedRefs() throws -> [GitRef] {
-        let packedURL = gitURL.appendingPathComponent("packed-refs")
+        let packedURL = gitURL.appendingPathComponent(GitPath.packedRefs.rawValue)
         
         guard fileManager.fileExists(atPath: packedURL.path) else { return [] }
         
