@@ -4,7 +4,6 @@ public protocol DiffGeneratorProtocol: Actor {
     func generateHunks(
         oldContent: String,
         newContent: String,
-        contextLines: Int
     ) async throws -> [DiffHunk]
 }
 
@@ -30,7 +29,6 @@ extension DiffGenerator: DiffGeneratorProtocol {
     public func generateHunks(
         oldContent: String,
         newContent: String,
-        contextLines: Int = 3
     ) async throws -> [DiffHunk] {
         // Early exit: identical content
         if oldContent == newContent {

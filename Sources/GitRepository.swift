@@ -156,8 +156,7 @@ extension GitRepository: GitRepositoryProtocol {
         
         return try await diffGenerator.generateHunks(
             oldContent: diffPair.old?.text ?? "",
-            newContent: diffPair.new?.text ?? "",
-            contextLines: 6
+            newContent: diffPair.new?.text ?? ""
         )
     }
 
@@ -182,8 +181,7 @@ extension GitRepository: GitRepositoryProtocol {
         )
         return try await diffGenerator.generateHunks(
             oldContent: diffPair.old?.text ?? "",
-            newContent: diffPair.new?.text ?? "",
-            contextLines: 6
+            newContent: diffPair.new?.text ?? ""
         )
     }
 
