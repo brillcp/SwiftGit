@@ -82,8 +82,8 @@ extension RefReader: RefReaderProtocol {
             // Detached HEAD - raw should be a commit hash
             if raw.isValidSHA {
                 // Optionally verify object exists
-                if let existsCheck = objectExistsCheck {
-                    result = try await existsCheck(raw) ? raw : nil
+                if let objectExistsCheck {
+                    result = try await objectExistsCheck(raw) ? raw : nil
                 } else {
                     result = raw
                 }
@@ -110,8 +110,9 @@ extension RefReader: RefReaderProtocol {
         let headContent = try String(contentsOf: headURL, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        if headContent.hasPrefix("ref: refs/heads/") {
-            return String(headContent.dropFirst("ref: refs/heads/".count))
+        let refsHeads = "ref: refs/heads/"
+        if headContent.hasPrefix(refsHeads) {
+            return String(headContent.dropFirst(refsHeads.count))
         }
         
         return nil // Detached HEAD
@@ -209,31 +210,34 @@ private extension RefReader {
             let sha = String(parts[0])
             let name = String(parts[1])
             
-            // Validate SHA-1 hash (40 hex characters)
-            guard sha.count == 40, sha.allSatisfy({ $0.isHexDigit }) else {
+            guard sha.isValidSHA else {
                 continue // Skip invalid hash
             }
             
-            if name.hasPrefix("refs/heads/") {
+            let heads = "refs/heads/"
+            let remotes = "refs/remotes/"
+            let tags = "refs/tags/"
+            
+            if name.hasPrefix(heads) {
                 refs.append(
                     GitRef(
-                        name: String(name.dropFirst("refs/heads/".count)),
+                        name: String(name.dropFirst(heads.count)),
                         hash: sha,
                         type: .localBranch
                     )
                 )
-            } else if name.hasPrefix("refs/remotes/") {
+            } else if name.hasPrefix(remotes) {
                 refs.append(
                     GitRef(
-                        name: String(name.dropFirst("refs/remotes/".count)),
+                        name: String(name.dropFirst(remotes.count)),
                         hash: sha,
                         type: .remoteBranch
                     )
                 )
-            } else if name.hasPrefix("refs/tags/") {
+            } else if name.hasPrefix(tags) {
                 refs.append(
                     GitRef(
-                        name: String(name.dropFirst("refs/tags/".count)),
+                        name: String(name.dropFirst(tags.count)),
                         hash: sha,
                         type: .tag
                     )
@@ -241,7 +245,6 @@ private extension RefReader {
             }
         }
         
-        // Replace annotated tag SHAs with peeled commit SHAs
         for i in refs.indices where refs[i].type == .tag {
             if let peeled = peeledMap[refs[i].hash] {
                 refs[i] = GitRef(
