@@ -7,6 +7,11 @@ public protocol GitRepositoryProtocol: Actor {
     /// Get a commit by hash (lazy loaded)
     func getCommit(_ hash: String) async throws -> Commit?
     
+    func streamCommits(
+        from startCommit: String,
+        limit: Int?
+    ) -> AsyncThrowingStream<Commit, Error>
+
     /// Get changed files for a commit
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
 
@@ -119,6 +124,50 @@ extension GitRepository: GitRepositoryProtocol {
         // Cache it
         await cache.set(.commit(hash: hash), value: commit)
         return commit
+    }
+
+    public func streamCommits(
+        from startCommit: String,
+        limit: Int? = nil
+    ) -> AsyncThrowingStream<Commit, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    var visited = Set<String>()
+                    var queue = [startCommit]
+                    var count = 0
+                    
+                    while let commitHash = queue.popLast() {
+                        // Check limit
+                        if let limit, count >= limit {
+                            break
+                        }
+                        
+                        // Skip if already visited (handles merge commits)
+                        guard !visited.contains(commitHash) else {
+                            continue
+                        }
+                        visited.insert(commitHash)
+                        
+                        // Load commit
+                        guard let commit = try await getCommit(commitHash) else {
+                            continue
+                        }
+                        
+                        // Yield commit to stream
+                        continuation.yield(commit)
+                        count += 1
+                        
+                        // Add parents to queue (BFS for chronological order)
+                        queue.insert(contentsOf: commit.parents, at: 0)
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     /// Get changed files for a commit

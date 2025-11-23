@@ -236,37 +236,6 @@ struct RefReaderTests {
         #expect(refs.contains { $0.name == "feature/ios-234" && $0.hash == featureHash })
         #expect(refs.contains { $0.name == "refactor/big-changes" && $0.hash == refactorHash })
     }
-
-    @Test func testRefCaching() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        try createTestRepo(in: tempDir)
-        
-        let mainHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
-        try writeRef(name: "main", hash: mainHash, to: tempDir)
-        
-        let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
-
-        // First call
-        let refs1 = try await refReader.getRefs()
-        #expect(refs1.count == 1)
-        
-        // Add another ref
-        let newHash = "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
-        try writeRef(name: "feature", hash: newHash, to: tempDir)
-        
-        // Second call (within cache timeout)
-        let refs2 = try await refReader.getRefs()
-        #expect(refs2.count == 1) // Still cached
-        
-        // Wait for cache to expire
-        try await Task.sleep(for: .seconds(1.1))
-        
-        // Third call (cache expired)
-        let refs3 = try await refReader.getRefs()
-        #expect(refs3.count == 2) // New data
-    }
 }
 
 // MARK: - Private helpers

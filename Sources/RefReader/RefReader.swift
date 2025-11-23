@@ -4,9 +4,6 @@ public protocol RefReaderProtocol: Actor {
     /// Get all refs (branches, tags, etc.)
     func getRefs() async throws -> [GitRef]
     
-    /// Resolve a reference path to a commit SHA
-    func resolveReference(_ refPath: String) async throws -> String?
-    
     /// Get HEAD commit SHA
     func getHEAD() async throws -> String?
     
@@ -56,59 +53,6 @@ extension RefReader: RefReaderProtocol {
         await cache.set(.refs, value: refs)
         
         return refs
-    }
-    
-    public func resolveReference(_ refPath: String) async throws -> String? {
-        // 1. Try loose ref first (single file read - O(1))
-        let refURL = gitURL.appendingPathComponent(refPath)
-        
-        if fileManager.fileExists(atPath: refURL.path) {
-            let hash = try String(contentsOf: refURL, encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            if hash.isValidSHA {
-                if let existsCheck = objectExistsCheck {
-                    return try await existsCheck(hash) ? hash : nil
-                }
-                return hash
-            }
-        }
-        
-        // 2. Search packed-refs directly (single file read, linear scan)
-        let packedURL = gitURL.appendingPathComponent(GitPath.packedRefs.rawValue)
-        
-        guard fileManager.fileExists(atPath: packedURL.path) else {
-            return nil
-        }
-        
-        let content = try String(contentsOf: packedURL, encoding: .utf8)
-        let lines = content.split(whereSeparator: \.isNewline)
-        
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            
-            if trimmed.isEmpty || trimmed.hasPrefix("#") || trimmed.hasPrefix("^") {
-                continue
-            }
-            
-            let parts = trimmed.split(separator: " ", maxSplits: 1)
-            guard parts.count == 2 else { continue }
-            
-            let sha = String(parts[0])
-            let name = String(parts[1])
-            
-            // Direct comparison - packed-refs has full path "refs/heads/main"
-            if name == refPath {
-                if sha.isValidSHA {
-                    if let existsCheck = objectExistsCheck {
-                        return try await existsCheck(sha) ? sha : nil
-                    }
-                    return sha
-                }
-            }
-        }
-        
-        return nil
     }
     
     public func getHEAD() async throws -> String? {
@@ -249,7 +193,7 @@ private extension RefReader {
                 let peeledID = String(s.dropFirst())
                 
                 // Validate peeled hash
-                guard peeledID.count == 40, peeledID.allSatisfy({ $0.isHexDigit }) else {
+                guard peeledID.isValidSHA else {
                     continue
                 }
                 
@@ -309,5 +253,58 @@ private extension RefReader {
         }
         
         return refs
+    }
+    
+    func resolveReference(_ refPath: String) async throws -> String? {
+        // 1. Try loose ref first (single file read - O(1))
+        let refURL = gitURL.appendingPathComponent(refPath)
+        
+        if fileManager.fileExists(atPath: refURL.path) {
+            let hash = try String(contentsOf: refURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if hash.isValidSHA {
+                if let objectExistsCheck {
+                    return try await objectExistsCheck(hash) ? hash : nil
+                }
+                return hash
+            }
+        }
+        
+        // 2. Search packed-refs directly (single file read, linear scan)
+        let packedURL = gitURL.appendingPathComponent(GitPath.packedRefs.rawValue)
+        
+        guard fileManager.fileExists(atPath: packedURL.path) else {
+            return nil
+        }
+        
+        let content = try String(contentsOf: packedURL, encoding: .utf8)
+        let lines = content.split(whereSeparator: \.isNewline)
+        
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            
+            if trimmed.isEmpty || trimmed.hasPrefix("#") || trimmed.hasPrefix("^") {
+                continue
+            }
+            
+            let parts = trimmed.split(separator: " ", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            
+            let sha = String(parts[0])
+            let name = String(parts[1])
+            
+            // Direct comparison - packed-refs has full path "refs/heads/main"
+            if name == refPath {
+                if sha.isValidSHA {
+                    if let existsCheck = objectExistsCheck {
+                        return try await existsCheck(sha) ? sha : nil
+                    }
+                    return sha
+                }
+            }
+        }
+        
+        return nil
     }
 }
