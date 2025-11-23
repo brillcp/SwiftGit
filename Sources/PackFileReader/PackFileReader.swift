@@ -20,7 +20,6 @@ public actor PackFileReader: @unchecked Sendable {
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
-
     private var packHandles: [URL: FileHandle] = [:]
     
     public var isMapped: Bool {

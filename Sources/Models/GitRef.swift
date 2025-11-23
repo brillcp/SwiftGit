@@ -15,3 +15,9 @@ public struct GitRef: Hashable, Sendable {
         self.type = type
     }
 }
+
+extension GitRef: Identifiable {
+    public var id: String {
+        hash
+    }
+}
