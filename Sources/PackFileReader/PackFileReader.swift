@@ -1,18 +1,5 @@
 import Foundation
 
-public struct PackObject: Sendable {
-    let hash: String
-    let type: ObjectType
-    let data: Data
-}
-
-public enum ObjectType: String, Sendable {
-    case commit
-    case tree
-    case blob
-    case tag
-}
-
 public protocol PackFileReaderProtocol: Actor {
     /// Check if pack file is memory-mapped
     var isMapped: Bool { get }
@@ -59,25 +46,33 @@ extension PackFileReader: PackFileReaderProtocol {
         at location: PackObjectLocation,
         packIndex: PackIndexProtocol
     ) throws -> ParsedObject {
-        // Read the pack object (handles deltas)
-        let packObject = try readObject(at: location, packIndex: packIndex)
+        let handle = try getPackHandle(for: location.packURL)
         
-        // Route to appropriate parser based on type
-        switch packObject.type {
-        case .commit:
-            let commit = try commitParser.parse(hash: packObject.hash, data: packObject.data)
+        var cache: [Int: (type: String, data: Data)] = [:]
+        
+        guard let (typeStr, data) = try readPackObjectAtOffset(
+            handle: handle,
+            offset: location.offset,
+            packIndex: packIndex,
+            cache: &cache
+        ) else {
+            throw PackError.objectNotFound
+        }
+        
+        switch typeStr {
+        case "commit":
+            let commit = try commitParser.parse(hash: location.hash, data: data)
             return .commit(commit)
-            
-        case .tree:
-            let tree = try treeParser.parse(hash: packObject.hash, data: packObject.data)
+        case "tree":
+            let tree = try treeParser.parse(hash: location.hash, data: data)
             return .tree(tree)
-            
-        case .blob:
-            let blob = try blobParser.parse(hash: packObject.hash, data: packObject.data)
+        case "blob":
+            let blob = try blobParser.parse(hash: location.hash, data: data)
             return .blob(blob)
-            
-        case .tag:
+        case "tag":
             throw PackError.unsupportedObjectType("tag")
+        default:
+            throw PackError.unsupportedObjectType(typeStr)
         }
     }
 
@@ -107,28 +102,6 @@ private extension PackFileReader {
             throw PackError.corruptedData
         }
         return data
-    }
-
-    func readObject(at location: PackObjectLocation, packIndex: PackIndexProtocol) throws -> PackObject {
-        let handle = try getPackHandle(for: location.packURL)
-        
-        // Read and resolve the object (handles deltas recursively)
-        var cache: [Int: (type: String, data: Data)] = [:]
-        
-        guard let (typeStr, data) = try readPackObjectAtOffset(
-            handle: handle,
-            offset: location.offset,
-            packIndex: packIndex,
-            cache: &cache
-        ) else {
-            throw PackError.objectNotFound
-        }
-        
-        guard let type = ObjectType(rawValue: typeStr) else {
-            throw PackError.unsupportedObjectType(typeStr)
-        }
-        
-        return PackObject(hash: location.hash, type: type, data: data)
     }
 
     func readPackObjectAtOffset(
