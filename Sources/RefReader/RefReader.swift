@@ -41,17 +41,30 @@ extension RefReader: RefReaderProtocol {
             return cached
         }
         
-        var refs: [GitRef] = []
+        var refsByName: [String: GitRef] = [:]  // Use dict to deduplicate
         
-        // Read loose refs
-        refs.append(contentsOf: try readLooseRefs(relativePath: "refs/heads", type: .localBranch))
-        refs.append(contentsOf: try readLooseRefs(relativePath: "refs/remotes", type: .remoteBranch))
-        refs.append(contentsOf: try readLooseRefs(relativePath: "refs/tags", type: .tag))
+        // Read loose refs (these take priority)
+        let looseHeads = try readLooseRefs(relativePath: "refs/heads", type: .localBranch)
+        let looseRemotes = try readLooseRefs(relativePath: "refs/remotes", type: .remoteBranch)
+        let looseTags = try readLooseRefs(relativePath: "refs/tags", type: .tag)
         
-        // Read packed refs
-        refs.append(contentsOf: try readPackedRefs())
+        for ref in looseHeads + looseRemotes + looseTags {
+            let key = "\(ref.type):\(ref.name)"  // Unique key
+            refsByName[key] = ref
+        }
         
-        // Cache the result
+        // Read packed refs (only add if not already present)
+        let packedRefs = try readPackedRefs()
+        for ref in packedRefs {
+            let key = "\(ref.type):\(ref.name)"
+            if refsByName[key] == nil {  // Don't overwrite loose refs
+                refsByName[key] = ref
+            }
+        }
+        
+        let refs = Array(refsByName.values)
+        
+        // Cache in unified cache
         await cache.set(.refs, value: refs)
         
         return refs
