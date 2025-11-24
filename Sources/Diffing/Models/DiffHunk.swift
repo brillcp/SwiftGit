@@ -4,6 +4,12 @@ public struct DiffHunk: Hashable, Sendable {
     public let id: Int
     public let header: String
     public let lines: [DiffLine]
+
+    public init(id: Int, header: String, lines: [DiffLine]) {
+        self.id = id
+        self.header = header
+        self.lines = lines
+    }
 }
 
 // Add this extension to DiffHunk
