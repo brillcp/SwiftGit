@@ -49,6 +49,8 @@ public protocol GitRepositoryProtocol: Actor {
     func getHEADBranch() async throws -> String?
     
     func getBranches() async throws -> Branches
+
+    func getStashes() async throws -> [Stash]
     
     /// Get commit history starting from a commit
     func getHistory(from commitHash: String, limit: Int?) async throws -> [Commit]
@@ -368,6 +370,10 @@ extension GitRepository: GitRepositoryProtocol {
         )
     }
     
+    public func getStashes() async throws -> [Stash] {
+        try await refReader.getStashes()
+    }
+
     // MARK: - History & Graph
     public func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
         var history: [Commit] = []

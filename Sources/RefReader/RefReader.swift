@@ -9,6 +9,8 @@ public protocol RefReaderProtocol: Actor {
     
     /// Get HEAD branch name (nil if detached)
     func getHEADBranch() async throws -> String?
+
+    func getStashes() async throws -> [Stash]
 }
 
 // MARK: -
@@ -116,6 +118,58 @@ extension RefReader: RefReaderProtocol {
         }
         
         return nil // Detached HEAD
+    }
+    
+    public func getStashes() async throws -> [Stash] {
+        let stashLogURL = gitURL.appendingPathComponent("logs/refs/stash")
+        
+        guard fileManager.fileExists(atPath: stashLogURL.path) else {
+            return []
+        }
+        
+        let content = try String(contentsOf: stashLogURL, encoding: .utf8)
+        let lines = content.split(separator: "\n")
+        
+        var stashes: [Stash] = []
+        
+        for (index, line) in lines.enumerated().reversed() {
+            let parts = line.split(separator: "\t", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            
+            let metadata = parts[0].split(separator: " ")
+            guard metadata.count >= 5 else { continue }
+            
+            let stashHash = String(metadata[1])
+            
+            // Verify object exists if check is available
+            if let objectExistsCheck {
+                guard try await objectExistsCheck(stashHash) else {
+                    continue
+                }
+            }
+            
+            let message = String(parts[1])
+            
+            // Parse timestamp
+            let timestampStr = String(metadata[3])
+            let date: Date
+            if let timestamp = TimeInterval(timestampStr) {
+                date = Date(timeIntervalSince1970: timestamp)
+            } else {
+                date = Date()
+            }
+            
+            stashes.append(
+                Stash(
+                    id: stashHash,
+                    index: lines.count - index - 1,
+                    message: message,
+                    date: date
+                )
+            )
+        }
+        
+        return stashes
     }
 }
 
