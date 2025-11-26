@@ -468,13 +468,34 @@ private extension GitRepository {
                         }
                     }
                     
-                    let stashes = try await getStashes()  // ✅ Get from reflog
+                    var stashInternalCommits = Set<String>()  // Track commits to hide
+                    let stashes = try await getStashes()
                     for stash in stashes {
-                        startingRefs.append(GitRef(
-                            name: stash.message,
-                            hash: stash.id,
-                            type: .stash
-                        ))
+                        // Add stash commit
+                        startingRefs.append(
+                            GitRef(
+                                name: stash.message,
+                                hash: stash.id,
+                                type: .stash
+                            )
+                        )
+                        
+                        // Track its internal commits (don't show these)
+                        if let stashCommit = try await getCommit(stash.id) {
+                            // parent[0] = base commit (OK to show, it's real work)
+                            // parent[1] = index state (HIDE - internal)
+                            // parent[2] = untracked (HIDE - internal)
+                            
+                            if stashCommit.parents.count >= 2 {
+                                // Hide index state commit
+                                stashInternalCommits.insert(stashCommit.parents[1])
+                            }
+                            
+                            if stashCommit.parents.count >= 3 {
+                                // Hide untracked files commit
+                                stashInternalCommits.insert(stashCommit.parents[2])
+                            }
+                        }
                     }
 
                     // If no refs, try HEAD
