@@ -128,15 +128,13 @@ extension GitRepository: GitRepositoryProtocol {
 
     /// Get commits from all branches as an array (convenience method)
     public func getAllCommits(limit: Int? = nil) async throws -> [Commit] {
-        var commits = [Commit]()
+        var streamedCommits = [Commit]()
         
         for try await commit in streamAllCommits(limit: limit) {
-            commits.append(commit)
+            streamedCommits.append(commit)
         }
         
-        // Sort by date (most recent first)
-        commits.sort { $0.author.timestamp > $1.author.timestamp }
-        return commits
+        return topologicalSort(streamedCommits)
     }
 
     public func streamAllCommits(limit: Int? = nil) -> AsyncThrowingStream<Commit, Error> {
@@ -503,6 +501,43 @@ private extension GitRepository {
             }
             return try await packReader.parseObject(at: packLocation, packIndex: packIndex)
         }
+    }
+
+    func topologicalSort(_ commits: [Commit]) -> [Commit] {
+        var sorted: [Commit] = []
+        var visited = Set<String>()
+        var commitMap: [String: Commit] = [:]
+        
+        // Build lookup map
+        for commit in commits {
+            commitMap[commit.id] = commit
+        }
+        
+        func visit(_ commitId: String) {
+            guard !visited.contains(commitId),
+                  let commit = commitMap[commitId] else {
+                return
+            }
+            
+            visited.insert(commitId)
+            
+            // Visit parents first (depth-first)
+            for parent in commit.parents {
+                visit(parent)
+            }
+            
+            // Add this commit after its parents
+            sorted.append(commit)
+        }
+        
+        // Start from most recent commits
+        let sortedByDate = commits.sorted { $0.author.timestamp > $1.author.timestamp }
+        
+        for commit in sortedByDate {
+            visit(commit.id)
+        }
+        
+        return sorted.reversed() // Reverse to get newest first
     }
 
     func getBlob(at path: String, treeHash: String) async throws -> Blob? {
