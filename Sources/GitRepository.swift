@@ -482,9 +482,6 @@ private extension GitRepository {
                         
                         // Track its internal commits (don't show these)
                         if let stashCommit = try await getCommit(stash.id) {
-                            if !stashCommit.parents.isEmpty {
-                                stashInternalCommits.insert(stashCommit.parents[0])
-                            }
                             if stashCommit.parents.count >= 2 {
                                 stashInternalCommits.insert(stashCommit.parents[1])
                             }
