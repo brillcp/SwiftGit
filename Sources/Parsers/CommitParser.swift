@@ -67,7 +67,8 @@ extension CommitParser: CommitParserProtocol {
             body: body,
             author: author,
             parents: parents,
-            tree: tree
+            tree: tree,
+            committerDate: committer.timestamp
         )
     }
 }

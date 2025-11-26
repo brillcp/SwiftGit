@@ -7,14 +7,16 @@ public struct Commit: Identifiable, Sendable {
     public let author: Author
     public let parents: [String]
     public let tree: String
+    public let committerDate: Date?
 
-    public init(id: String, title: String, body: String, author: Author, parents: [String], tree: String) {
+    public init(id: String, title: String, body: String, author: Author, parents: [String], tree: String, committerDate: Date?) {
         self.id = id
         self.title = title
         self.body = body
         self.author = author
         self.parents = parents
         self.tree = tree
+        self.committerDate = committerDate
     }
 }
 
