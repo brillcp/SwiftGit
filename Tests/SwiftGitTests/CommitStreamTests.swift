@@ -274,6 +274,67 @@ struct CommitStreamTests {
             }
         }
     }
+
+    @Test func testCommitComparison() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Get OUR commits
+        var ourCommits: [Commit] = []
+        var seenHashes = Set<String>()
+        
+        for try await commit in await repository.streamAllCommits(limit: nil) {
+            if !seenHashes.contains(commit.id) {
+                seenHashes.insert(commit.id)
+                ourCommits.append(commit)
+            }
+        }
+        
+        // Sort by date
+        ourCommits.sort { $0.author.timestamp > $1.author.timestamp }
+        
+        print("\n=== OUR COMMITS (sorted by date) ===")
+        print("Total: \(ourCommits.count)")
+        print("\nFirst 30:")
+        for (i, commit) in ourCommits.prefix(30).enumerated() {
+            let dateStr = ISO8601DateFormatter().string(from: commit.author.timestamp)
+            print("\(i+1). [\(dateStr)] \(commit.title)")
+        }
+        
+        #if os(macOS)
+        // Get GIT's commits
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = [
+            "-C", repoURL.path,
+            "log", "--all",
+            "--pretty=format:%H|%ai|%s",
+            "-n", "30"
+        ]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launch()
+        task.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            print("\n=== GIT LOG --all (sorted by date) ===")
+            let lines = output.split(separator: "\n")
+            print("Total: \(lines.count)")
+            print("\nFirst 30:")
+            for (i, line) in lines.enumerated() {
+                let parts = line.split(separator: "|")
+                if parts.count >= 3 {
+                    print("\(i+1). [\(parts[1])] \(parts[2])")
+                }
+            }
+        }
+        #else
+        print("\n⏭️ Skipping git log comparison on this platform (Process is unavailable)")
+        #endif
+    }
 }
 
 // MARK: - Test Helpers
