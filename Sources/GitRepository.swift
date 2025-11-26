@@ -482,17 +482,13 @@ private extension GitRepository {
                         
                         // Track its internal commits (don't show these)
                         if let stashCommit = try await getCommit(stash.id) {
-                            // parent[0] = base commit (OK to show, it's real work)
-                            // parent[1] = index state (HIDE - internal)
-                            // parent[2] = untracked (HIDE - internal)
-                            
+                            if !stashCommit.parents.isEmpty {
+                                stashInternalCommits.insert(stashCommit.parents[0])
+                            }
                             if stashCommit.parents.count >= 2 {
-                                // Hide index state commit
                                 stashInternalCommits.insert(stashCommit.parents[1])
                             }
-                            
                             if stashCommit.parents.count >= 3 {
-                                // Hide untracked files commit
                                 stashInternalCommits.insert(stashCommit.parents[2])
                             }
                         }

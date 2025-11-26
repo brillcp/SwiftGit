@@ -12,7 +12,6 @@ public struct DiffHunk: Hashable, Sendable {
     }
 }
 
-// Add this extension to DiffHunk
 public extension DiffHunk {
     func displayRows() -> [DiffLine] {
         var result: [DiffLine] = []
