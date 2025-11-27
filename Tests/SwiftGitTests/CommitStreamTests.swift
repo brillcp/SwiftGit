@@ -5,6 +5,78 @@ import Foundation
 @Suite("Commit Stream Tests")
 struct CommitStreamTests {
     // MARK: - Refs Loading Tests
+    @Test func testCommitDiffMatchesGit() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Use a known commit hash from GitKraken
+        let commitHash = "a842fa5f80d0163f4030c6ee47b2c673a3ac1826"  // The one from your screenshots
+        
+        // Get your diff
+        let yourChanges = try await repository.getChangedFiles(commitHash)
+        
+        print("\n=== YOUR CHANGED FILES (\(yourChanges.count)) ===")
+        for (path, file) in yourChanges.sorted(by: { $0.key < $1.key }) {
+            print("  [\(file.changeType)] \(path)")
+        }
+        
+        #if os(macOS)
+        // Get Git's diff
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = [
+            "-C", repoURL.path,
+            "diff-tree", "--no-commit-id", "--name-status", "-r",
+            commitHash
+        ]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launch()
+        task.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            let gitChanges = output.split(separator: "\n")
+            
+            print("\n=== GIT CHANGED FILES (\(gitChanges.count)) ===")
+            for line in gitChanges {
+                print("  \(line)")
+            }
+            
+            // Compare
+            let yourPaths = Set(yourChanges.keys)
+            let gitPaths = Set(gitChanges.map { line in
+                String(line.split(separator: "\t").last!)
+            })
+            
+            let extra = yourPaths.subtracting(gitPaths)
+            let missing = gitPaths.subtracting(yourPaths)
+            
+            if !extra.isEmpty {
+                print("\n❌ EXTRA FILES (false positives):")
+                for path in extra.sorted() {
+                    print("  \(path)")
+                }
+            }
+            
+            if !missing.isEmpty {
+                print("\n❌ MISSING FILES (false negatives):")
+                for path in missing.sorted() {
+                    print("  \(path)")
+                }
+            }
+            
+            if extra.isEmpty && missing.isEmpty {
+                print("\n✅ Perfect match!")
+            }
+        }
+        #else
+        print("\n⏭️ Skipping git log comparison on this platform (Process is unavailable)")
+        #endif
+    }
+
     @Test func testGetAllRefs() async throws {
         guard let repoURL = getTestRepoURL() else {
             return

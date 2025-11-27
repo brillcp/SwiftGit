@@ -63,68 +63,69 @@ private extension DiffCalculator {
     ) async throws -> [String: CommitedFile] {
         var result: [String: CommitedFile] = [:]
         
-        // Build reverse maps for rename detection
-        let currentByBlob = Dictionary(grouping: current.keys, by: { current[$0]! })
-            .compactMapValues { $0.first }
-        let parentByBlob = Dictionary(grouping: parent.keys, by: { parent[$0]! })
-            .compactMapValues { $0.first }
+        // Track which files we've processed
+        var processedCurrent = Set<String>()
+        var processedParent = Set<String>()
         
-        var renamedBlobIds = Set<String>()
-        
-        // 1. Detect renames
-        let commonBlobIds = Set(currentByBlob.keys).intersection(parentByBlob.keys)
-        
-        for blobId in commonBlobIds {
-            let oldPath = parentByBlob[blobId]!
-            let newPath = currentByBlob[blobId]!
-            
-            guard oldPath != newPath else { continue }
-            
-            if let blob = try await blobLoader(blobId) {
-                result[newPath] = CommitedFile(
-                    path: newPath,
-                    blob: blob,
-                    changeType: .renamed(from: oldPath)
-                )
-                renamedBlobIds.insert(blobId)
-            }
-        }
-        
-        // 2. Detect added and modified
-        for (path, blobHash) in current where !renamedBlobIds.contains(blobHash) {
-            if let parentBlobHash = parent[path] {
-                if parentBlobHash != blobHash {
-                    // Modified
-                    if let blob = try await blobLoader(blobHash) {
-                        result[path] = CommitedFile(
-                            path: path,
+        // 1. Process all files in current tree
+        for (newPath, newBlobHash) in current {
+            // Check if this exact path existed in parent
+            if let parentBlobHash = parent[newPath] {
+                if parentBlobHash == newBlobHash {
+                    // Same file, unchanged - skip
+                    processedCurrent.insert(newPath)
+                    processedParent.insert(newPath)
+                    continue
+                } else {
+                    // Same path, different blob - modified
+                    if let blob = try await blobLoader(newBlobHash) {
+                        result[newPath] = CommitedFile(
+                            path: newPath,
                             blob: blob,
                             changeType: .modified
                         )
                     }
+                    processedCurrent.insert(newPath)
+                    processedParent.insert(newPath)
+                    continue
                 }
+            }
+            
+            // Path doesn't exist in parent - could be added or renamed
+            // Check if this blob existed at a different path in parent
+            if let oldPath = parent.first(where: { $0.value == newBlobHash })?.key,
+               current[oldPath] == nil {  // Old path must be gone for it to be a rename
+                // This is a rename
+                if let blob = try await blobLoader(newBlobHash) {
+                    result[newPath] = CommitedFile(
+                        path: newPath,
+                        blob: blob,
+                        changeType: .renamed(from: oldPath)
+                    )
+                }
+                processedCurrent.insert(newPath)
+                processedParent.insert(oldPath)
             } else {
-                // Added
-                if let blob = try await blobLoader(blobHash) {
-                    result[path] = CommitedFile(
-                        path: path,
+                // This is a new file
+                if let blob = try await blobLoader(newBlobHash) {
+                    result[newPath] = CommitedFile(
+                        path: newPath,
                         blob: blob,
                         changeType: .added
                     )
                 }
+                processedCurrent.insert(newPath)
             }
         }
         
-        // 3. Detect deleted
-        for (path, blobHash) in parent where !renamedBlobIds.contains(blobHash) {
-            if current[path] == nil {
-                if let blob = try await blobLoader(blobHash) {
-                    result[path] = CommitedFile(
-                        path: path,
-                        blob: blob,
-                        changeType: .deleted
-                    )
-                }
+        // 2. Detect deleted files (files in parent but not processed yet)
+        for (oldPath, oldBlobHash) in parent where !processedParent.contains(oldPath) {
+            if let blob = try await blobLoader(oldBlobHash) {
+                result[oldPath] = CommitedFile(
+                    path: oldPath,
+                    blob: blob,
+                    changeType: .deleted
+                )
             }
         }
         
