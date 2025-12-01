@@ -63,6 +63,11 @@ public protocol GitRepositoryProtocol: Actor {
     func stageFiles() async throws
     func unstageFile(at path: String) async throws
     func unstageFiles() async throws
+
+    /// Stage hunks
+    func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
+    func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
+    func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
 }
 
 // MARK: -
@@ -76,6 +81,7 @@ public actor GitRepository {
     private let refReader: RefReaderProtocol
     private let workingTree: WorkingTreeReaderProtocol
     private let commandRunner: GitCommandable
+    private let patchGenerator: PatchGenerator
 
     private var securityScopeStarted: Bool = false
     private let fileManager: FileManager
@@ -107,6 +113,7 @@ public actor GitRepository {
             cache: cache
         )
         self.commandRunner = CommandRunner()
+        self.patchGenerator = PatchGenerator()
         self.fileManager = fileManager
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
     }
@@ -484,24 +491,58 @@ extension GitRepository: GitRepositoryProtocol {
         _ = try await locator.enumeratePackedHashes(visitor)
     }
     
+    // MARK: - Git commands
     // Stage files
     public func stageFile(at path: String) async throws {
-        try await commandRunner.run(.add(paths: [path]), in: url)
+        try await commandRunner.run(.add(paths: [path]), stdin: nil, in: url)
     }
     
     /// Stage multiple files
     public func stageFiles() async throws {
-        try await commandRunner.run(.addAll, in: url)
+        try await commandRunner.run(.addAll, stdin: nil, in: url)
     }
     
     /// Unstage a file
     public func unstageFile(at path: String) async throws {
-        try await commandRunner.run(.reset(paths: [path]), in: url)
+        try await commandRunner.run(.reset(paths: [path]), stdin: nil, in: url)
     }
     
     /// Unstage multiple files
     public func unstageFiles() async throws {
-        try await commandRunner.run(.resetAll, in: url)
+        try await commandRunner.run(.resetAll, stdin: nil, in: url)
+    }
+    
+    /// Stage hunk
+    public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
+        
+        try await commandRunner.run(
+            .applyPatch(cached: true),
+            stdin: patch,  // Pass patch via stdin
+            in: url
+        )
+    }
+
+    /// Unstage hunk
+    public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
+        
+        try await commandRunner.run(
+            .applyPatch(cached: true),
+            stdin: patch,
+            in: url
+        )
+    }
+
+    /// Disgard hunk
+    public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
+        
+        try await commandRunner.run(
+            .applyPatch(cached: false),
+            stdin: patch,
+            in: url
+        )
     }
 }
 

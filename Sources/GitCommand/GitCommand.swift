@@ -6,9 +6,7 @@ public enum GitCommand: Sendable {
     case reset(paths: [String])
     case resetAll  // For "unstage all"
     case commit(message: String, author: String?)
-    case applyPatch(patchPath: String, cached: Bool)
-//    case checkout(branch: String)
-//    case stash(message: String?)
+    case applyPatch(cached: Bool)
 }
 
 extension GitCommand {
@@ -28,15 +26,11 @@ extension GitCommand {
                 args += ["--author", author]
             }
             return args
-        case .applyPatch(let patchPath, let cached):
-            // Apply a patch file
-            // --cached means apply to index (staging area)
-            // without --cached applies to working directory
+        case .applyPatch(let cached):
             var args = ["apply"]
             if cached {
                 args.append("--cached")
             }
-            args.append(patchPath)
             return args
         }
     }
