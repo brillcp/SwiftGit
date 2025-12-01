@@ -60,9 +60,9 @@ public protocol GitRepositoryProtocol: Actor {
     
     /// Stage files
     func stageFile(at path: String) async throws
-    func stageFiles(_ paths: [String]) async throws
+    func stageFiles() async throws
     func unstageFile(at path: String) async throws
-    func unstageFiles(_ paths: [String]) async throws
+    func unstageFiles() async throws
 }
 
 // MARK: -
@@ -490,8 +490,8 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     /// Stage multiple files
-    public func stageFiles(_ paths: [String]) async throws {
-        try await commandRunner.run(.add(paths: paths), in: url)
+    public func stageFiles() async throws {
+        try await commandRunner.run(.addAll, in: url)
     }
     
     /// Unstage a file
@@ -500,8 +500,8 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     /// Unstage multiple files
-    public func unstageFiles(_ paths: [String]) async throws {
-        try await commandRunner.run(.reset(paths: paths), in: url)
+    public func unstageFiles() async throws {
+        try await commandRunner.run(.resetAll, in: url)
     }
 }
 
