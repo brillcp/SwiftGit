@@ -57,6 +57,12 @@ public protocol GitRepositoryProtocol: Actor {
     func objectExists(_ hash: String) async throws -> Bool
     
     func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws
+    
+    /// Stage files
+    func stageFile(at path: String) async throws
+    func stageFiles(_ paths: [String]) async throws
+    func unstageFile(at path: String) async throws
+    func unstageFiles(_ paths: [String]) async throws
 }
 
 // MARK: -
@@ -69,7 +75,8 @@ public actor GitRepository {
     private let diffGenerator: DiffGeneratorProtocol
     private let refReader: RefReaderProtocol
     private let workingTree: WorkingTreeReaderProtocol
-    
+    private let commandRunner: GitCommandable
+
     private var securityScopeStarted: Bool = false
     private let fileManager: FileManager
 
@@ -99,6 +106,7 @@ public actor GitRepository {
             indexReader: GitIndexReader(cache: cache),
             cache: cache
         )
+        self.commandRunner = CommandRunner()
         self.fileManager = fileManager
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
     }
@@ -125,7 +133,7 @@ extension GitRepository: GitRepositoryProtocol {
         await cache.set(.commit(hash: hash), value: commit)
         return commit
     }
-
+    
     /// Get commits from all branches as an array (convenience method)
     public func getAllCommits(limit: Int? = nil) async throws -> [Commit] {
         var streamedCommits = [Commit]()
@@ -136,7 +144,7 @@ extension GitRepository: GitRepositoryProtocol {
         
         return streamedCommits.sorted { $0.author.timestamp < $1.author.timestamp }
     }
-
+    
     public func streamAllCommits(limit: Int? = nil) -> AsyncThrowingStream<Commit, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -174,7 +182,7 @@ extension GitRepository: GitRepositoryProtocol {
                             }
                         }
                     }
-
+                    
                     // If no refs, try HEAD
                     if startingRefs.isEmpty {
                         if let head = try await getHEAD() {
@@ -236,7 +244,7 @@ extension GitRepository: GitRepositoryProtocol {
             }
         }
     }
-
+    
     /// Get changed files for a commit
     public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
         guard let commit = try await getCommit(commitId) else { return [:] }
@@ -257,12 +265,12 @@ extension GitRepository: GitRepositoryProtocol {
             }
         )
     }
-
+    
     public func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk] {
         guard let commit = try await getCommit(commitId) else { return [] }
         
         let newBlob = try await getBlob(at: path, treeHash: commit.tree)
-
+        
         var oldBlob: Blob? = nil
         if let parentId = commit.parents.first, let parentCommit = try await getCommit(parentId) {
             oldBlob = try await getBlob(at: path, treeHash: parentCommit.tree)
@@ -275,7 +283,7 @@ extension GitRepository: GitRepositoryProtocol {
             newContent: diffPair.new?.text ?? ""
         )
     }
-
+    
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard let head = try await getHEAD(),
               let commit = try await getCommit(head)
@@ -300,7 +308,7 @@ extension GitRepository: GitRepositoryProtocol {
             newContent: diffPair.new?.text ?? ""
         )
     }
-
+    
     public func getTree(_ hash: String) async throws -> Tree? {
         // Check cache
         if let cached: Tree = await cache.get(.tree(hash: hash)) { return cached }
@@ -369,7 +377,7 @@ extension GitRepository: GitRepositoryProtocol {
         let headTree = try await getTreePaths(commit.tree)
         return try await workingTree.computeStatus(headTree: headTree)
     }
-
+    
     /// Get only staged changes (HEAD → Index)
     public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
         guard let head = try await getHEAD(),
@@ -389,7 +397,7 @@ extension GitRepository: GitRepositoryProtocol {
     public func getUntrackedFiles() async throws -> [String] {
         try await workingTree.untrackedFiles()
     }
-
+    
     public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
         try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
     }
@@ -420,7 +428,7 @@ extension GitRepository: GitRepositoryProtocol {
     public func getHEAD() async throws -> String? {
         try await refReader.getHEAD()
     }
-        
+    
     public func getHEADBranch() async throws -> String? {
         try await refReader.getHEADBranch()
     }
@@ -438,7 +446,7 @@ extension GitRepository: GitRepositoryProtocol {
     public func getStashes() async throws -> [Stash] {
         try await refReader.getStashes()
     }
-
+    
     // MARK: - History & Graph
     public func getHistory(from commitHash: String, limit: Int? = nil) async throws -> [Commit] {
         var history: [Commit] = []
@@ -474,6 +482,26 @@ extension GitRepository: GitRepositoryProtocol {
         guard shouldContinue else { return }
         
         _ = try await locator.enumeratePackedHashes(visitor)
+    }
+    
+    // Stage files
+    public func stageFile(at path: String) async throws {
+        try await commandRunner.run(.add(paths: [path]), in: url)
+    }
+    
+    /// Stage multiple files
+    public func stageFiles(_ paths: [String]) async throws {
+        try await commandRunner.run(.add(paths: paths), in: url)
+    }
+    
+    /// Unstage a file
+    public func unstageFile(at path: String) async throws {
+        try await commandRunner.run(.reset(paths: [path]), in: url)
+    }
+    
+    /// Unstage multiple files
+    public func unstageFiles(_ paths: [String]) async throws {
+        try await commandRunner.run(.reset(paths: paths), in: url)
     }
 }
 
@@ -555,3 +583,4 @@ private extension GitRepository {
         }
     }
 }
+
