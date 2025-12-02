@@ -114,7 +114,7 @@ struct HunkStagingTests {
         }
         
         let repository = GitRepository(url: repoURL)
-        let testFile = "File.swift"
+        let testFile = "test_hunk_header_\(UUID().uuidString).txt"
         
         // Create file with content
         let initialContent = """
