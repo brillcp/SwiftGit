@@ -21,7 +21,6 @@ struct CommitStreamTests {
             print("  [\(file.changeType)] \(path)")
         }
         
-        #if os(macOS)
         // Get Git's diff
         let task = Process()
         task.launchPath = "/usr/bin/git"
@@ -72,9 +71,6 @@ struct CommitStreamTests {
                 print("\n✅ Perfect match!")
             }
         }
-        #else
-        print("\n⏭️ Skipping git log comparison on this platform (Process is unavailable)")
-        #endif
     }
 
     @Test func testGetAllRefs() async throws {
@@ -257,7 +253,6 @@ struct CommitStreamTests {
         }
         
         let repository = GitRepository(url: repoURL)
-        #if os(macOS)
         // Get our commits
         var ourCommits: [String] = []
         for try await commit in await repository.streamAllCommits(limit: 100) {
@@ -305,9 +300,6 @@ struct CommitStreamTests {
                 }
             }
         }
-        #else
-        print("\n⏭️ Skipping git log comparison on this platform (Process is unavailable)")
-        #endif
     }
     
     @Test func testStashesInStream() async throws {
@@ -374,7 +366,6 @@ struct CommitStreamTests {
             print("\(i+1). [\(dateStr)] \(commit.title)")
         }
         
-        #if os(macOS)
         // Get GIT's commits
         let task = Process()
         task.launchPath = "/usr/bin/git"
@@ -403,9 +394,6 @@ struct CommitStreamTests {
                 }
             }
         }
-        #else
-        print("\n⏭️ Skipping git log comparison on this platform (Process is unavailable)")
-        #endif
     }
 }
 

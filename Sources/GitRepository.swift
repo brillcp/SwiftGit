@@ -494,7 +494,7 @@ extension GitRepository: GitRepositoryProtocol {
     // MARK: - Git commands
     // Stage files
     public func stageFile(at path: String) async throws {
-        try await commandRunner.run(.add(paths: [path]), stdin: nil, in: url)
+        try await commandRunner.run(.add(path: path), stdin: nil, in: url)
     }
     
     /// Stage multiple files
@@ -504,7 +504,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Unstage a file
     public func unstageFile(at path: String) async throws {
-        try await commandRunner.run(.reset(paths: [path]), stdin: nil, in: url)
+        try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
     }
     
     /// Unstage multiple files

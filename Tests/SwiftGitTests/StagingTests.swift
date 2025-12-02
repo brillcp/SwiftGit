@@ -2,7 +2,6 @@ import Testing
 import Foundation
 @testable import SwiftGit
 
-#if os(macOS)
 @Suite("Staging Operations Tests")
 struct StagingTests {
     @Test func testStageModifiedFile() async throws {
@@ -111,54 +110,6 @@ struct StagingTests {
         }
     }
     
-    // MARK: - Stage Multiple Files Tests
-    
-    @Test func testStageMultipleFiles() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
-        let testFiles = [
-            "test_multi_1_\(UUID().uuidString).txt",
-            "test_multi_2_\(UUID().uuidString).txt",
-            "test_multi_3_\(UUID().uuidString).txt"
-        ]
-        let repository = GitRepository(url: repoURL)
-        
-        // Create test files
-        for file in testFiles {
-            try createTestFile(in: repoURL, named: file, content: "test content")
-        }
-        
-        // Stage all files at once
-        _ = try await repository.stageFiles(testFiles)
-        
-        // Verify all files are staged
-        let status = try gitStatus(in: repoURL)
-        for file in testFiles {
-            #expect(status.contains("A  \(file)"), "\(file) should be staged")
-        }
-        
-        // Cleanup
-        try gitReset(in: repoURL)
-        for file in testFiles {
-            try deleteTestFile(in: repoURL, named: file)
-        }
-    }
-    
-    @Test func testStageEmptyArray() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
-        let repository = GitRepository(url: repoURL)
-        
-        // Stage empty array (should succeed but do nothing)
-        _ = try await repository.stageFiles([])
-        
-        // No assertion needed - just verify it doesn't crash
-    }
-    
     // MARK: - Stage All Tests
     
     @Test func testStageAll() async throws {
@@ -178,7 +129,7 @@ struct StagingTests {
         }
         
         // Stage all changes
-        _ = try await repository.stageAll()
+        _ = try await repository.stageFiles()
         
         // Verify all files are staged
         let status = try gitStatus(in: repoURL)
@@ -222,38 +173,6 @@ struct StagingTests {
         try deleteTestFile(in: repoURL, named: testFile)
     }
     
-    @Test func testUnstageMultipleFiles() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
-        let testFiles = [
-            "test_unstage_multi_1_\(UUID().uuidString).txt",
-            "test_unstage_multi_2_\(UUID().uuidString).txt"
-        ]
-        let repository = GitRepository(url: repoURL)
-        
-        // Create and stage files
-        for file in testFiles {
-            try createTestFile(in: repoURL, named: file, content: "test")
-        }
-        _ = try await repository.stageFiles(testFiles)
-        
-        // Unstage all files
-        _ = try await repository.unstageFiles(testFiles)
-        
-        // Verify all files are unstaged
-        let status = try gitStatus(in: repoURL)
-        for file in testFiles {
-            #expect(status.contains("?? \(file)"), "\(file) should be untracked")
-        }
-        
-        // Cleanup
-        for file in testFiles {
-            try deleteTestFile(in: repoURL, named: file)
-        }
-    }
-    
     @Test func testUnstageAll() async throws {
         guard let repoURL = getTestRepoURL() else {
             return
@@ -269,10 +188,10 @@ struct StagingTests {
         for file in testFiles {
             try createTestFile(in: repoURL, named: file, content: "test")
         }
-        _ = try await repository.stageAll()
+        _ = try await repository.stageFiles()
         
         // Unstage all
-        _ = try await repository.unstageAll()
+        _ = try await repository.unstageFiles()
         
         // Verify all files are unstaged
         let status = try gitStatus(in: repoURL)
@@ -290,7 +209,7 @@ struct StagingTests {
 // MARK: - Test Helpers
 private extension StagingTests {    
     func getTestRepoURL() -> URL? {
-        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"  // Update this
+        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"
         let url = URL(fileURLWithPath: testRepoPath)
         
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -307,7 +226,7 @@ private extension StagingTests {
     
     func modifyTestFile(in repoURL: URL, named: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
-        let content = (try? String(contentsOf: fileURL)) ?? ""
+        let content = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
         try (content + "\nmodified").write(to: fileURL, atomically: true, encoding: .utf8)
     }
     
@@ -347,4 +266,3 @@ private extension StagingTests {
     }
 
 }
-#endif

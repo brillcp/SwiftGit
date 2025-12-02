@@ -53,9 +53,12 @@ extension DiffGenerator: DiffGeneratorProtocol {
             return [makeBinaryPlaceholder()]
         }
         
+        let trimmedOld = oldContent.trimmingCharacters(in: .newlines)
+        let trimmedNew = newContent.trimmingCharacters(in: .newlines)
+        
         // Split into lines (keep as Substring for memory efficiency)
-        let oldLines = oldContent.split(separator: "\n", omittingEmptySubsequences: false)
-        let newLines = newContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let oldLines = trimmedOld.split(separator: "\n", omittingEmptySubsequences: false)
+        let newLines = trimmedNew.split(separator: "\n", omittingEmptySubsequences: false)
         
         // Generate diff
         let diff = makeDiff(oldLines: oldLines, newLines: newLines)
@@ -232,11 +235,18 @@ private extension DiffGenerator {
                     if !currentHunk.isEmpty {
                         // Add trailing context
                         currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
+
+                        let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
+                        let removedCount = currentHunk.filter { $0.type == .removed }.count
+                        let addedCount = currentHunk.filter { $0.type == .added }.count
+                        let oldCount = unchangedCount + removedCount
+                        let newCount = unchangedCount + addedCount
+
                         let header = makeHunkHeader(
                             oldStart: hunkOldStart,
-                            oldCount: oldLineNum - hunkOldStart - unchangedBuffer.count + contextLines,
+                            oldCount: oldCount,
                             newStart: hunkNewStart,
-                            newCount: newLineNum - hunkNewStart - unchangedBuffer.count + contextLines
+                            newCount: newCount
                         )
                         hunks.append(DiffHunk(id: hunkId, header: header, lines: currentHunk))
                         hunkId += 1
@@ -244,11 +254,10 @@ private extension DiffGenerator {
                     }
                     unchangedBuffer.removeAll()
                 }
-                
             case .added:
                 if currentHunk.isEmpty {
-                    hunkOldStart = oldLineNum
-                    hunkNewStart = newLineNum
+                    hunkOldStart = oldLineNum - unchangedBuffer.suffix(contextLines).count
+                    hunkNewStart = newLineNum - unchangedBuffer.suffix(contextLines).count
                     // Add leading context
                     currentHunk.append(contentsOf: unchangedBuffer.suffix(contextLines))
                 } else {
@@ -258,11 +267,10 @@ private extension DiffGenerator {
                 
                 currentHunk.append(line)
                 newLineNum += 1
-                
             case .removed:
                 if currentHunk.isEmpty {
-                    hunkOldStart = oldLineNum
-                    hunkNewStart = newLineNum
+                    hunkOldStart = oldLineNum - unchangedBuffer.suffix(contextLines).count
+                    hunkNewStart = newLineNum - unchangedBuffer.suffix(contextLines).count
                     // Add leading context
                     currentHunk.append(contentsOf: unchangedBuffer.suffix(contextLines))
                 } else {
@@ -278,11 +286,18 @@ private extension DiffGenerator {
         // Close final hunk
         if !currentHunk.isEmpty {
             currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
+
+            let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
+            let removedCount = currentHunk.filter { $0.type == .removed }.count
+            let addedCount = currentHunk.filter { $0.type == .added }.count
+            let oldCount = unchangedCount + removedCount
+            let newCount = unchangedCount + addedCount
+            
             let header = makeHunkHeader(
                 oldStart: hunkOldStart,
-                oldCount: oldLineNum - hunkOldStart,
+                oldCount: oldCount,
                 newStart: hunkNewStart,
-                newCount: newLineNum - hunkNewStart
+                newCount: newCount
             )
             hunks.append(DiffHunk(id: hunkId, header: header, lines: currentHunk))
         }

@@ -1,9 +1,9 @@
 import Foundation
 
 public enum GitCommand: Sendable {
-    case add(paths: [String])
+    case add(path: String)
     case addAll  // For "stage all"
-    case reset(paths: [String])
+    case reset(path: String)
     case resetAll  // For "unstage all"
     case commit(message: String, author: String?)
     case applyPatch(cached: Bool)
@@ -12,12 +12,12 @@ public enum GitCommand: Sendable {
 extension GitCommand {
     var arguments: [String] {
         switch self {
-        case .add(let paths):
-            return ["add", "--"] + paths
+        case .add(let path):
+            return ["add", "--"] + [path]
         case .addAll:
             return ["add", "--all"]
-        case .reset(let paths):
-            return ["reset", "HEAD", "--"] + paths
+        case .reset(let path):
+            return ["reset", "HEAD", "--"] + [path]
         case .resetAll:
             return ["reset", "HEAD"]
         case .commit(let message, let author):

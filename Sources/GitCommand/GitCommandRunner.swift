@@ -21,7 +21,6 @@ extension CommandRunner: GitCommandable {
         stdin: String? = nil,
         in repoURL: URL
     ) async throws -> CommandResult {
-        #if os(macOS)
         let process = Process()
         process.executableURL = try findGitBinary()
         process.currentDirectoryURL = repoURL
@@ -65,16 +64,12 @@ extension CommandRunner: GitCommandable {
             throw GitError.commandFailed(command: command, result: result)
         }
         return result
-        #else
-        throw NSError(domain: "macOS only", code: 1337)
-        #endif
     }
 }
 
 // MARK: - Private functions
 private extension CommandRunner {
     func findGitBinary() throws -> URL {
-        #if os(macOS)
         // Try common paths
         let paths = [
             "/usr/bin/git",
@@ -106,8 +101,5 @@ private extension CommandRunner {
         }
         
         throw GitError.gitNotFound
-        #else
-        throw NSError(domain: "macOS only", code: 1337)
-        #endif
     }
 }
