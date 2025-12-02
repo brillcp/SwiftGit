@@ -32,6 +32,7 @@ extension GitCommand {
                 args.append("--cached")
             }
             if ignoreWhitespace {
+                args.append("--ignore-space-change")
                 args.append("--ignore-whitespace")
             }
             return args

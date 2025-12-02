@@ -233,11 +233,15 @@ private extension DiffGenerator {
                         // Add trailing context
                         currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
 
-                        while let last = currentHunk.last,
-                              last.type == .unchanged,
-                              last.segments.count == 1,
-                              last.segments[0].text.isEmpty {
-                            currentHunk.removeLast()
+                        // Remove trailing empty lines (any type)
+                        while let last = currentHunk.last {
+                            let isEmpty = last.segments.allSatisfy { $0.text.isEmpty }
+                            
+                            if isEmpty {
+                                currentHunk.removeLast()
+                            } else {
+                                break
+                            }
                         }
 
                         let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
@@ -291,12 +295,15 @@ private extension DiffGenerator {
         if !currentHunk.isEmpty {
             currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
 
-            // Remove meaningless trailing empty unchanged lines
-            while let last = currentHunk.last,
-                  last.type == .unchanged,
-                  last.segments.count == 1,
-                  last.segments[0].text.isEmpty {
-                currentHunk.removeLast()
+            // Remove trailing empty lines (any type)
+            while let last = currentHunk.last {
+                let isEmpty = last.segments.allSatisfy { $0.text.isEmpty }
+                
+                if isEmpty {
+                    currentHunk.removeLast()
+                } else {
+                    break
+                }
             }
 
             let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
