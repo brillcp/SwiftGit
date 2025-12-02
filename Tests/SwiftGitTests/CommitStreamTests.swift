@@ -37,7 +37,7 @@ struct CommitStreamTests {
         
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
-            let gitChanges = output.split(separator: "\n")
+            let gitChanges = output.split(separator: String.newLine)
             
             print("\n=== GIT CHANGED FILES (\(gitChanges.count)) ===")
             for line in gitChanges {
@@ -274,7 +274,7 @@ struct CommitStreamTests {
         
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
-            let gitCommits = output.split(separator: "\n").map(String.init)
+            let gitCommits = output.split(separator: String.newLine).map(String.init)
             
             print("\n=== GIT LOG --all (first 100) ===")
             print("Count: \(gitCommits.count)")
@@ -384,7 +384,7 @@ struct CommitStreamTests {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let output = String(data: data, encoding: .utf8) {
             print("\n=== GIT LOG --all (sorted by date) ===")
-            let lines = output.split(separator: "\n")
+            let lines = output.split(separator: String.newLine)
             print("Total: \(lines.count)")
             print("\nFirst 30:")
             for (i, line) in lines.enumerated() {

@@ -11,4 +11,6 @@ extension String {
         guard validLengths.contains(count) else { return false }
         return allSatisfy { $0.isHexDigit }
     }
+
+    public static let newLine: String = "\n"
 }

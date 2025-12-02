@@ -15,7 +15,7 @@ extension CommitParser: CommitParserProtocol {
             throw ParseError.invalidEncoding
         }
 
-        let lines = content.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = content.split(separator: String.newLine, omittingEmptySubsequences: false)
 
         var tree = ""
         var parents: [String] = []
@@ -59,7 +59,7 @@ extension CommitParser: CommitParserProtocol {
         }
 
         let title = messageLines.first ?? ""
-        let body = messageLines.dropFirst().joined(separator: "\n").replacingOccurrences(of: "^\\n+", with: "", options: .regularExpression)
+        let body = messageLines.dropFirst().joined(separator: String.newLine).replacingOccurrences(of: "^\\n+", with: "", options: .regularExpression)
 
         return Commit(
             id: hash,

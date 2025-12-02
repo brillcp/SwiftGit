@@ -17,7 +17,7 @@ extension PatchGenerator {
         patch += "+++ b/\(file.path)\n"
         
         // Hunk
-        patch += hunk.header + "\n"
+        patch += hunk.header + String.newLine
         
         for line in hunk.lines {
             let lineText = line.segments.map { $0.text }.joined()
@@ -46,7 +46,7 @@ extension PatchGenerator {
         
         // All hunks
         for hunk in hunks {
-            patch += hunk.header + "\n"
+            patch += hunk.header + String.newLine
             
             for line in hunk.lines {
                 let lineText = line.segments.map { $0.text }.joined()
@@ -69,7 +69,7 @@ extension PatchGenerator {
     public func generatePatch(changes: [(file: WorkingTreeFile, hunks: [DiffHunk])]) -> String {
         changes
             .map { generatePatch(hunks: $0.hunks, file: $0.file) }
-            .joined(separator: "\n")
+            .joined(separator: String.newLine)
     }
     
     /// Generate a reverse patch (for unstaging/discarding)
@@ -82,7 +82,7 @@ extension PatchGenerator {
         patch += "+++ b/\(file.path)\n"
         
         // Reversed hunk header
-        patch += reverseHunkHeader(hunk.header) + "\n"
+        patch += reverseHunkHeader(hunk.header) + String.newLine
         
         // Reversed lines (swap +/-)
         for line in hunk.lines {

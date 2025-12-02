@@ -23,7 +23,7 @@ struct StashTests {
             "0000000000000000000000000000000000000000 \(stash.hash) Test User <test@example.com> \(stash.timestamp) -0800\t\(stash.message)"
         }
         
-        let content = lines.joined(separator: "\n")
+        let content = lines.joined(separator: .newLine)
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
     

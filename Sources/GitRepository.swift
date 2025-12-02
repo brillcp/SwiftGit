@@ -314,11 +314,11 @@ extension GitRepository: GitRepositoryProtocol {
         var oldContent = diffPair.old?.text ?? ""
         var newContent = diffPair.new?.text ?? ""
 
-        if !oldContent.isEmpty && !oldContent.hasSuffix("\n") {
-            oldContent += "\n"
+        if !oldContent.isEmpty && !oldContent.hasSuffix(.newLine) {
+            oldContent += .newLine
         }
-        if !newContent.isEmpty && !newContent.hasSuffix("\n") {
-            newContent += "\n"
+        if !newContent.isEmpty && !newContent.hasSuffix(.newLine) {
+            newContent += .newLine
         }
 
         return try await diffGenerator.generateHunks(

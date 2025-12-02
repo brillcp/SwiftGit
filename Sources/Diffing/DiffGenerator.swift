@@ -54,8 +54,8 @@ extension DiffGenerator: DiffGeneratorProtocol {
         }
         
         // Split into lines (keep as Substring for memory efficiency)
-        let oldLines = oldContent.split(separator: "\n", omittingEmptySubsequences: false)
-        let newLines = newContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let oldLines = oldContent.split(separator: String.newLine, omittingEmptySubsequences: false)
+        let newLines = newContent.split(separator: String.newLine, omittingEmptySubsequences: false)
         
         // Generate diff
         let diff = makeDiff(oldLines: oldLines, newLines: newLines)

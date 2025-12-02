@@ -141,7 +141,7 @@ extension RefReader: RefReaderProtocol {
         }
         
         let content = try String(contentsOf: stashLogURL, encoding: .utf8)
-        let lines = content.split(separator: "\n")
+        let lines = content.split(separator: String.newLine)
         
         var stashes: [Stash] = []
         
@@ -227,7 +227,7 @@ private extension RefReader {
             }
             
             // Get first line only
-            let hash = content.split(separator: "\n", maxSplits: 1).first?
+            let hash = content.split(separator: String.newLine, maxSplits: 1).first?
                 .trimmingCharacters(in: .whitespaces) ?? ""
             
             // Validate before adding
