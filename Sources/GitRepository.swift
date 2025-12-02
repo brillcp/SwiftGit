@@ -310,9 +310,20 @@ extension GitRepository: GitRepositoryProtocol {
             headTree: headTree,
             indexMap: indexMap
         )
+
+        var oldContent = diffPair.old?.text ?? ""
+        var newContent = diffPair.new?.text ?? ""
+
+        if !oldContent.isEmpty && !oldContent.hasSuffix("\n") {
+            oldContent += "\n"
+        }
+        if !newContent.isEmpty && !newContent.hasSuffix("\n") {
+            newContent += "\n"
+        }
+
         return try await diffGenerator.generateHunks(
-            oldContent: diffPair.old?.text ?? "",
-            newContent: diffPair.new?.text ?? ""
+            oldContent: oldContent,
+            newContent: newContent
         )
     }
     

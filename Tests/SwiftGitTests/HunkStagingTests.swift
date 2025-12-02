@@ -203,28 +203,8 @@ struct HunkStagingTests {
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\n")
         _ = try await repository.stageFile(at: testFile)
         
-        // CHECK: What's in index?
-        let indexCheck = Process()
-        indexCheck.launchPath = "/usr/bin/git"
-        indexCheck.arguments = ["-C", repoURL.path, "show", ":0:\(testFile)"]
-        let indexPipe = Pipe()
-        indexCheck.standardOutput = indexPipe
-        indexCheck.launch()
-        indexCheck.waitUntilExit()
-        let indexData = indexPipe.fileHandleForReading.readDataToEndOfFile()
-        let indexContent = String(data: indexData, encoding: .utf8) ?? ""
-        
-        print("\n=== INDEX CONTENT AFTER INITIAL STAGE ===")
-        print(indexContent)
-        print("=== END INDEX ===")
-        
         // Modify file
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nNew line\nLine 2\n")
-        
-        print("\n=== WORKING TREE CONTENT ===")
-        let workingContent = try String(contentsOf: repoURL.appendingPathComponent(testFile), encoding: .utf8)
-        print(workingContent)
-        print("=== END WORKING ===")
         
         // Get the hunk
         guard let status = try await repository.getWorkingTreeStatus(),
@@ -239,22 +219,6 @@ struct HunkStagingTests {
         #expect(!hunks.isEmpty, "Should have hunks")
         
         let hunk = hunks[0]
-        
-        print("\n=== HUNK INFO ===")
-        print("Header: \(hunk.header)")
-        print("Lines in hunk:")
-        for (i, line) in hunk.lines.enumerated() {
-            let text = line.segments.map { $0.text }.joined()
-            print("  \(i): [\(line.type)] '\(text)'")
-        }
-        
-        // Generate the patch
-        let patchGen = PatchGenerator()
-        let patch = patchGen.generatePatch(hunk: hunk, file: file)
-        
-        print("\n=== GENERATED PATCH ===")
-        print(patch)
-        print("=== END PATCH ===")
         
         // Stage the hunk
         try await repository.stageHunk(hunk, in: file)
