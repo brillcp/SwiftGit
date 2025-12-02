@@ -5,7 +5,8 @@ enum GitError: Error {
     case commandFailed(command: GitCommand, result: CommandResult)
     case notARepository
     case conflictDetected
-    case cannotStageHunkFromUntrackedFile  // NEW
+    case cannotStageHunkFromUntrackedFile
+    case fileNotInIndex(path: String)
 
     var userMessage: String {
         switch self {
@@ -23,6 +24,8 @@ enum GitError: Error {
             return "conflict"
         case .cannotStageHunkFromUntrackedFile:
             return "Cannot stage individual hunks from untracked files. Please stage the entire file first."
+        case .fileNotInIndex(let path):
+            return "Cannot stage hunk: '\(path)' is not in the index. Stage the entire file first."
         }
     }
 }

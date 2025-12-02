@@ -53,12 +53,9 @@ extension DiffGenerator: DiffGeneratorProtocol {
             return [makeBinaryPlaceholder()]
         }
         
-        let trimmedOld = oldContent.trimmingCharacters(in: .newlines)
-        let trimmedNew = newContent.trimmingCharacters(in: .newlines)
-        
         // Split into lines (keep as Substring for memory efficiency)
-        let oldLines = trimmedOld.split(separator: "\n", omittingEmptySubsequences: false)
-        let newLines = trimmedNew.split(separator: "\n", omittingEmptySubsequences: false)
+        let oldLines = oldContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let newLines = newContent.split(separator: "\n", omittingEmptySubsequences: false)
         
         // Generate diff
         let diff = makeDiff(oldLines: oldLines, newLines: newLines)
@@ -236,6 +233,13 @@ private extension DiffGenerator {
                         // Add trailing context
                         currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
 
+                        while let last = currentHunk.last,
+                              last.type == .unchanged,
+                              last.segments.count == 1,
+                              last.segments[0].text.isEmpty {
+                            currentHunk.removeLast()
+                        }
+
                         let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
                         let removedCount = currentHunk.filter { $0.type == .removed }.count
                         let addedCount = currentHunk.filter { $0.type == .added }.count
@@ -286,6 +290,14 @@ private extension DiffGenerator {
         // Close final hunk
         if !currentHunk.isEmpty {
             currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
+
+            // Remove meaningless trailing empty unchanged lines
+            while let last = currentHunk.last,
+                  last.type == .unchanged,
+                  last.segments.count == 1,
+                  last.segments[0].text.isEmpty {
+                currentHunk.removeLast()
+            }
 
             let unchangedCount = currentHunk.filter { $0.type == .unchanged }.count
             let removedCount = currentHunk.filter { $0.type == .removed }.count

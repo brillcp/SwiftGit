@@ -514,6 +514,14 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Stage hunk
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        // Check if file is in index
+        let snapshot = try await workingTree.readIndex()
+        let fileInIndex = snapshot.contains { $0.path == file.path }
+        
+        if !fileInIndex {
+            throw GitError.fileNotInIndex(path: file.path)
+        }
+
         if file.unstaged == .untracked {
             throw GitError.cannotStageHunkFromUntrackedFile
         }
@@ -529,6 +537,14 @@ extension GitRepository: GitRepositoryProtocol {
 
     /// Unstage hunk
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        // Validation
+        let snapshot = try await workingTree.readIndex()
+        let fileInIndex = snapshot.contains { $0.path == file.path }
+        
+        if !fileInIndex {
+            throw GitError.fileNotInIndex(path: file.path)
+        }
+
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
         
         try await commandRunner.run(
