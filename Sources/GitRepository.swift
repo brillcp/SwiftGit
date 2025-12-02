@@ -514,11 +514,15 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Stage hunk
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
+        if file.unstaged == .untracked {
+            throw GitError.cannotStageHunkFromUntrackedFile
+        }
+
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
         
         try await commandRunner.run(
             .applyPatch(cached: true),
-            stdin: patch,  // Pass patch via stdin
+            stdin: patch,
             in: url
         )
     }
