@@ -11,9 +11,14 @@ public protocol GitIndexReaderProtocol: Actor {
 // MARK: -
 public actor GitIndexReader {
     private let cache: ObjectCacheProtocol
+    private let fileManager: FileManager
     
-    public init(cache: ObjectCacheProtocol) {
+    public init(
+        cache: ObjectCacheProtocol,
+        fileManager: FileManager = .default
+    ) {
         self.cache = cache
+        self.fileManager = fileManager
     }
 }
 
@@ -21,7 +26,7 @@ public actor GitIndexReader {
 extension GitIndexReader: GitIndexReaderProtocol {
     public func readIndex(at url: URL) async throws -> GitIndexSnapshot {
         // Check if file exists
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard fileManager.fileExists(atPath: url.path) else {
             throw GitIndexError.fileNotFound(url)
         }
         

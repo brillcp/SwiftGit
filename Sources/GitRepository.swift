@@ -512,7 +512,20 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Discard all changes in a file (restore to index version)
     public func discardFile(at path: String) async throws {
-        try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
+        // Get file status
+        guard let status = try await getWorkingTreeStatus(),
+              let file = status.files[path] else {
+            return  // File doesn't exist
+        }
+        
+        if file.unstaged == .untracked {
+            // Untracked file - delete from filesystem
+            let fileURL = url.appendingPathComponent(path)
+            try fileManager.removeItem(at: fileURL)
+        } else {
+            // Tracked file - restore from index/HEAD
+            try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
+        }
     }
 
     /// Discard all unstaged changes
