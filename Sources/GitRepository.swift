@@ -553,6 +553,8 @@ extension GitRepository: GitRepositoryProtocol {
             stdin: patch,
             in: url
         )
+        
+        try await cleanupTrailingNewlineChange(for: file.path)
     }
 
     /// Disgard hunk
@@ -644,5 +646,36 @@ private extension GitRepository {
             }
         }
     }
-}
 
+    func cleanupTrailingNewlineChange(for path: String) async throws {
+        // Get HEAD content
+        guard let head = try await getHEAD(),
+              let commit = try await getCommit(head) else {
+            return
+        }
+        
+        let tree = try await getTreePaths(commit.tree)
+        guard let blobHash = tree[path],
+              let headBlob = try await getBlob(blobHash) else {
+            return
+        }
+        
+        // Get INDEX content
+        let snapshot = try await workingTree.readIndex()
+        guard let indexEntry = snapshot.first(where: { $0.path == path }),
+              let indexBlob = try await getBlob(indexEntry.sha1)
+        else { return }
+        
+        let headContent = headBlob.text
+        let indexContent = indexBlob.text
+        
+        // Check if only difference is trailing newline
+        let headTrimmed = headContent?.trimmingCharacters(in: .newlines)
+        let indexTrimmed = indexContent?.trimmingCharacters(in: .newlines)
+        
+        if headTrimmed == indexTrimmed && headContent != indexContent {
+            // Only difference is trailing newlines - unstage it
+            try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+        }
+    }
+}

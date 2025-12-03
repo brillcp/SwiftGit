@@ -26,17 +26,20 @@ public protocol ObjectLocatorProtocol: Actor {
 public actor ObjectLocator {
     private let repoURL: URL
     private let packIndexManager: PackIndexManagerProtocol
-    
+    private let fileManager: FileManager
+
     // Lazy caches
     private var looseObjectCache: [String: URL] = [:]
     private var scannedPrefixes: Set<String> = []
     
     public init(
         repoURL: URL,
-        packIndexManager: PackIndexManagerProtocol
+        packIndexManager: PackIndexManagerProtocol,
+        fileManager: FileManager = .default
     ) {
         self.repoURL = repoURL
         self.packIndexManager = packIndexManager
+        self.fileManager = fileManager
     }
 }
 
@@ -109,7 +112,6 @@ private extension ObjectLocator {
         let suffix = String(hashLower.dropFirst(2))
         let directURL = objectsURL.appendingPathComponent("\(prefix)/\(suffix)")
         
-        let fileManager = FileManager.default
         if fileManager.fileExists(atPath: directURL.path) {
             looseObjectCache[hashLower] = directURL
             return directURL
@@ -128,7 +130,6 @@ private extension ObjectLocator {
     func scanPrefix(_ prefix: String) async throws {
         let prefixURL = objectsURL.appendingPathComponent(prefix)
         
-        let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: prefixURL.path) else {
             scannedPrefixes.insert(prefix)
             return
@@ -136,7 +137,7 @@ private extension ObjectLocator {
         
         // Scan off main thread
         let objects = try await Task.detached {
-            try Self.scanPrefixDirectory(prefixURL: prefixURL, prefix: prefix, fileManager: fileManager)
+            try Self.scanPrefixDirectory(prefixURL: prefixURL, prefix: prefix, fileManager: .default)
         }.value
         
         // Cache results
@@ -154,7 +155,6 @@ private extension ObjectLocator {
             return
         }
         
-        let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: objectsURL.path) else {
             return
         }

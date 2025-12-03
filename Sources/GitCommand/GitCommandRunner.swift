@@ -11,7 +11,11 @@ public protocol GitCommandable: Actor {
 
 // MARK: -
 public actor CommandRunner {
-    public init() {}
+    private let fileManager: FileManager
+
+    public init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+    }
 }
 
 // MARK: - GitCommandable
@@ -78,7 +82,7 @@ private extension CommandRunner {
         ]
         
         for path in paths {
-            if FileManager.default.fileExists(atPath: path) {
+            if fileManager.fileExists(atPath: path) {
                 return URL(fileURLWithPath: path)
             }
         }
