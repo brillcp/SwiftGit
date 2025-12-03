@@ -12,9 +12,6 @@ public protocol WorkingTreeReaderProtocol: Actor {
 
     /// Get unstaged changes (Index → Working Tree)
     func unstagedChanges() async throws -> [String: WorkingTreeFile]
-    
-    /// Get untracked files
-    func untrackedFiles() async throws -> [String]
 }
 
 // MARK: -
@@ -110,12 +107,6 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         }
         
         return files
-    }
-    
-    public func untrackedFiles() async throws -> [String] {
-        let indexEntries = try await readIndex()
-        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
-        return Array(untracked.keys)
     }
 }
 

@@ -28,7 +28,6 @@ public protocol GitRepositoryProtocol: Actor {
     func getWorkingTreeStatus() async throws -> WorkingTreeStatus?
     func getStagedChanges() async throws -> [String: WorkingTreeFile]
     func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
-    func getUntrackedFiles() async throws -> [String]
 
     /// Walk a tree recursively, calling visitor for each entry
     /// Visitor returns true to continue, false to stop
@@ -68,6 +67,9 @@ public protocol GitRepositoryProtocol: Actor {
     func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
     func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
     func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
+    
+    func discardFile(at path: String) async throws
+    func discardAllFiles() async throws
 }
 
 // MARK: -
@@ -401,11 +403,6 @@ extension GitRepository: GitRepositoryProtocol {
         try await workingTree.unstagedChanges()
     }
     
-    /// Get only untracked files
-    public func getUntrackedFiles() async throws -> [String] {
-        try await workingTree.untrackedFiles()
-    }
-    
     public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
         try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
     }
@@ -513,6 +510,16 @@ extension GitRepository: GitRepositoryProtocol {
         try await commandRunner.run(.resetAll, stdin: nil, in: url)
     }
     
+    /// Discard all changes in a file (restore to index version)
+    public func discardFile(at path: String) async throws {
+        try await commandRunner.run(.checkout(paths: [path]), stdin: nil, in: url)
+    }
+
+    /// Discard all unstaged changes
+    public func discardAllFiles() async throws {
+        try await commandRunner.run(.checkoutAll, stdin: nil, in: url)
+    }
+
     /// Stage hunk
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Check if file is in index
