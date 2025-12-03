@@ -512,12 +512,12 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Discard all changes in a file (restore to index version)
     public func discardFile(at path: String) async throws {
-        try await commandRunner.run(.checkout(paths: [path]), stdin: nil, in: url)
+        try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
     }
 
     /// Discard all unstaged changes
     public func discardAllFiles() async throws {
-        try await commandRunner.run(.checkoutAll, stdin: nil, in: url)
+        try await commandRunner.run(.restoreAll, stdin: nil, in: url)
     }
 
     /// Stage hunk
