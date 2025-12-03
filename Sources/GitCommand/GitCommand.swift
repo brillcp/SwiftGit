@@ -6,7 +6,7 @@ public enum GitCommand: Sendable {
     case reset(path: String)
     case resetAll  // For "unstage all"
     case commit(message: String, author: String?)
-    case applyPatch(cached: Bool, ignoreWhitespace: Bool = true)
+    case applyPatch(cached: Bool)
 }
 
 extension GitCommand {
@@ -26,15 +26,13 @@ extension GitCommand {
                 args += ["--author", author]
             }
             return args
-        case .applyPatch(let cached, let ignoreWhitespace):
+        case .applyPatch(let cached):
             var args = ["apply"]
             if cached {
                 args.append("--cached")
             }
-            if ignoreWhitespace {
-                args.append("--ignore-space-change")
-                args.append("--ignore-whitespace")
-            }
+            args.append("--ignore-whitespace")
+            args.append("--unidiff-zero")
             return args
         }
     }
