@@ -408,12 +408,8 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Get only staged changes (HEAD → Index)
     public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
-        guard let head = try await getHEAD(),
-              let commit = try await getCommit(head)
-        else { return [:] }
-        
-        let headTree = try await getTreePaths(commit.tree)
-        return try await workingTree.stagedChanges(headTree: headTree)
+        let snapshot = try await getRepoSnapshot()
+        return try await workingTree.stagedChanges(headTree: snapshot.headTree)
     }
     
     /// Get only unstaged changes (Index → Working Tree)
@@ -712,21 +708,15 @@ private extension GitRepository {
     }
 
     func cleanupTrailingNewlineChange(for path: String) async throws {
-        // Get HEAD content
-        guard let head = try await getHEAD(),
-              let commit = try await getCommit(head) else {
-            return
-        }
-        
-        let tree = try await getTreePaths(commit.tree)
-        guard let blobHash = tree[path],
+        let snapshot = try await getRepoSnapshot()
+
+        guard let blobHash = snapshot.headTree[path],
               let headBlob = try await getBlob(blobHash) else {
             return
         }
         
         // Get INDEX content
-        let snapshot = try await workingTree.readIndex()
-        guard let indexEntry = snapshot.first(where: { $0.path == path }),
+        guard let indexEntry = snapshot.index.first(where: { $0.path == path }),
               let indexBlob = try await getBlob(indexEntry.sha1)
         else { return }
         
