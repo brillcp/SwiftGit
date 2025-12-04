@@ -35,6 +35,7 @@ extension GitCommand {
             }
             args.append("--ignore-whitespace")
             args.append("--unidiff-zero")
+            args.append("--whitespace=nowarn")
             return args
         case .restore(let paths):
             return ["restore", "--"] + [paths]
