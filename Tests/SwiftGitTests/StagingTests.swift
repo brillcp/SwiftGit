@@ -14,22 +14,28 @@ struct StagingTests {
         
         // Setup: Create and commit a file
         try createTestFile(in: repoURL, named: testFile, content: "original")
-        _ = try await repository.stageFile(at: testFile)
-        // Commit it (we'll implement this later, for now just stage)
+        try gitAdd(in: repoURL, pathspec: testFile)
+        try gitCommit(in: repoURL, message: "add test file")
         
         // Modify the file
         try modifyTestFile(in: repoURL, named: testFile)
         
         // Verify file is unstaged
-        var status = try gitStatus(in: repoURL)
-        #expect(status.contains(" M \(testFile)"), "File should be modified but unstaged")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix(" M "), "File should be modified but unstaged")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Stage the file
         _ = try await repository.stageFile(at: testFile)
         
         // Verify file is staged
-        status = try gitStatus(in: repoURL)
-        #expect(status.contains("M  \(testFile)"), "File should be staged")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("M  "), "File should be staged")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Cleanup
         try gitReset(in: repoURL)
@@ -48,15 +54,21 @@ struct StagingTests {
         try createTestFile(in: repoURL, named: testFile, content: "new file")
         
         // Verify file is untracked
-        var status = try gitStatus(in: repoURL)
-        #expect(status.contains("?? \(testFile)"), "File should be untracked")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("?? "), "File should be untracked")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Stage the file
         _ = try await repository.stageFile(at: testFile)
         
         // Verify file is staged
-        status = try gitStatus(in: repoURL)
-        #expect(status.contains("A  \(testFile)"), "File should be staged as new")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("A  "), "File should be staged as new")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Cleanup
         try gitReset(in: repoURL)
@@ -73,20 +85,29 @@ struct StagingTests {
         
         // Setup: Create and commit a file (assume it exists in repo)
         // For this test, use an existing tracked file or create one first
+        try createTestFile(in: repoURL, named: testFile, content: "to delete")
+        try gitAdd(in: repoURL, pathspec: testFile)
+        try gitCommit(in: repoURL, message: "add file to delete")
         
         // Delete the file
         try deleteTestFile(in: repoURL, named: testFile)
         
         // Verify file is deleted but not staged
-        var status = try gitStatus(in: repoURL)
-        #expect(status.contains(" D \(testFile)"), "File should be deleted but unstaged")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix(" D "), "File should be deleted but unstaged")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Stage the deletion
         _ = try await repository.stageFile(at: testFile)
         
         // Verify deletion is staged
-        status = try gitStatus(in: repoURL)
-        #expect(status.contains("D  \(testFile)"), "Deletion should be staged")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("D  "), "Deletion should be staged")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Cleanup
         try gitReset(in: repoURL)
@@ -159,15 +180,21 @@ struct StagingTests {
         _ = try await repository.stageFile(at: testFile)
         
         // Verify file is staged
-        var status = try gitStatus(in: repoURL)
-        #expect(status.contains("A  \(testFile)"), "File should be staged")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("A  "), "File should be staged")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Unstage the file
         _ = try await repository.unstageFile(at: testFile)
         
         // Verify file is unstaged
-        status = try gitStatus(in: repoURL)
-        #expect(status.contains("?? \(testFile)"), "File should be untracked again")
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("?? "), "File should be untracked again")
+        } else {
+            Issue.record("No status line for file")
+        }
         
         // Cleanup
         try deleteTestFile(in: repoURL, named: testFile)
@@ -194,9 +221,12 @@ struct StagingTests {
         _ = try await repository.unstageFiles()
         
         // Verify all files are unstaged
-        let status = try gitStatus(in: repoURL)
         for file in testFiles {
-            #expect(status.contains("?? \(file)"), "\(file) should be untracked")
+            if let line = try statusLine(for: file, in: repoURL) {
+                #expect(line.hasPrefix("?? "), "\(file) should be untracked")
+            } else {
+                Issue.record("No status line for file")
+            }
         }
         
         // Cleanup
@@ -265,4 +295,28 @@ private extension StagingTests {
         task.waitUntilExit()
     }
 
+    func gitAdd(in repoURL: URL, pathspec: String = ".") throws {
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = ["-C", repoURL.path, "add", pathspec]
+        task.launch()
+        task.waitUntilExit()
+    }
+    
+    func gitCommit(in repoURL: URL, message: String) throws {
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = ["-C", repoURL.path, "commit", "-m", message]
+        task.launch()
+        task.waitUntilExit()
+    }
+    
+    func statusLine(for file: String, in repoURL: URL) throws -> String? {
+        let output = try gitStatus(in: repoURL)
+        // Each line is two status columns + space + path
+        return output
+            .split(separator: "\n")
+            .map(String.init)
+            .first { $0.hasSuffix(" \(file)") || $0.hasSuffix(file) }
+    }
 }

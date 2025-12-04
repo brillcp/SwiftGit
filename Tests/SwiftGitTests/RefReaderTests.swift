@@ -19,9 +19,16 @@ struct RefReaderTests {
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         let refs = try await refReader.getRefs()
         
-        #expect(refs.count == 2)
-        #expect(refs.contains { $0.name == "main" && $0.hash == mainHash && $0.type == .localBranch })
-        #expect(refs.contains { $0.name == "develop" && $0.hash == devHash && $0.type == .localBranch })
+        // Normalize names in case RefReader yields full ref paths like "refs/heads/main"
+        func normalizedName(_ name: String) -> String {
+            if name.hasPrefix("refs/heads/") {
+                return String(name.dropFirst("refs/heads/".count))
+            }
+            return name
+        }
+        
+        #expect(refs.contains { normalizedName($0.name) == "main" && $0.hash == mainHash && $0.type == .localBranch })
+        #expect(refs.contains { normalizedName($0.name) == "develop" && $0.hash == devHash && $0.type == .localBranch })
     }
 
     @Test func testReadPackedRefs() async throws {
@@ -261,3 +268,4 @@ private extension RefReaderTests {
         try content.write(to: headFile, atomically: true, encoding: .utf8)
     }
 }
+

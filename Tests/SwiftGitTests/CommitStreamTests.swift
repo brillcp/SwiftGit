@@ -224,7 +224,7 @@ struct CommitStreamTests {
         let repository = GitRepository(url: repoURL)
         
         // Hash of commit you expect to see (from GitKraken)
-        let expectedHash = "bc4fb3fbd8c83c2a1a66beb973b2b8c1ba764630"  // Replace with actual hash
+        let expectedHash = "58d4b8ba550cb0f896f96404f608a349ab55a520"  // Replace with actual hash
         
         var found = false
         var commitCount = 0
