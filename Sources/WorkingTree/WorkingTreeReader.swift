@@ -2,7 +2,7 @@ import Foundation
 import CommonCrypto
 
 public protocol WorkingTreeReaderProtocol: Actor {
-    func readIndex(force: Bool) async throws -> [IndexEntry]
+    func readIndex() async throws -> [IndexEntry]
 
     /// Compute the current working tree status
     func computeStatus(headTree: [String: String]) async throws -> WorkingTreeStatus
@@ -11,7 +11,10 @@ public protocol WorkingTreeReaderProtocol: Actor {
     func stagedChanges(headTree: [String: String]) async throws -> [String: WorkingTreeFile]
 
     /// Get unstaged changes (Index → Working Tree)
-    func unstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile]
+    func unstagedChanges() async throws -> [String: WorkingTreeFile]
+    
+    /// Get untracked files
+    func untrackedFiles() async throws -> [String]
 }
 
 // MARK: -
@@ -36,19 +39,19 @@ public actor WorkingTreeReader {
 
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
-    public func readIndex(force: Bool) async throws -> [IndexEntry] {
+    public func readIndex() async throws -> [IndexEntry] {
         guard fileManager.fileExists(atPath: indexURL.path) else {
             return []
         }
         
-        let snapshot = try await indexReader.readIndex(at: indexURL, force: force)
+        let snapshot = try await indexReader.readIndex(at: indexURL)
         return snapshot.entries
     }
     
 
     public func computeStatus(headTree: [String: String]) async throws -> WorkingTreeStatus {
         // 1. Read index
-        let indexEntries = try await readIndex(force: false)
+        let indexEntries = try await readIndex()
         let indexMap = Dictionary(uniqueKeysWithValues: indexEntries.map { ($0.path, $0.sha1) })
         
         // 2. Check working tree against index (with stat optimization)
@@ -70,8 +73,8 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         return status.files.filter { $0.value.isStaged }
     }
 
-    public func unstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile] {
-        let indexEntries = try await readIndex(force: force)
+    public func unstagedChanges() async throws -> [String: WorkingTreeFile] {
+        let indexEntries = try await readIndex()
         let indexMap = Dictionary(uniqueKeysWithValues: indexEntries.map { ($0.path, $0.sha1) })
         let workingTree = try await checkWorkingTreeAgainstIndex(indexEntries: indexEntries)
         let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
@@ -107,6 +110,12 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         }
         
         return files
+    }
+    
+    public func untrackedFiles() async throws -> [String] {
+        let indexEntries = try await readIndex()
+        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
+        return Array(untracked.keys)
     }
 }
 

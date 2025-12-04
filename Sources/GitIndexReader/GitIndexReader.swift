@@ -2,10 +2,10 @@ import Foundation
 
 public protocol GitIndexReaderProtocol: Actor {
     /// Read the Git index file
-    func readIndex(at url: URL, force: Bool) async throws -> GitIndexSnapshot
+    func readIndex(at url: URL) async throws -> GitIndexSnapshot
     
     /// Get a specific index entry by path (O(1) lookup)
-    func getEntry(for path: String, at url: URL, force: Bool) async throws -> IndexEntry?
+    func getEntry(for path: String, at url: URL) async throws -> IndexEntry?
 }
 
 // MARK: -
@@ -24,7 +24,7 @@ public actor GitIndexReader {
 
 // MARK: -  GitIndexReaderProtocol
 extension GitIndexReader: GitIndexReaderProtocol {
-    public func readIndex(at url: URL, force: Bool) async throws -> GitIndexSnapshot {
+    public func readIndex(at url: URL) async throws -> GitIndexSnapshot {
         // Check if file exists
         guard fileManager.fileExists(atPath: url.path) else {
             throw GitIndexError.fileNotFound(url)
@@ -34,10 +34,6 @@ extension GitIndexReader: GitIndexReaderProtocol {
         let modDate = try url.resourceValues(forKeys: [.contentModificationDateKey])
             .contentModificationDate
         
-        if force {
-            await cache.remove(.indexSnapshot(url: url))
-        }
-
         if let cached: (snapshot: GitIndexSnapshot, modDate: Date) = await cache.get(.indexSnapshot(url: url)) {
             if cached.modDate == modDate {
                 return cached.snapshot
@@ -56,8 +52,8 @@ extension GitIndexReader: GitIndexReaderProtocol {
         return snapshot
     }
     
-    public func getEntry(for path: String, at url: URL, force: Bool) async throws -> IndexEntry? {
-        let snapshot = try await readIndex(at: url, force: force)
+    public func getEntry(for path: String, at url: URL) async throws -> IndexEntry? {
+        let snapshot = try await readIndex(at: url)
         return snapshot[path]
     }
 }

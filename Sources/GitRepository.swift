@@ -26,9 +26,9 @@ public protocol GitRepositoryProtocol: Actor {
     /// Stream a large blob without loading entirely into memory
     func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, Error>
     
-    func getWorkingTreeStatus(force: Bool) async throws -> WorkingTreeStatus?
-    func getStagedChanges(force: Bool) async throws -> [String: WorkingTreeFile]
-    func getUnstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile]
+    func getWorkingTreeStatus() async throws -> WorkingTreeStatus?
+    func getStagedChanges() async throws -> [String: WorkingTreeFile]
+    func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
 
     /// Walk a tree recursively, calling visitor for each entry
     /// Visitor returns true to continue, false to stop
@@ -295,7 +295,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
-        let snapshot = try await getRepoSnapshot(force: true)
+        let snapshot = try await getRepoSnapshot()
         
         let resolver = WorkingTreeDiffResolver(
             repoURL: url,
@@ -316,7 +316,7 @@ extension GitRepository: GitRepositoryProtocol {
     
     /// Get diff for staged changes (index vs HEAD)
     public func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
-        let snapshot = try await getRepoSnapshot(force: true)
+        let snapshot = try await getRepoSnapshot()
         
         // Get HEAD version
         let headContent: String
@@ -401,20 +401,20 @@ extension GitRepository: GitRepositoryProtocol {
         }
     }
     
-    public func getWorkingTreeStatus(force: Bool) async throws -> WorkingTreeStatus? {
-        let snapshot = try await getRepoSnapshot(force: force)
+    public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
+        let snapshot = try await getRepoSnapshot()
         return try await workingTree.computeStatus(headTree: snapshot.headTree)
     }
     
     /// Get only staged changes (HEAD → Index)
-    public func getStagedChanges(force: Bool) async throws -> [String: WorkingTreeFile] {
-        let snapshot = try await getRepoSnapshot(force: force)
+    public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
+        let snapshot = try await getRepoSnapshot()
         return try await workingTree.stagedChanges(headTree: snapshot.headTree)
     }
     
     /// Get only unstaged changes (Index → Working Tree)
-    public func getUnstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile] {
-        try await workingTree.unstagedChanges(force: force)
+    public func getUnstagedChanges() async throws -> [String: WorkingTreeFile] {
+        try await workingTree.unstagedChanges()
     }
     
     public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
@@ -527,7 +527,7 @@ extension GitRepository: GitRepositoryProtocol {
     /// Discard all changes in a file (restore to index version)
     public func discardFile(at path: String) async throws {
         // Get file status
-        guard let status = try await getWorkingTreeStatus(force: true),
+        guard let status = try await getWorkingTreeStatus(),
               let file = status.files[path] else {
             return  // File doesn't exist
         }
@@ -550,7 +550,7 @@ extension GitRepository: GitRepositoryProtocol {
     /// Stage hunk
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Check if file is in index
-        let snapshot = try await workingTree.readIndex(force: true)
+        let snapshot = try await workingTree.readIndex()
         let fileInIndex = snapshot.contains { $0.path == file.path }
         
         if !fileInIndex {
@@ -573,7 +573,7 @@ extension GitRepository: GitRepositoryProtocol {
     /// Unstage hunk
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Validation
-        let snapshot = try await workingTree.readIndex(force: true)
+        let snapshot = try await workingTree.readIndex()
         let fileInIndex = snapshot.contains { $0.path == file.path }
         
         if !fileInIndex {
@@ -621,13 +621,13 @@ private extension GitRepository {
         let indexMap: [String: String]
     }
 
-    func getRepoSnapshot(force: Bool) async throws -> RepoSnapshot {
+    func getRepoSnapshot() async throws -> RepoSnapshot {
         guard let head = try await getHEAD(), let commit = try await getCommit(head) else {
             throw GitError.notARepository
         }
         
         let headTree = try await getTreePaths(commit.tree)
-        let index = try await workingTree.readIndex(force: force)
+        let index = try await workingTree.readIndex()
         let indexMap = Dictionary(uniqueKeysWithValues: index.map { ($0.path, $0.sha1) })
         
         return RepoSnapshot(
@@ -708,7 +708,7 @@ private extension GitRepository {
     }
 
     func cleanupTrailingNewlineChange(for path: String) async throws {
-        let snapshot = try await getRepoSnapshot(force: true)
+        let snapshot = try await getRepoSnapshot()
 
         guard let blobHash = snapshot.headTree[path],
               let headBlob = try await getBlob(blobHash) else {
