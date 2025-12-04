@@ -314,11 +314,19 @@ private extension DiffGenerator {
     
     /// Word-level diff using Myers' algorithm (via difference)
     func wordDiff(old: Substring, new: Substring, forOld: Bool) -> [Segment] {
-        // Split into words (keep as Substring views)
-        let oldWords = old.split(whereSeparator: { $0.isWhitespace })
-        let newWords = new.split(whereSeparator: { $0.isWhitespace })
+        // Extract and preserve leading whitespace
+        let oldLeading = old.prefix(while: { $0.isWhitespace })
+        let newLeading = new.prefix(while: { $0.isWhitespace })
         
-        // Use Myers' algorithm for word diff too
+        // Get content after leading whitespace
+        let oldContent = old.drop(while: { $0.isWhitespace })
+        let newContent = new.drop(while: { $0.isWhitespace })
+        
+        // Split content into words (now safe to split on whitespace)
+        let oldWords = oldContent.split(whereSeparator: { $0.isWhitespace })
+        let newWords = newContent.split(whereSeparator: { $0.isWhitespace })
+        
+        // Use Myers' algorithm for word diff
         let difference = Array(newWords).difference(from: Array(oldWords))
         
         var segments: [Segment] = []
@@ -335,6 +343,17 @@ private extension DiffGenerator {
             case .insert(let offset, _, _):
                 insertions.insert(offset)
             }
+        }
+        
+        // Add leading whitespace as first segment (not highlighted)
+        let leadingSpace = forOld ? String(oldLeading) : String(newLeading)
+        if !leadingSpace.isEmpty {
+            segments.append(Segment(
+                id: segmentId,
+                text: leadingSpace,
+                isHighlighted: false
+            ))
+            segmentId += 1
         }
         
         // Generate segments based on which version we're building
@@ -360,13 +379,17 @@ private extension DiffGenerator {
             }
         }
         
-        // Add spaces between words
+        // Add spaces between words (skip first if it's the leading whitespace)
+        let startIndex = leadingSpace.isEmpty ? 0 : 1
         return segments.enumerated().map { index, segment in
-            Segment(
-                id: segment.id,
-                text: index < segments.count - 1 ? segment.text + " " : segment.text,
-                isHighlighted: segment.isHighlighted
-            )
+            if index >= startIndex && index < segments.count - 1 {
+                return Segment(
+                    id: segment.id,
+                    text: segment.text + " ",
+                    isHighlighted: segment.isHighlighted
+                )
+            }
+            return segment
         }
     }
     
