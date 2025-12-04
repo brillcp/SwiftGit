@@ -26,9 +26,9 @@ public protocol GitRepositoryProtocol: Actor {
     /// Stream a large blob without loading entirely into memory
     func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, Error>
     
-    func getWorkingTreeStatus() async throws -> WorkingTreeStatus?
-    func getStagedChanges() async throws -> [String: WorkingTreeFile]
-    func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
+    func getWorkingTreeStatus(force: Bool) async throws -> WorkingTreeStatus?
+    func getStagedChanges(force: Bool) async throws -> [String: WorkingTreeFile]
+    func getUnstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile]
 
     /// Walk a tree recursively, calling visitor for each entry
     /// Visitor returns true to continue, false to stop
@@ -401,20 +401,20 @@ extension GitRepository: GitRepositoryProtocol {
         }
     }
     
-    public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
-        let snapshot = try await getRepoSnapshot(force: false)
+    public func getWorkingTreeStatus(force: Bool) async throws -> WorkingTreeStatus? {
+        let snapshot = try await getRepoSnapshot(force: force)
         return try await workingTree.computeStatus(headTree: snapshot.headTree)
     }
     
     /// Get only staged changes (HEAD → Index)
-    public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
-        let snapshot = try await getRepoSnapshot(force: true)
+    public func getStagedChanges(force: Bool) async throws -> [String: WorkingTreeFile] {
+        let snapshot = try await getRepoSnapshot(force: force)
         return try await workingTree.stagedChanges(headTree: snapshot.headTree)
     }
     
     /// Get only unstaged changes (Index → Working Tree)
-    public func getUnstagedChanges() async throws -> [String: WorkingTreeFile] {
-        try await workingTree.unstagedChanges(force: true)
+    public func getUnstagedChanges(force: Bool) async throws -> [String: WorkingTreeFile] {
+        try await workingTree.unstagedChanges(force: force)
     }
     
     public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
@@ -527,7 +527,7 @@ extension GitRepository: GitRepositoryProtocol {
     /// Discard all changes in a file (restore to index version)
     public func discardFile(at path: String) async throws {
         // Get file status
-        guard let status = try await getWorkingTreeStatus(),
+        guard let status = try await getWorkingTreeStatus(force: true),
               let file = status.files[path] else {
             return  // File doesn't exist
         }
