@@ -15,6 +15,7 @@ public protocol GitRepositoryProtocol: Actor {
 
     func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk]
     func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk]
+    func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk]
 
     /// Get a tree by hash (lazy loaded)
     func getTree(_ hash: String) async throws -> Tree?
@@ -294,13 +295,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
-        guard let head = try await getHEAD(),
-              let commit = try await getCommit(head)
-        else { return [] }
-        
-        let headTree = try await getTreePaths(commit.tree)
-        let snapshot = try await workingTree.readIndex()
-        let indexMap = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.path, $0.sha1) })
+        let snapshot = try await getRepoSnapshot()
         
         let resolver = WorkingTreeDiffResolver(
             repoURL: url,
@@ -309,8 +304,8 @@ extension GitRepository: GitRepositoryProtocol {
         
         let diffPair = try await resolver.resolveDiff(
             for: workingFile,
-            headTree: headTree,
-            indexMap: indexMap
+            headTree: snapshot.headTree,
+            indexMap: snapshot.indexMap
         )
 
         return try await diffGenerator.generateHunks(
@@ -319,6 +314,33 @@ extension GitRepository: GitRepositoryProtocol {
         )
     }
     
+    /// Get diff for staged changes (index vs HEAD)
+    public func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
+        let snapshot = try await getRepoSnapshot()
+        
+        // Get HEAD version
+        let headContent: String
+        if let headBlobHash = snapshot.headTree[workingFile.path] {
+            headContent = try await getBlob(headBlobHash)?.text ?? ""
+        } else {
+            headContent = ""
+        }
+        
+        // Get index version
+        let indexContent: String
+        if let indexEntry = snapshot.index.first(where: { $0.path == workingFile.path }) {
+            indexContent = try await getBlob(indexEntry.sha1)?.text ?? ""
+        } else {
+            indexContent = ""
+        }
+        
+        // Diff: HEAD → index (what's staged)
+        return try await diffGenerator.generateHunks(
+            oldContent: headContent,
+            newContent: indexContent
+        )
+    }
+
     public func getTree(_ hash: String) async throws -> Tree? {
         // Check cache
         if let cached: Tree = await cache.get(.tree(hash: hash)) { return cached }
@@ -380,12 +402,8 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
-        guard let head = try await getHEAD(),
-              let commit = try await getCommit(head)
-        else { return nil }
-        
-        let headTree = try await getTreePaths(commit.tree)
-        return try await workingTree.computeStatus(headTree: headTree)
+        let snapshot = try await getRepoSnapshot()
+        return try await workingTree.computeStatus(headTree: snapshot.headTree)
     }
     
     /// Get only staged changes (HEAD → Index)
@@ -599,6 +617,32 @@ public enum RepositoryError: Error {
 
 // MARK: - Private functions
 private extension GitRepository {
+    struct RepoSnapshot {
+        let head: String
+        let commit: Commit
+        let headTree: [String: String]
+        let index: [IndexEntry]
+        let indexMap: [String: String]
+    }
+
+    func getRepoSnapshot() async throws -> RepoSnapshot {
+        guard let head = try await getHEAD(), let commit = try await getCommit(head) else {
+            throw GitError.notARepository
+        }
+        
+        let headTree = try await getTreePaths(commit.tree)
+        let index = try await workingTree.readIndex()
+        let indexMap = Dictionary(uniqueKeysWithValues: index.map { ($0.path, $0.sha1) })
+        
+        return RepoSnapshot(
+            head: head,
+            commit: commit,
+            headTree: headTree,
+            index: index,
+            indexMap: indexMap
+        )
+    }
+
     /// Load an object from storage (loose or packed)
     func loadObject(hash: String) async throws -> ParsedObject? {
         guard let location = try await locator.locate(hash) else { return nil }
