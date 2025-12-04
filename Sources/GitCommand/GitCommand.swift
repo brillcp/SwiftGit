@@ -15,11 +15,11 @@ extension GitCommand {
     var arguments: [String] {
         switch self {
         case .add(let path):
-            return ["add", "--"] + [path]
+            return ["add", "--", path]
         case .addAll:
             return ["add", "--all"]
         case .reset(let path):
-            return ["reset", "HEAD", "--"] + [path]
+            return ["reset", "HEAD", "--", path]
         case .resetAll:
             return ["reset", "HEAD"]
         case .commit(let message, let author):
@@ -37,8 +37,8 @@ extension GitCommand {
             args.append("--unidiff-zero")
             args.append("--whitespace=nowarn")
             return args
-        case .restore(let paths):
-            return ["restore", "--"] + [paths]
+        case .restore(let path):
+            return ["restore", "--", path]
         case .restoreAll:
             return ["restore", "."]
         }
