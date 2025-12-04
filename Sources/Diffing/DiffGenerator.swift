@@ -57,8 +57,12 @@ extension DiffGenerator: DiffGeneratorProtocol {
         let oldLines = oldContent.split(separator: String.newLine, omittingEmptySubsequences: false)
         let newLines = newContent.split(separator: String.newLine, omittingEmptySubsequences: false)
         
+        // Filter out ONLY the final empty element if it exists
+        let filteredOld = oldLines.last?.isEmpty == true ? oldLines.dropLast() : oldLines
+        let filteredNew = newLines.last?.isEmpty == true ? newLines.dropLast() : newLines
+
         // Generate diff
-        let diff = makeDiff(oldLines: oldLines, newLines: newLines)
+        let diff = makeDiff(oldLines: filteredOld, newLines: filteredNew)
         
         // Group into hunks
         return groupIntoHunks(diff: diff, contextLines: contextLines)

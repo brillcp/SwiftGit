@@ -276,4 +276,3 @@ private extension HunkStagingTests {
         task.waitUntilExit()
     }
 }
-
