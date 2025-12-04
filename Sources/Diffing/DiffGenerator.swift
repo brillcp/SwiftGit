@@ -259,15 +259,21 @@ private extension DiffGenerator {
                         hunks.append(DiffHunk(id: hunkId, header: header, lines: currentHunk))
                         hunkId += 1
                         currentHunk = []
+
+                        // Keep the last contextLines for the next hunk's leading context
+                        unchangedBuffer = Array(unchangedBuffer.suffix(contextLines))
+                    } else {
+                        unchangedBuffer.removeAll()
                     }
-                    unchangedBuffer.removeAll()
                 }
             case .added:
                 if currentHunk.isEmpty {
-                    hunkOldStart = oldLineNum - unchangedBuffer.suffix(contextLines).count
-                    hunkNewStart = newLineNum - unchangedBuffer.suffix(contextLines).count
+                    let contextToAdd = unchangedBuffer.suffix(contextLines)
+                    hunkOldStart = oldLineNum - contextToAdd.count
+                    hunkNewStart = newLineNum - contextToAdd.count
+                    
                     // Add leading context
-                    currentHunk.append(contentsOf: unchangedBuffer.suffix(contextLines))
+                    currentHunk.append(contentsOf: contextToAdd)
                 } else {
                     currentHunk.append(contentsOf: unchangedBuffer)
                 }
