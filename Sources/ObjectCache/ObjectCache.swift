@@ -64,16 +64,11 @@ public actor ObjectCache {
 // MARK: - ObjectCacheProtocol
 extension ObjectCache: ObjectCacheProtocol {
     public func get<T>(_ key: CacheKey) async -> T? {
-        guard let entry = storage[key] else {
-            missCount += 1
-            return nil
-        }
-        
-        // Update access time and move to front (most recently used)
-        storage[key]?.lastAccessed = Date()
-        accessOrder.moveToFront(key)
-        
-        hitCount += 1
+        guard var entry = storage[key] else { return nil }
+
+        accessOrder.remove(key)
+        accessOrder.append(key)
+        entry.lastAccessed = .now
         return entry.value as? T
     }
     
@@ -107,11 +102,11 @@ extension ObjectCache: ObjectCacheProtocol {
     }
     
     public func remove(_ key: CacheKey) async {
-        if let entry = storage[key] {
-            currentMemoryUsage -= entry.estimatedSize
-            storage.removeValue(forKey: key)
-            accessOrder.remove(key)
-        }
+        guard let entry = storage[key] else { return }
+
+        currentMemoryUsage -= entry.estimatedSize
+        storage.removeValue(forKey: key)
+        accessOrder.remove(key)
     }
     
     public func contains(_ key: CacheKey) async -> Bool {
