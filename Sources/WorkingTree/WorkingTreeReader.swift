@@ -15,6 +15,9 @@ public protocol WorkingTreeReaderProtocol: Actor {
     
     /// Get untracked files
     func untrackedFiles() async throws -> [String]
+
+    /// Invalidate index cache
+    func invalidateIndexCache() async
 }
 
 // MARK: -
@@ -117,6 +120,11 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
         return Array(untracked.keys)
     }
+
+    public func invalidateIndexCache() async {
+        let url = indexURL
+        await cache.remove(.indexSnapshot(url: url))
+    }
 }
 
 // MARK: - Private
@@ -139,7 +147,6 @@ private extension WorkingTreeReader {
             if let hash = try await checkFile(entry: entry, fileURL: fileURL) {
                 result[entry.path] = hash
             }
-            // If nil, file was deleted - don't add to result
         }
         
         return result

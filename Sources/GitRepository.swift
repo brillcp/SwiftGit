@@ -568,6 +568,8 @@ extension GitRepository: GitRepositoryProtocol {
             stdin: patch,
             in: url
         )
+
+        await workingTree.invalidateIndexCache()
     }
 
     /// Unstage hunk
