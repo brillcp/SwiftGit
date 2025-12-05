@@ -71,6 +71,8 @@ public protocol GitRepositoryProtocol: Actor {
     
     func discardFile(at path: String) async throws
     func discardAllFiles() async throws
+
+    func commit(message: String, author: String?) async throws
 }
 
 // MARK: -
@@ -504,13 +506,35 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     // MARK: - Git commands
-    // Stage files
+    public func commit(message: String, author: String?) async throws {
+        // Validate message
+        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw GitError.emptyCommitMessage
+        }
+        
+        // Check if there are staged changes
+        let staged = try await getStagedChanges()
+        guard !staged.isEmpty else {
+            throw GitError.nothingToCommit
+        }
+        
+        try await commandRunner.run(
+            .commit(message: message, author: author),
+            stdin: nil,
+            in: url
+        )
+        
+        // Invalidate cache (index is reset after commit)
+        await workingTree.invalidateIndexCache()
+    }
+
+    /// Stage files
     public func stageFile(at path: String) async throws {
         try await commandRunner.run(.add(path: path), stdin: nil, in: url)
         await workingTree.invalidateIndexCache()
     }
     
-    /// Stage multiple files
+    /// Stage all files
     public func stageFiles() async throws {
         try await commandRunner.run(.addAll, stdin: nil, in: url)
         await workingTree.invalidateIndexCache()
@@ -522,7 +546,7 @@ extension GitRepository: GitRepositoryProtocol {
         await workingTree.invalidateIndexCache()
     }
     
-    /// Unstage multiple files
+    /// Unstage all files
     public func unstageFiles() async throws {
         try await commandRunner.run(.resetAll, stdin: nil, in: url)
         await workingTree.invalidateIndexCache()
@@ -533,7 +557,7 @@ extension GitRepository: GitRepositoryProtocol {
         // Get file status
         guard let status = try await getWorkingTreeStatus(),
               let file = status.files[path] else {
-            return  // File doesn't exist
+            return // File doesn't exist
         }
         
         if file.unstaged == .untracked {
