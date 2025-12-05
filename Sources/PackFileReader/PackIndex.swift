@@ -8,19 +8,11 @@ public struct PackObjectLocation: Sendable {
 
 // MARK: -
 public protocol PackIndexProtocol: Sendable {
-    var entries: [String: PackObjectLocation] { get }
-
     /// Load and parse a pack index file
     func load(idxURL: URL, packURL: URL) throws
     
     /// Find the location of an object by hash
     func findObject(_ hash: String) -> PackObjectLocation?
-    
-    /// Get all hashes in this pack
-    func getAllHashes() -> Set<String>
-    
-    /// Clear index data
-    func clear()
 }
 
 // MARK: -
@@ -40,8 +32,6 @@ public final class PackIndex: @unchecked Sendable {
     private var crcTableOffset: Int = 0
     private var offsetTableOffset: Int = 0
     private var largeOffsetTableOffset: Int = 0
-
-    public var entries: [String: PackObjectLocation] = [:]
 }
 
 // MARK: - PackIndexProtocol
@@ -90,12 +80,6 @@ extension PackIndex: PackIndexProtocol {
     public func findObject(_ hash: String) -> PackObjectLocation? {
         let hashLower = hash.lowercased()
         
-        // Check cache first
-        if let cached = entries[hashLower] {
-            return cached
-        }
-        
-        // Use fanout table for binary search range
         guard let firstByte = UInt8(hash.prefix(2), radix: 16) else {
             return nil
         }
@@ -105,29 +89,8 @@ extension PackIndex: PackIndexProtocol {
         
         guard rangeStart < rangeEnd else { return nil }
         
-        // Lazy load this range
-        do {
-            try loadRange(start: rangeStart, end: rangeEnd)
-        } catch {
-            return nil
-        }
-        
-        // Check cache again
-        return entries[hashLower]
-    }
-    
-    public func getAllHashes() -> Set<String> {
-        // Load all if not cached
-        if entries.count < objectCount {
-            try? loadRange(start: 0, end: objectCount)
-        }
-        return Set(entries.keys)
-    }
-    
-    public func clear() {
-        entries.removeAll()
-        try? idxHandle?.close()
-        idxHandle = nil
+        // Search range directly (no cache)
+        return try? searchRange(start: rangeStart, end: rangeEnd, targetHash: hashLower)
     }
 }
 
@@ -140,7 +103,7 @@ public enum PackIndexError: Error {
 
 // MARK: - Private
 private extension PackIndex {
-    func loadRange(start: Int, end: Int) throws {
+    func searchRange(start: Int, end: Int, targetHash: String) throws -> PackObjectLocation? {
         guard let handle = idxHandle, let packURL = packURL else {
             throw PackIndexError.corruptedData
         }
@@ -155,64 +118,49 @@ private extension PackIndex {
             throw PackIndexError.corruptedData
         }
         
-        var hashes: [String] = []
         var hashPos = 0
-        for _ in 0..<count {
+        for i in 0..<count {
             let hashBytes = hashData[hashPos..<hashPos + 20]
             let hashString = hashBytes.toHexString()
-            hashes.append(hashString)
-            hashPos += 20
-        }
-        
-        // Read offsets for this range
-        let offsetOffset = offsetTableOffset + (start * 4)
-        try handle.seek(toOffset: UInt64(offsetOffset))
-        
-        guard let offsetData = try handle.read(upToCount: count * 4) else {
-            throw PackIndexError.corruptedData
-        }
-        
-        var offsets: [Int] = []
-        var largeOffsetIndices: [(index: Int, largeOffsetIndex: Int)] = []
-        var offsetPos = 0
-        
-        for i in 0..<count {
-            var tempOffset = offsetPos
-            let off = offsetData.readUInt32(at: &tempOffset)
-            offsetPos = tempOffset
             
-            if off & 0x80000000 != 0 {
-                let largeOffsetIndex = Int(off & 0x7fffffff)
-                largeOffsetIndices.append((index: i, largeOffsetIndex: largeOffsetIndex))
-                offsets.append(0)  // Placeholder
-            } else {
-                offsets.append(Int(off))
-            }
-        }
-        
-        // Handle large offsets if any
-        if !largeOffsetIndices.isEmpty {
-            for (index, largeOffsetIndex) in largeOffsetIndices {
-                let largeOffsetPosition = largeOffsetTableOffset + (largeOffsetIndex * 8)
-                try handle.seek(toOffset: UInt64(largeOffsetPosition))
+            if hashString == targetHash {
+                // Found it! Now get the offset
+                let offsetOffset = offsetTableOffset + ((start + i) * 4)
+                try handle.seek(toOffset: UInt64(offsetOffset))
                 
-                guard let largeOffsetData = try handle.read(upToCount: 8) else {
+                guard let offsetData = try handle.read(upToCount: 4) else {
                     throw PackIndexError.corruptedData
                 }
                 
                 var tempOffset = 0
-                let largeOffset = largeOffsetData.readUInt64(at: &tempOffset, index: largeOffsetIndex)
-                offsets[index] = Int(largeOffset)
+                var off = offsetData.readUInt32(at: &tempOffset)
+                
+                // Handle large offset if needed
+                if off & 0x80000000 != 0 {
+                    let largeOffsetIndex = Int(off & 0x7fffffff)
+                    let largeOffsetPosition = largeOffsetTableOffset + (largeOffsetIndex * 8)
+                    try handle.seek(toOffset: UInt64(largeOffsetPosition))
+                    
+                    guard let largeOffsetData = try handle.read(upToCount: 8) else {
+                        throw PackIndexError.corruptedData
+                    }
+                    
+                    var tempLargeOffset = 0
+                    let largeOffset = largeOffsetData.readUInt64(at: &tempLargeOffset, index: largeOffsetIndex)
+                    off = UInt32(largeOffset)
+                }
+                
+                return PackObjectLocation(
+                    hash: hashString,
+                    offset: Int(off),
+                    packURL: packURL
+                )
             }
+            
+            hashPos += 20
         }
         
-        // Build cache entries
-        for (hash, offset) in zip(hashes, offsets) {
-            entries[hash] = PackObjectLocation(
-                hash: hash,
-                offset: offset,
-                packURL: packURL
-            )
-        }
+        // Not found in this range
+        return nil
     }
 }

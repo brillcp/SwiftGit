@@ -56,8 +56,6 @@ public protocol GitRepositoryProtocol: Actor {
     /// Check if an object exists (without loading it)
     func objectExists(_ hash: String) async throws -> Bool
     
-    func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws
-    
     /// Stage files
     func stageFile(at path: String) async throws
     func stageFiles() async throws
@@ -299,6 +297,12 @@ extension GitRepository: GitRepositoryProtocol {
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         let snapshot = try await getRepoSnapshot()
         
+        print("\n=== getFileDiff SNAPSHOT DEBUG ===")
+        if let entry = snapshot.index.first(where: { $0.path == workingFile.path }) {
+            print("Index entry SHA for \(workingFile.path): \(entry.sha1)")
+        }
+        print("=== END SNAPSHOT ===")
+        
         let resolver = WorkingTreeDiffResolver(
             repoURL: url,
             blobLoader: self
@@ -309,6 +313,12 @@ extension GitRepository: GitRepositoryProtocol {
             headTree: snapshot.headTree,
             indexMap: snapshot.indexMap
         )
+        
+        print("\n=== getFileDiff DEBUG ===")
+        print("File: \(workingFile.path)")
+        print("Old content (first 100 chars): \(diffPair.old?.text?.prefix(100) ?? "nil")")
+        print("New content (first 100 chars): \(diffPair.new?.text?.prefix(100) ?? "nil")")
+        print("=== END DEBUG ===")
 
         return try await diffGenerator.generateHunks(
             oldContent: diffPair.old?.text ?? "",
@@ -498,13 +508,6 @@ extension GitRepository: GitRepositoryProtocol {
         try await locator.exists(hash)
     }
     
-    public func enumerateObjects(_ visitor: @Sendable (String) async throws -> Bool) async throws {
-        let shouldContinue = try await locator.enumerateLooseHashes(visitor)
-        guard shouldContinue else { return }
-        
-        _ = try await locator.enumeratePackedHashes(visitor)
-    }
-    
     // MARK: - Git commands
     public func commit(message: String, author: String?) async throws {
         // Validate message
@@ -589,6 +592,11 @@ extension GitRepository: GitRepositoryProtocol {
             throw GitError.cannotStageHunkFromUntrackedFile
         }
 
+        // Save old blob SHA BEFORE staging
+        let oldBlobSha = snapshot.first(where: { $0.path == file.path })?.sha1
+        print("\n=== BEFORE STAGING ===")
+        print("Old blob SHA: \(oldBlobSha ?? "nil")")
+
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
         
         try await commandRunner.run(
@@ -598,6 +606,17 @@ extension GitRepository: GitRepositoryProtocol {
         )
 
         await workingTree.invalidateIndexCache()
+        
+        if let oldSha = oldBlobSha {
+            print("Removing blob from cache: \(oldSha)")
+            await cache.remove(.blob(hash: oldSha))
+        }
+        
+        let snapshotAfter = try await workingTree.readIndex()
+        let newBlobSha = snapshotAfter.first(where: { $0.path == file.path })?.sha1
+        print("New blob SHA: \(newBlobSha ?? "nil")")
+        print("SHAs are different: \(oldBlobSha != newBlobSha)")
+        print("=== END STAGING ===\n")
     }
 
     /// Unstage hunk

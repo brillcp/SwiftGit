@@ -6,12 +6,8 @@ public protocol PackIndexManagerProtocol: Actor {
     /// Find object in any loaded pack file
     func findObject(_ hash: String) async throws -> PackObjectLocation?
     
-    func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool
-
+    /// Get pack index
     func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol?
-
-    /// Invalidate cached pack indexes
-    func invalidate()
 }
 
 // MARK: - PackIndexManager Implementation
@@ -47,26 +43,6 @@ extension PackIndexManager: PackIndexManagerProtocol {
     public func getPackIndex(for packURL: URL) async throws -> PackIndexProtocol? {
         try await ensureIndexesLoaded()
         return packIndexByURL[packURL]
-    }
-    
-    public func enumeratePackedHashes(_ visitor: @Sendable (String) async throws -> Bool) async throws -> Bool {
-        try await ensureIndexesLoaded()
-        
-        for packIndex in packIndexes {
-            for hash in packIndex.getAllHashes() {
-                let shouldContinue = try await visitor(hash)
-                if !shouldContinue {
-                    return false // Signal to stop
-                }
-            }
-        }
-        return true
-    }
-    
-    public func invalidate() {
-        packIndexes.forEach { $0.clear() }
-        packIndexes.removeAll()
-        indexesLoaded = false
     }
 }
 
