@@ -4,7 +4,6 @@ import Foundation
 
 @Suite("Commit Stream Tests")
 struct CommitStreamTests {
-    // MARK: - Refs Loading Tests
     @Test func testCommitDiffMatchesGit() async throws {
         guard let repoURL = getTestRepoURL() else { return }
         

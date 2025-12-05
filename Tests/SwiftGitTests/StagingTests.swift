@@ -234,6 +234,99 @@ struct StagingTests {
             try deleteTestFile(in: repoURL, named: file)
         }
     }
+    
+    // MARK: - Commit Tests
+    @Test func testCommit() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let testFile = "test_commit_\(UUID().uuidString).txt"
+        let repository = GitRepository(url: repoURL)
+        
+        // Create and stage file
+        try createTestFile(in: repoURL, named: testFile, content: "Hello")
+        _ = try await repository.stageFile(at: testFile)
+        
+        // Verify file is staged
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("A  "), "File should be staged")
+        }
+        
+        // Commit
+        try await repository.commit(message: "Add test file", author: nil)
+        
+        // Verify no staged changes
+        let staged = try await repository.getStagedChanges()
+        #expect(staged.isEmpty, "Should have no staged changes after commit")
+        
+        // Verify file is now tracked and clean
+        let status = try gitStatus(in: repoURL)
+        #expect(!status.contains(testFile), "File should not appear in status (clean)")
+        
+        // Cleanup
+        try gitReset(in: repoURL)
+        try? deleteTestFile(in: repoURL, named: testFile)
+    }
+
+    @Test func testCommitEmptyMessage() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Try to commit with empty message
+        do {
+            try await repository.commit(message: "", author: nil)
+            Issue.record("Should have thrown error for empty message")
+        } catch GitError.emptyCommitMessage {
+            // Expected
+        } catch {
+            Issue.record("Wrong error type: \(error)")
+        }
+    }
+
+    @Test func testCommitNothingStaged() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Try to commit with nothing staged
+        do {
+            try await repository.commit(message: "Test commit", author: nil)
+            Issue.record("Should have thrown error for nothing to commit")
+        } catch GitError.nothingToCommit {
+            // Expected
+        } catch {
+            Issue.record("Wrong error type: \(error)")
+        }
+    }
+
+    @Test func testCommitMultipleFiles() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let testFiles = [
+            "test_commit_multi_1_\(UUID().uuidString).txt",
+            "test_commit_multi_2_\(UUID().uuidString).txt"
+        ]
+        let repository = GitRepository(url: repoURL)
+        
+        // Create and stage files
+        for file in testFiles {
+            try createTestFile(in: repoURL, named: file, content: "test")
+        }
+        _ = try await repository.stageFiles()
+        
+        // Commit
+        try await repository.commit(message: "Add multiple test files", author: nil)
+        
+        // Verify no staged changes
+        let staged = try await repository.getStagedChanges()
+        #expect(staged.isEmpty, "Should have no staged changes after commit")
+        
+        // Cleanup
+        try gitReset(in: repoURL)
+        for file in testFiles {
+            try? deleteTestFile(in: repoURL, named: file)
+        }
+    }
 }
 
 // MARK: - Test Helpers
