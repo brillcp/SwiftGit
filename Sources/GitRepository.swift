@@ -507,21 +507,25 @@ extension GitRepository: GitRepositoryProtocol {
     // Stage files
     public func stageFile(at path: String) async throws {
         try await commandRunner.run(.add(path: path), stdin: nil, in: url)
+        await workingTree.invalidateIndexCache()
     }
     
     /// Stage multiple files
     public func stageFiles() async throws {
         try await commandRunner.run(.addAll, stdin: nil, in: url)
+        await workingTree.invalidateIndexCache()
     }
     
     /// Unstage a file
     public func unstageFile(at path: String) async throws {
         try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+        await workingTree.invalidateIndexCache()
     }
     
     /// Unstage multiple files
     public func unstageFiles() async throws {
         try await commandRunner.run(.resetAll, stdin: nil, in: url)
+        await workingTree.invalidateIndexCache()
     }
     
     /// Discard all changes in a file (restore to index version)
@@ -590,6 +594,8 @@ extension GitRepository: GitRepositoryProtocol {
             in: url
         )
         
+        await workingTree.invalidateIndexCache()
+
         try await cleanupTrailingNewlineChange(for: file.path)
     }
 
