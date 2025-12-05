@@ -22,25 +22,25 @@ public struct CacheStats {
 
 public protocol ObjectCacheProtocol: Actor {
     /// Get an object from cache
-    func get<T>(_ key: CacheKey) -> T?
+    func get<T>(_ key: CacheKey) async -> T?
     
     /// Store an object in cache
-    func set<T>(_ key: CacheKey, value: T)
+    func set<T>(_ key: CacheKey, value: T) async
     
     /// Remove an object from cache
-    func remove(_ key: CacheKey)
+    func remove(_ key: CacheKey) async
     
     /// Check if key exists without retrieving value
-    func contains(_ key: CacheKey) -> Bool
+    func contains(_ key: CacheKey) async -> Bool
     
     /// Clear all cached objects
-    func clear()
+    func clear() async
     
     /// Clear objects matching a predicate
-    func clear(where predicate: (CacheKey) -> Bool)
+    func clear(where predicate: (CacheKey) -> Bool) async
     
     /// Get current cache statistics
-    func stats() -> CacheStats
+    func stats() async -> CacheStats
 }
 
 public actor ObjectCache {
@@ -63,7 +63,7 @@ public actor ObjectCache {
 
 // MARK: - ObjectCacheProtocol
 extension ObjectCache: ObjectCacheProtocol {
-    public func get<T>(_ key: CacheKey) -> T? {
+    public func get<T>(_ key: CacheKey) async -> T? {
         guard let entry = storage[key] else {
             missCount += 1
             return nil
@@ -77,7 +77,7 @@ extension ObjectCache: ObjectCacheProtocol {
         return entry.value as? T
     }
     
-    public func set<T>(_ key: CacheKey, value: T) {
+    public func set<T>(_ key: CacheKey, value: T) async {
         let estimatedSize = estimateSize(value)
         
         // If object already exists, update it
@@ -106,7 +106,7 @@ extension ObjectCache: ObjectCacheProtocol {
         evictIfNeeded()
     }
     
-    public func remove(_ key: CacheKey) {
+    public func remove(_ key: CacheKey) async {
         if let entry = storage[key] {
             currentMemoryUsage -= entry.estimatedSize
             storage.removeValue(forKey: key)
@@ -114,17 +114,17 @@ extension ObjectCache: ObjectCacheProtocol {
         }
     }
     
-    public func contains(_ key: CacheKey) -> Bool {
+    public func contains(_ key: CacheKey) async -> Bool {
         storage[key] != nil
     }
     
-    public func clear() {
+    public func clear() async {
         storage.removeAll()
         accessOrder.removeAll()
         currentMemoryUsage = 0
     }
     
-    public func clear(where predicate: (CacheKey) -> Bool) {
+    public func clear(where predicate: (CacheKey) -> Bool) async {
         let keysToRemove = storage.keys.filter(predicate)
         for key in keysToRemove {
             if let entry = storage[key] {
@@ -135,7 +135,7 @@ extension ObjectCache: ObjectCacheProtocol {
         }
     }
     
-    public func stats() -> CacheStats {
+    public func stats() async -> CacheStats {
         CacheStats(
             hits: hitCount,
             misses: missCount,
