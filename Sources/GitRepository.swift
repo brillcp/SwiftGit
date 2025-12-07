@@ -6,9 +6,7 @@ public protocol GitRepositoryProtocol: Actor {
     
     /// Get a commit by hash (lazy loaded)
     func getCommit(_ hash: String) async throws -> Commit?
-    
     func getAllCommits(limit: Int?) async throws -> [Commit]
-    func streamAllCommits(limit: Int?) -> AsyncThrowingStream<Commit, Error>
 
     /// Get changed files for a commit
     func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
@@ -30,10 +28,6 @@ public protocol GitRepositoryProtocol: Actor {
     func getStagedChanges() async throws -> [String: WorkingTreeFile]
     func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
 
-    /// Walk a tree recursively, calling visitor for each entry
-    /// Visitor returns true to continue, false to stop
-    func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws
-    
     /// Get all file paths in a tree (flattened)
     func getTreePaths(_ treeHash: String) async throws -> [String: String] // path -> blob hash
     
@@ -70,7 +64,7 @@ public protocol GitRepositoryProtocol: Actor {
     func discardFile(at path: String) async throws
     func discardAllFiles() async throws
 
-    func commit(message: String, author: String?) async throws
+    func commit(message: String) async throws
 }
 
 // MARK: -
@@ -144,7 +138,7 @@ extension GitRepository: GitRepositoryProtocol {
         return commit
     }
     
-    /// Get commits from all branches as an array (convenience method)
+    /// Get commits from all branches as an array
     public func getAllCommits(limit: Int? = nil) async throws -> [Commit] {
         var streamedCommits = [Commit]()
         
@@ -153,106 +147,6 @@ extension GitRepository: GitRepositoryProtocol {
         }
         
         return streamedCommits.sorted { $0.author.timestamp < $1.author.timestamp }
-    }
-    
-    public func streamAllCommits(limit: Int? = nil) -> AsyncThrowingStream<Commit, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    // Get all refs
-                    let allRefs = try await getRefs()
-                    
-                    // Filter based on options
-                    var startingRefs = allRefs.filter { ref in
-                        switch ref.type {
-                        case .stash: false
-                        default: true
-                        }
-                    }
-                    
-                    var stashInternalCommits = Set<String>()  // Track commits to hide
-                    let stashes = try await getStashes()
-                    for stash in stashes {
-                        // Add stash commit
-                        startingRefs.append(
-                            GitRef(
-                                name: stash.message,
-                                hash: stash.id,
-                                type: .stash
-                            )
-                        )
-                        
-                        // Track its internal commits (don't show these)
-                        if let stashCommit = try await getCommit(stash.id) {
-                            if stashCommit.parents.count >= 2 {
-                                stashInternalCommits.insert(stashCommit.parents[1])
-                            }
-                            if stashCommit.parents.count >= 3 {
-                                stashInternalCommits.insert(stashCommit.parents[2])
-                            }
-                        }
-                    }
-                    
-                    // If no refs, try HEAD
-                    if startingRefs.isEmpty {
-                        if let head = try await getHEAD() {
-                            if let commit = try await getCommit(head) {
-                                continuation.yield(commit)
-                            }
-                            continuation.finish()
-                            return
-                        } else {
-                            continuation.finish()
-                            return
-                        }
-                    }
-                    
-                    var visited = Set<String>()
-                    var queue: [String] = []
-                    var count = 0
-                    
-                    // Start from all branch/tag/stash heads
-                    for ref in startingRefs {
-                        queue.append(ref.hash)
-                    }
-                    
-                    // BFS traversal
-                    while let commitHash = queue.popLast() {
-                        // Check limit
-                        if let limit = limit, count >= limit {
-                            break
-                        }
-                        
-                        // Skip if already visited
-                        guard !visited.contains(commitHash) else {
-                            continue
-                        }
-                        visited.insert(commitHash)
-                        
-                        // Load commit
-                        guard let commit = try await getCommit(commitHash) else {
-                            continue
-                        }
-                        
-                        // Skip internal stash commits
-                        if stashInternalCommits.contains(commit.id) {
-                            continue
-                        }
-                        
-                        // Yield commit to stream
-                        continuation.yield(commit)
-                        count += 1
-                        
-                        // Add parents to queue
-                        queue.insert(contentsOf: commit.parents, at: 0)
-                    }
-                    
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
     }
     
     /// Get changed files for a commit
@@ -330,8 +224,8 @@ extension GitRepository: GitRepositoryProtocol {
         
         // Get index version
         let indexContent: String
-        if let indexEntry = snapshot.index.first(where: { $0.path == workingFile.path }) {
-            indexContent = try await getBlob(indexEntry.sha1)?.text ?? ""
+        if let indexEntry = snapshot.indexMap[workingFile.path] {
+            indexContent = try await getBlob(indexEntry)?.text ?? ""
         } else {
             indexContent = ""
         }
@@ -405,22 +299,18 @@ extension GitRepository: GitRepositoryProtocol {
     
     public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
         let snapshot = try await getRepoSnapshot()
-        return try await workingTree.computeStatus(headTree: snapshot.headTree)
+        return try await workingTree.computeStatus(snapshot: snapshot)
     }
     
     /// Get only staged changes (HEAD → Index)
     public func getStagedChanges() async throws -> [String: WorkingTreeFile] {
         let snapshot = try await getRepoSnapshot()
-        return try await workingTree.stagedChanges(headTree: snapshot.headTree)
+        return try await workingTree.stagedChanges(snapshot: snapshot)
     }
     
     /// Get only unstaged changes (Index → Working Tree)
     public func getUnstagedChanges() async throws -> [String: WorkingTreeFile] {
         try await workingTree.unstagedChanges()
-    }
-    
-    public func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
-        try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
     }
     
     public func getTreePaths(_ treeHash: String) async throws -> [String : String] {
@@ -499,7 +389,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     // MARK: - Git commands
-    public func commit(message: String, author: String?) async throws {
+    public func commit(message: String) async throws {
         // Validate message
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw GitError.emptyCommitMessage
@@ -512,7 +402,7 @@ extension GitRepository: GitRepositoryProtocol {
         }
         
         try await commandRunner.run(
-            .commit(message: message, author: author),
+            .commit(message: message, author: nil),
             stdin: nil,
             in: url
         )
@@ -643,14 +533,114 @@ public enum RepositoryError: Error {
     case packIndexNotFound
 }
 
+public struct RepoSnapshot: Sendable {
+    let head: String
+    let commit: Commit
+    let headTree: [String: String]
+    let index: [IndexEntry]
+    let indexMap: [String: String]
+}
+
 // MARK: - Private functions
 private extension GitRepository {
-    struct RepoSnapshot {
-        let head: String
-        let commit: Commit
-        let headTree: [String: String]
-        let index: [IndexEntry]
-        let indexMap: [String: String]
+    func streamAllCommits(limit: Int? = nil) -> AsyncThrowingStream<Commit, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // Get all refs
+                    let allRefs = try await getRefs()
+                    
+                    // Filter based on options
+                    var startingRefs = allRefs.filter { ref in
+                        switch ref.type {
+                        case .stash: false
+                        default: true
+                        }
+                    }
+                    
+                    var stashInternalCommits = Set<String>()  // Track commits to hide
+                    let stashes = try await getStashes()
+                    for stash in stashes {
+                        // Add stash commit
+                        startingRefs.append(
+                            GitRef(
+                                name: stash.message,
+                                hash: stash.id,
+                                type: .stash
+                            )
+                        )
+                        
+                        // Track its internal commits (don't show these)
+                        if let stashCommit = try await getCommit(stash.id) {
+                            if stashCommit.parents.count >= 2 {
+                                stashInternalCommits.insert(stashCommit.parents[1])
+                            }
+                            if stashCommit.parents.count >= 3 {
+                                stashInternalCommits.insert(stashCommit.parents[2])
+                            }
+                        }
+                    }
+                    
+                    // If no refs, try HEAD
+                    if startingRefs.isEmpty {
+                        if let head = try await getHEAD() {
+                            if let commit = try await getCommit(head) {
+                                continuation.yield(commit)
+                            }
+                            continuation.finish()
+                            return
+                        } else {
+                            continuation.finish()
+                            return
+                        }
+                    }
+                    
+                    var visited = Set<String>()
+                    var queue: [String] = []
+                    var count = 0
+                    
+                    // Start from all branch/tag/stash heads
+                    for ref in startingRefs {
+                        queue.append(ref.hash)
+                    }
+                    
+                    // BFS traversal
+                    while let commitHash = queue.popLast() {
+                        // Check limit
+                        if let limit = limit, count >= limit {
+                            break
+                        }
+                        
+                        // Skip if already visited
+                        guard !visited.contains(commitHash) else {
+                            continue
+                        }
+                        visited.insert(commitHash)
+                        
+                        // Load commit
+                        guard let commit = try await getCommit(commitHash) else {
+                            continue
+                        }
+                        
+                        // Skip internal stash commits
+                        if stashInternalCommits.contains(commit.id) {
+                            continue
+                        }
+                        
+                        // Yield commit to stream
+                        continuation.yield(commit)
+                        count += 1
+                        
+                        // Add parents to queue
+                        queue.insert(contentsOf: commit.parents, at: 0)
+                    }
+                    
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     func getRepoSnapshot() async throws -> RepoSnapshot {
@@ -739,6 +729,10 @@ private extension GitRepository {
         }
     }
 
+    func walkTree(_ treeHash: String, visitor: (Tree.Entry) async throws -> Bool) async throws {
+        try await walkTreeRecursive(treeHash: treeHash, currentPath: "", visitor: visitor)
+    }
+
     func cleanupTrailingNewlineChange(for path: String) async throws {
         let snapshot = try await getRepoSnapshot()
 
@@ -748,8 +742,8 @@ private extension GitRepository {
         }
         
         // Get INDEX content
-        guard let indexEntry = snapshot.index.first(where: { $0.path == path }),
-              let indexBlob = try await getBlob(indexEntry.sha1)
+        guard let indexEntry = snapshot.indexMap[path],
+              let indexBlob = try await getBlob(indexEntry)
         else { return }
         
         let headContent = headBlob.text
