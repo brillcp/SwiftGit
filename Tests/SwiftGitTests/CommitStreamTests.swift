@@ -4,6 +4,192 @@ import Foundation
 
 @Suite("Commit Stream Tests")
 struct CommitStreamTests {
+    @Test func testCommitCacheInvalidation() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_cache_\(UUID().uuidString).txt"
+        
+        // Create and stage a file
+        try createTestFile(in: repoURL, named: testFile, content: "Test content")
+        try await repository.stageFile(at: testFile)
+        
+        // Get index SHA before commit
+        let indexURL = repoURL.appendingPathComponent(".git/index")
+        let modDateBefore = try FileManager.default.attributesOfItem(atPath: indexURL.path)[.modificationDate] as? Date
+        
+        print("\n=== BEFORE COMMIT ===")
+        print("Index modDate: \(modDateBefore!)")
+        
+        let stagedBefore = try await repository.getStagedChanges()
+        print("Staged count: \(stagedBefore.count)")
+        
+        // Small delay to ensure we're in a different millisecond
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Commit
+        try await repository.commit(message: "Test commit")
+        
+        // Check index modDate after commit
+        let modDateAfter = try FileManager.default.attributesOfItem(atPath: indexURL.path)[.modificationDate] as? Date
+        
+        print("\n=== AFTER COMMIT ===")
+        print("Index modDate: \(modDateAfter!)")
+        print("ModDate changed: \(modDateBefore != modDateAfter)")
+        print("Time difference: \(modDateAfter!.timeIntervalSince(modDateBefore!))s")
+        
+        // Try reading staged multiple times
+        for i in 1...3 {
+            let staged = try await repository.getStagedChanges()
+            print("\nLoad \(i):")
+            print("  Staged count: \(staged.count)")
+            print("  Keys: \(staged.keys)")
+        }
+        
+        // Cleanup
+        try gitReset(in: repoURL, hard: true)
+        try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
+    }
+
+    @Test func testCommitClearsStaged() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_commit_\(UUID().uuidString).txt"
+        
+        // Create and stage a file
+        try createTestFile(in: repoURL, named: testFile, content: "Test content")
+        try await repository.stageFile(at: testFile)
+        
+        // Verify file is staged
+        let stagedBefore = try await repository.getStagedChanges()
+        #expect(stagedBefore[testFile] != nil, "File should be staged before commit")
+        
+        // Commit
+        try await repository.commit(message: "Test commit")
+        
+        // Verify staged is now empty
+        let stagedAfter = try await repository.getStagedChanges()
+        print("\n=== AFTER COMMIT ===")
+        print("Staged files: \(stagedAfter.keys)")
+        print("Count: \(stagedAfter.count)")
+        print("=== END ===\n")
+        
+        #expect(stagedAfter.isEmpty, "Should have no staged files after commit")
+        #expect(stagedAfter[testFile] == nil, "Test file should not be staged after commit")
+        
+        // Cleanup
+        try gitReset(in: repoURL, hard: true)
+        try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
+    }
+
+    @Test func testMultipleLoadAfterCommit() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_multi_load_\(UUID().uuidString).txt"
+        
+        // Create and stage a file
+        try createTestFile(in: repoURL, named: testFile, content: "Test content")
+        try await repository.stageFile(at: testFile)
+        
+        // Commit
+        try await repository.commit(message: "Test commit")
+        
+        // Load staged multiple times (simulating what your UI does)
+        for i in 1...3 {
+            let staged = try await repository.getStagedChanges()
+            print("Load \(i): \(staged.count) staged files")
+            #expect(staged.isEmpty, "Load \(i) should show no staged files")
+        }
+        
+        // Cleanup
+        try gitReset(in: repoURL, hard: true)
+        try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
+    }
+
+    @Test func testCommitLoadingPerformance() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Warm up (load pack indexes, etc.)
+        _ = try await repository.getHEAD()
+        
+        // Measure commit loading
+        let start = Date()
+        let commits = try await repository.getAllCommits(limit: 2048)
+        let elapsed = Date().timeIntervalSince(start)
+        
+        print("\n=== COMMIT LOADING PERFORMANCE ===")
+        print("Loaded \(commits.count) commits in \(elapsed)s")
+        print("Average per commit: \(elapsed / Double(commits.count))s")
+        print("=== END ===\n")
+        
+        #expect(commits.count > 0, "Should load at least some commits")
+    }
+
+    @Test func testIndividualCommitLoadSpeed() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        guard let headHash = try await repository.getHEAD() else {
+            Issue.record("No HEAD found")
+            return
+        }
+        
+        // First load (cold cache)
+        let coldStart = Date()
+        _ = try await repository.getCommit(headHash)
+        let coldElapsed = Date().timeIntervalSince(coldStart)
+        
+        // Second load (warm cache)
+        let warmStart = Date()
+        _ = try await repository.getCommit(headHash)
+        let warmElapsed = Date().timeIntervalSince(warmStart)
+        
+        print("\n=== INDIVIDUAL COMMIT LOAD ===")
+        print("Cold cache: \(coldElapsed)s")
+        print("Warm cache: \(warmElapsed)s")
+        print("=== END ===\n")
+        
+        // Warm cache should be <1ms
+        #expect(warmElapsed < 0.001, "Cached commit load took \(warmElapsed)s")
+        
+        // Cold cache should be <50ms
+        #expect(coldElapsed < 0.05, "First commit load took \(coldElapsed)s")
+    }
+
+    @Test func testPackIndexCacheEffectiveness() async throws {
+        guard let repoURL = getTestRepoURL() else { return }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Get a series of commits (should share pack file ranges)
+        let commits = try await repository.getAllCommits(limit: 50)
+        
+        guard commits.count >= 10 else {
+            Issue.record("Not enough commits to test")
+            return
+        }
+        
+        // Load first 10 commits individually
+        let start = Date()
+        for commit in commits.prefix(10) {
+            _ = try await repository.getCommit(commit.id)
+        }
+        let elapsed = Date().timeIntervalSince(start)
+        
+        print("\n=== PACK CACHE TEST ===")
+        print("Re-loaded 10 commits in \(elapsed)s")
+        print("Average: \(elapsed / 10.0)s per commit")
+        print("=== END ===\n")
+        
+        // With cache, should be very fast (all cached)
+        #expect(elapsed < 0.01, "10 cached commits took \(elapsed)s (expected <10ms)")
+    }
+
     @Test func testCommitDiffMatchesGit() async throws {
         guard let repoURL = getTestRepoURL() else { return }
         
@@ -78,7 +264,7 @@ struct CommitStreamTests {
         }
         
         let repository = GitRepository(url: repoURL)
-        let allRefs = try await repository.getRefs()
+        let allRefs = try await repository.getRefs().flatMap(\.value)
         
         print("\n=== ALL REFS (\(allRefs.count) total) ===")
         
@@ -109,8 +295,8 @@ struct CommitStreamTests {
         }
         
         let repository = GitRepository(url: repoURL)
-        let allRefs = try await repository.getRefs()
-        
+        let allRefs = try await repository.getRefs().flatMap(\.value)
+
         // Look for branches with "2848" in the name
         let branches2848 = allRefs.filter { $0.name.contains("2848") }
         
@@ -167,8 +353,8 @@ struct CommitStreamTests {
         let repository = GitRepository(url: repoURL)
         
         // Manually replicate streamAllCommits logic to see starting points
-        let allRefs = try await repository.getRefs()
-        
+        let allRefs = try await repository.getRefs().flatMap(\.value)
+
         let startingRefs = allRefs.filter { ref in
             switch ref.type {
             case .stash: false
@@ -191,11 +377,7 @@ struct CommitStreamTests {
         
         let repository = GitRepository(url: repoURL)
         
-        var commits: [Commit] = []
-        
-        for try await commit in await repository.streamAllCommits(limit: nil) {
-            commits.append(commit)
-        }
+        let commits = try await repository.getAllCommits(limit: nil)
         
         print("\n=== STREAMED COMMITS ===")
         print("Total commits: \(commits.count)")
@@ -223,12 +405,13 @@ struct CommitStreamTests {
         let repository = GitRepository(url: repoURL)
         
         // Hash of commit you expect to see (from GitKraken)
-        let expectedHash = "58d4b8ba550cb0f896f96404f608a349ab55a520"  // Replace with actual hash
+        let expectedHash = "068ce37832990168f161a46548a6d9868378f5c5"  // Replace with actual hash
         
         var found = false
         var commitCount = 0
         
-        for try await commit in await repository.streamAllCommits(limit: nil) {
+        let commits = try await repository.getAllCommits(limit: nil)
+        for commit in commits {
             commitCount += 1
             if commit.id == expectedHash {
                 found = true
@@ -253,11 +436,7 @@ struct CommitStreamTests {
         
         let repository = GitRepository(url: repoURL)
         // Get our commits
-        var ourCommits: [String] = []
-        for try await commit in await repository.streamAllCommits(limit: 100) {
-            ourCommits.append(commit.id)
-        }
-        
+        let ourCommits: [String] = try await repository.getAllCommits(limit: 100).map(\.id)
         print("\n=== OUR COMMITS (first 100) ===")
         print("Count: \(ourCommits.count)")
         
@@ -320,7 +499,8 @@ struct CommitStreamTests {
         // Check if stashes appear in stream
         var stashCommitsInStream = Set<String>()
         
-        for try await commit in await repository.streamAllCommits(limit: nil) {
+        let commits = try await repository.getAllCommits(limit: 2048)
+        for commit in commits {
             if stashes.contains(where: { $0.id == commit.id }) {
                 stashCommitsInStream.insert(commit.id)
             }
@@ -347,7 +527,9 @@ struct CommitStreamTests {
         var ourCommits: [Commit] = []
         var seenHashes = Set<String>()
         
-        for try await commit in await repository.streamAllCommits(limit: nil) {
+        let commits = try await repository.getAllCommits(limit: nil)
+
+        for commit in commits {
             if !seenHashes.contains(commit.id) {
                 seenHashes.insert(commit.id)
                 ourCommits.append(commit)
@@ -399,7 +581,7 @@ struct CommitStreamTests {
 // MARK: - Test Helpers
 private extension CommitStreamTests {
     func getTestRepoURL() -> URL? {
-        let testRepoPath = "/Users/vg/Documents/Dev/quartr-ios"
+        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"
         let url = URL(fileURLWithPath: testRepoPath)
         
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -407,5 +589,23 @@ private extension CommitStreamTests {
         }
         
         return url
+    }
+
+    func createTestFile(in repoURL: URL, named: String, content: String) throws {
+        let fileURL = repoURL.appendingPathComponent(named)
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
+    func gitReset(in repoURL: URL, hard: Bool = false) throws {
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        var args = ["-C", repoURL.path, "reset"]
+        if hard {
+            args.append("--hard")
+        }
+        args.append("HEAD")
+        task.arguments = args
+        task.launch()
+        task.waitUntilExit()
     }
 }

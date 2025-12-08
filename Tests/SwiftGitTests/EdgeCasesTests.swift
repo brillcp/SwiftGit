@@ -45,7 +45,7 @@ struct EdgeCasesTests {
         
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
         
-        let refs = try await refReader.getRefs()
+        let refs = try await refReader.getRefs().flatMap(\.value)
         #expect(refs.count == 1)
         #expect(refs.first?.name == "main")
         #expect(refs.first?.hash == commitHash)

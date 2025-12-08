@@ -137,9 +137,9 @@ struct HunkStagingTests {
         """
         try createTestFile(in: repoURL, named: testFile, content: modifiedContent)
         
-        guard let status = try await repository.getWorkingTreeStatus(),
-              let file = status.files[testFile]
-        else {
+        let status = try await repository.getWorkingTreeStatus()
+
+        guard let file = status.files[testFile] else {
             Issue.record("File not found in status")
             return
         }
@@ -207,13 +207,13 @@ struct HunkStagingTests {
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nNew line\nLine 2\n")
         
         // Get the hunk
-        guard let status = try await repository.getWorkingTreeStatus(),
-              let file = status.files[testFile]
-        else {
-            Issue.record("File not in status")
+        let status = try await repository.getWorkingTreeStatus()
+
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
             return
         }
-        
+
         let hunks = try await repository.getFileDiff(for: file)
         
         #expect(!hunks.isEmpty, "Should have hunks")
@@ -227,7 +227,7 @@ struct HunkStagingTests {
         let statusAfter = try await repository.getWorkingTreeStatus()
         print("Status after staging:\n\(String(describing: statusAfter))")
         
-        let contains = statusAfter?.files.contains(where: { $0.value.path == file.path }) ?? false
+        let contains = statusAfter.files.contains(where: { $0.value.path == file.path })
         #expect(contains, "File should be staged")
         
         // Cleanup
@@ -252,12 +252,13 @@ struct HunkStagingTests {
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nModified Line 2\nLine 3\n")
         
         // Get file status
-        guard let status = try await repository.getWorkingTreeStatus(),
-              let file = status.files[testFile] else {
-            Issue.record("File not in status")
+        let status = try await repository.getWorkingTreeStatus()
+
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
             return
         }
-        
+
         // Get hunks
         let hunks = try await repository.getFileDiff(for: file)
         #expect(!hunks.isEmpty, "Should have hunks")
@@ -271,8 +272,8 @@ struct HunkStagingTests {
         }
         
         // Get updated status and hunks
-        guard let statusAfter = try await repository.getWorkingTreeStatus(),
-              let fileAfter = statusAfter.files[testFile] else {
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
             Issue.record("File not in status after staging")
             return
         }
@@ -311,8 +312,8 @@ struct HunkStagingTests {
         try "Line 1\nModified Line 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
         
         // Get hunks
-        guard let status = try await repository.getWorkingTreeStatus(),
-              let file = status.files[testFile] else {
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
             Issue.record("File not in status")
             return
         }
@@ -345,7 +346,7 @@ struct HunkStagingTests {
 
         // Check what's left
         let statusAfter = try await repository.getWorkingTreeStatus()
-        let fileAfter = statusAfter?.files[testFile]
+        let fileAfter = statusAfter.files[testFile]
         
         print("\n=== AFTER STAGING ===")
         print("Staged: \(String(describing: fileAfter?.staged))")
@@ -404,8 +405,8 @@ struct HunkStagingTests {
         try createTestFile(in: repoURL, named: testFile, content: modified)
         
         // Get hunks
-        guard let status = try await repository.getWorkingTreeStatus(),
-              let file = status.files[testFile] else {
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
             Issue.record("File not in status")
             return
         }
@@ -424,8 +425,8 @@ struct HunkStagingTests {
         }
         
         // Get staged hunks
-        guard let statusAfter = try await repository.getWorkingTreeStatus(),
-              let fileAfter = statusAfter.files[testFile] else {
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
             Issue.record("File not in status after staging")
             return
         }
@@ -437,7 +438,7 @@ struct HunkStagingTests {
         
         // Verify partially unstaged
         let statusPartial = try await repository.getWorkingTreeStatus()
-        let filePartial = statusPartial?.files[testFile]
+        let filePartial = statusPartial.files[testFile]
         #expect(filePartial?.staged != nil, "Should still have staged changes")
         #expect(filePartial?.unstaged != nil, "Should have unstaged changes")
         

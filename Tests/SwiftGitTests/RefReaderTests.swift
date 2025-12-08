@@ -17,7 +17,7 @@ struct RefReaderTests {
         try writeRef(name: "develop", hash: devHash, to: tempDir)
         
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
-        let refs = try await refReader.getRefs()
+        let refs = try await refReader.getRefs().flatMap(\.value)
         
         // Normalize names in case RefReader yields full ref paths like "refs/heads/main"
         func normalizedName(_ name: String) -> String {
@@ -49,7 +49,7 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
-        let refs = try await refReader.getRefs()
+        let refs = try await refReader.getRefs().flatMap(\.value)
         
         #expect(refs.count == 2)
         #expect(refs.contains { $0.name == "main" && $0.hash == mainHash && $0.type == .localBranch })
@@ -74,8 +74,8 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
-        let refs = try await refReader.getRefs()
-        
+        let refs = try await refReader.getRefs().flatMap(\.value)
+
         #expect(refs.count == 1)
         #expect(refs.first?.name == "v1.0.0")
         #expect(refs.first?.type == .tag)
@@ -237,8 +237,8 @@ struct RefReaderTests {
         try writePackedRefs(packedRefsContent, to: tempDir)
         
         let refReader = RefReader(repoURL: tempDir, cache: ObjectCache())
-        let refs = try await refReader.getRefs()
-        
+        let refs = try await refReader.getRefs().flatMap(\.value)
+
         #expect(refs.count == 2)
         #expect(refs.contains { $0.name == "feature/ios-234" && $0.hash == featureHash })
         #expect(refs.contains { $0.name == "refactor/big-changes" && $0.hash == refactorHash })

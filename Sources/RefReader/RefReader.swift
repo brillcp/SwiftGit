@@ -209,17 +209,36 @@ private extension RefReader {
             return []
         }
         
-        let basePath = baseURL.path
-        let basePathLength = basePath.count + 1
+        // Compute base components once for robust relative path derivation
+        let baseComponents = baseURL.standardizedFileURL.pathComponents
+        let baseCount = baseComponents.count
         
         for case let fileURL as URL in enumerator {
             let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             guard resourceValues.isRegularFile == true else { continue }
             
-            // Extract name efficiently
-            let fullPath = fileURL.path
-            guard fullPath.count > basePathLength else { continue }
-            let name = String(fullPath.dropFirst(basePathLength))
+            // Derive the ref name as the path relative to baseURL using pathComponents
+            let fileComponents = fileURL.standardizedFileURL.pathComponents
+            guard fileComponents.count > baseCount else { continue }
+            
+            // Ensure the prefix matches; if not, fall back to dropping common prefix safely
+            let hasCommonPrefix = zip(baseComponents, fileComponents).allSatisfy { $0 == $1 }
+            let relativeComponents: [String]
+            if hasCommonPrefix {
+                relativeComponents = Array(fileComponents.dropFirst(baseCount))
+            } else {
+                // Fallback: use URL's path(relativeTo:) style construction by removing baseURL.path prefix if present
+                let fullPath = fileURL.path
+                let basePath = baseURL.path.hasSuffix("/") ? String(baseURL.path.dropLast()) : baseURL.path
+                if fullPath.hasPrefix(basePath + "/") {
+                    let startIndex = fullPath.index(fullPath.startIndex, offsetBy: basePath.count + 1)
+                    relativeComponents = fullPath[startIndex...].split(separator: "/").map(String.init)
+                } else {
+                    // If we cannot determine a safe relative path, skip
+                    continue
+                }
+            }
+            let name = relativeComponents.joined(separator: "/")
             
             // Read just enough bytes for a SHA (40-64 chars + potential whitespace)
             guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe).prefix(128),
@@ -379,3 +398,4 @@ private extension RefReader {
         return nil
     }
 }
+

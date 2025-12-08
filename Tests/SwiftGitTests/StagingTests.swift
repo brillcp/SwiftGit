@@ -244,7 +244,7 @@ struct StagingTests {
         
         // Create and stage file
         try createTestFile(in: repoURL, named: testFile, content: "Hello")
-        _ = try await repository.stageFile(at: testFile)
+        try await repository.stageFile(at: testFile)
         
         // Verify file is staged
         if let line = try statusLine(for: testFile, in: repoURL) {
@@ -252,7 +252,7 @@ struct StagingTests {
         }
         
         // Commit
-        try await repository.commit(message: "Add test file", author: nil)
+        try await repository.commit(message: "Add test file")
         
         // Verify no staged changes
         let staged = try await repository.getStagedChanges()
@@ -274,7 +274,7 @@ struct StagingTests {
         
         // Try to commit with empty message
         do {
-            try await repository.commit(message: "", author: nil)
+            try await repository.commit(message: "")
             Issue.record("Should have thrown error for empty message")
         } catch GitError.emptyCommitMessage {
             // Expected
@@ -290,7 +290,7 @@ struct StagingTests {
         
         // Try to commit with nothing staged
         do {
-            try await repository.commit(message: "Test commit", author: nil)
+            try await repository.commit(message: "Test commit")
             Issue.record("Should have thrown error for nothing to commit")
         } catch GitError.nothingToCommit {
             // Expected
@@ -312,10 +312,10 @@ struct StagingTests {
         for file in testFiles {
             try createTestFile(in: repoURL, named: file, content: "test")
         }
-        _ = try await repository.stageFiles()
+        try await repository.stageFiles()
         
         // Commit
-        try await repository.commit(message: "Add multiple test files", author: nil)
+        try await repository.commit(message: "Add multiple test files")
         
         // Verify no staged changes
         let staged = try await repository.getStagedChanges()

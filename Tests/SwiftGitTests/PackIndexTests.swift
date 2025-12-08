@@ -4,51 +4,51 @@ import Foundation
 
 @Suite("PackIndex Tests")
 struct PackIndexTests {
-    @Test func testLoadPackIndex() async throws {
-        // This test requires a real pack file
-        // Skip if not available
-        let packIndexPath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.idx"
-        let packFilePath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.pack"
-        
-        let idxURL = URL(fileURLWithPath: packIndexPath)
-        let packURL = URL(fileURLWithPath: packFilePath)
-        
-        guard FileManager.default.fileExists(atPath: idxURL.path) else {
-            return // Skip test
-        }
-        
-        let packIndex = PackIndex()
-        try packIndex.load(idxURL: idxURL, packURL: packURL)
-        
-        #expect(packIndex.entries.count > 0)
-    }
+//    @Test func testLoadPackIndex() async throws {
+//        // This test requires a real pack file
+//        // Skip if not available
+//        let packIndexPath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.idx"
+//        let packFilePath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.pack"
+//        
+//        let idxURL = URL(fileURLWithPath: packIndexPath)
+//        let packURL = URL(fileURLWithPath: packFilePath)
+//        
+//        guard FileManager.default.fileExists(atPath: idxURL.path) else {
+//            return // Skip test
+//        }
+//        
+//        let packIndex = PackIndex()
+//        try packIndex.load(idxURL: idxURL, packURL: packURL)
+//        
+//        #expect(packIndex.entries.count > 0)
+//    }
 
-    @Test func testFindObjectInPackIndex() async throws {
-        // This test requires a real pack file
-        // Skip if not available
-        let packIndexPath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.idx"
-        let packFilePath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.pack"
-        
-        let idxURL = URL(fileURLWithPath: packIndexPath)
-        let packURL = URL(fileURLWithPath: packFilePath)
-        
-        guard FileManager.default.fileExists(atPath: idxURL.path) else {
-            return // Skip test
-        }
-        
-        let packIndex = PackIndex()
-        try packIndex.load(idxURL: idxURL, packURL: packURL)
-        
-        // Get first hash from entries
-        guard let firstHash = packIndex.entries.keys.first else {
-            Issue.record("No entries in pack index")
-            return
-        }
-        
-        let location = packIndex.findObject(firstHash)
-        #expect(location != nil)
-        #expect(location?.hash == firstHash)
-    }
+//    @Test func testFindObjectInPackIndex() async throws {
+//        // This test requires a real pack file
+//        // Skip if not available
+//        let packIndexPath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.idx"
+//        let packFilePath = "/Users/vg/Documents/Dev/Odin/.git/objects/pack/pack-*.pack"
+//        
+//        let idxURL = URL(fileURLWithPath: packIndexPath)
+//        let packURL = URL(fileURLWithPath: packFilePath)
+//        
+//        guard FileManager.default.fileExists(atPath: idxURL.path) else {
+//            return // Skip test
+//        }
+//        
+//        let packIndex = PackIndex()
+//        try packIndex.load(idxURL: idxURL, packURL: packURL)
+//        
+//        // Get first hash from entries
+//        guard let firstHash = packIndex.entries.keys.first else {
+//            Issue.record("No entries in pack index")
+//            return
+//        }
+//        
+//        let location = packIndex.findObject(firstHash)
+//        #expect(location != nil)
+//        #expect(location?.hash == firstHash)
+//    }
 
     @Test func testPackIndexMultipleFiles() async throws {
         // This test would require a repo with multiple pack files

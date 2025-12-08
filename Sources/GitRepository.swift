@@ -1,9 +1,6 @@
 import Foundation
 
 public protocol GitRepositoryProtocol: Actor {
-    /// Repository URL
-    var url: URL { get }
-    
     /// Get a commit by hash (lazy loaded)
     func getCommit(_ hash: String) async throws -> Commit?
     func getAllCommits(limit: Int?) async throws -> [Commit]
@@ -82,8 +79,7 @@ public actor GitRepository {
 
     private var securityScopeStarted: Bool = false
     private let fileManager: FileManager
-
-    public let url: URL
+    private let url: URL
 
     public init(
         url: URL,
