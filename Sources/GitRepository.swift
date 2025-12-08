@@ -24,7 +24,7 @@ public protocol GitRepositoryProtocol: Actor {
     /// Stream a large blob without loading entirely into memory
     func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, Error>
     
-    func getWorkingTreeStatus() async throws -> WorkingTreeStatus?
+    func getWorkingTreeStatus() async throws -> WorkingTreeStatus
     func getStagedChanges() async throws -> [String: WorkingTreeFile]
     func getUnstagedChanges() async throws -> [String: WorkingTreeFile]
 
@@ -297,7 +297,7 @@ extension GitRepository: GitRepositoryProtocol {
         }
     }
     
-    public func getWorkingTreeStatus() async throws -> WorkingTreeStatus? {
+    public func getWorkingTreeStatus() async throws -> WorkingTreeStatus {
         let snapshot = try await getRepoSnapshot()
         return try await workingTree.computeStatus(snapshot: snapshot)
     }
@@ -440,8 +440,8 @@ extension GitRepository: GitRepositoryProtocol {
     /// Discard all changes in a file (restore to index version)
     public func discardFile(at path: String) async throws {
         // Get file status
-        guard let status = try await getWorkingTreeStatus(),
-              let file = status.files[path] else {
+        let status = try await getWorkingTreeStatus()
+        guard let file = status.files[path] else {
             return // File doesn't exist
         }
         
