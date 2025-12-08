@@ -410,6 +410,7 @@ extension GitRepository: GitRepositoryProtocol {
         // Invalidate cache (index is reset after commit)
         await workingTree.invalidateIndexCache()
         await cache.remove(.head)
+        await cache.remove(.refs)
     }
 
     /// Stage files
