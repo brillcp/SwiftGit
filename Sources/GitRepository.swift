@@ -32,7 +32,7 @@ public protocol GitRepositoryProtocol: Actor {
     func getTreePaths(_ treeHash: String) async throws -> [String: String] // path -> blob hash
     
     /// Get all refs (branches, tags, etc.)
-    func getRefs() async throws -> [GitRef]
+    func getRefs() async throws -> [String: [GitRef]]
     
     /// Get current HEAD commit hash
     func getHEAD() async throws -> String?
@@ -332,7 +332,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     // MARK: - References
-    public func getRefs() async throws -> [GitRef] {
+    public func getRefs() async throws -> [String: [GitRef]] {
         try await refReader.getRefs()
     }
     
@@ -345,8 +345,9 @@ extension GitRepository: GitRepositoryProtocol {
     }
     
     public func getBranches() async throws -> Branches {
-        let allRefs = try await getRefs()
-        
+        let refMap = try await getRefs()
+        let allRefs = refMap.values.flatMap { $0 }
+
         return Branches(
             local: allRefs.filter { $0.type == .localBranch },
             remote: allRefs.filter { $0.type == .remoteBranch },
@@ -550,8 +551,9 @@ private extension GitRepository {
             Task {
                 do {
                     // Get all refs
-                    let allRefs = try await getRefs()
-                    
+                    let refMap = try await getRefs()
+                    let allRefs = refMap.values.flatMap { $0 }
+
                     // Filter based on options
                     var startingRefs = allRefs.filter { ref in
                         switch ref.type {

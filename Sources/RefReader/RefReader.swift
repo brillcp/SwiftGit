@@ -2,7 +2,7 @@ import Foundation
 
 public protocol RefReaderProtocol: Actor {
     /// Get all refs (branches, tags, etc.)
-    func getRefs() async throws -> [GitRef]
+    func getRefs() async throws -> [String: [GitRef]]
     
     /// Get HEAD commit SHA
     func getHEAD() async throws -> String?
@@ -35,36 +35,37 @@ public actor RefReader {
 
 // MARK: - RefReaderProtocol
 extension RefReader: RefReaderProtocol {
-    public func getRefs() async throws -> [GitRef] {
-        // Check unified cache
-        if let cached: [GitRef] = await cache.get(.refs) {
+    public func getRefs() async throws -> [String: [GitRef]] {
+        // Check cache
+        if let cached: [String: [GitRef]] = await cache.get(.refs) {
             return cached
         }
         
-        var refsByName: [String: GitRef] = [:]  // Use dict to deduplicate
+        var refsByName: [String: GitRef] = [:]
         
-        // Read loose refs (these take priority)
+        // Read loose refs
         let looseHeads = try readLooseRefs(relativePath: "refs/heads", type: .localBranch)
         let looseRemotes = try readLooseRefs(relativePath: "refs/remotes", type: .remoteBranch)
         let looseTags = try readLooseRefs(relativePath: "refs/tags", type: .tag)
         
         for ref in looseHeads + looseRemotes + looseTags {
-            let key = "\(ref.type):\(ref.name)"  // Unique key
+            let key = "\(ref.type):\(ref.name)"
             refsByName[key] = ref
         }
         
-        // Read packed refs (only add if not already present)
+        // Read packed refs
         let packedRefs = try readPackedRefs()
         for ref in packedRefs {
             let key = "\(ref.type):\(ref.name)"
-            if refsByName[key] == nil {  // Don't overwrite loose refs
+            if refsByName[key] == nil {
                 refsByName[key] = ref
             }
         }
         
-        let refs = Array(refsByName.values)
+        // Group by commit hash
+        let refs = Dictionary(grouping: refsByName.values, by: { $0.hash })
         
-        // Cache in unified cache
+        // Cache it
         await cache.set(.refs, value: refs)
         
         return refs
