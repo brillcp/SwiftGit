@@ -535,11 +535,24 @@ extension GitRepository: GitRepositoryProtocol {
 }
 
 // MARK: - Repository error
-public enum RepositoryError: Error {
+public enum RepositoryError: LocalizedError {
     case objectNotFound(String)
     case invalidObjectType
     case corruptedRepository
     case packIndexNotFound
+
+    public var errorDescription: String? {
+        switch self {
+        case .objectNotFound(let hash):
+            return "Object not found: \(hash)"
+        case .invalidObjectType:
+            return "Invalid object type"
+        case .corruptedRepository:
+            return "Corrupted repository"
+        case .packIndexNotFound:
+            return "Pack index not found"
+        }
+    }
 }
 
 public struct RepoSnapshot: Sendable {

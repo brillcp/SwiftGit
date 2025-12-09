@@ -91,7 +91,7 @@ private extension LooseObjectParser {
 }
 
 // MARK: - Parse Errors
-enum ParseError: Error, CustomStringConvertible {
+public enum ParseError: LocalizedError {
     case malformedHeader
     case invalidEncoding
     case unsupportedObjectType(String)
@@ -99,7 +99,7 @@ enum ParseError: Error, CustomStringConvertible {
     case malformedTree
     case missingRequiredField(String)
     
-    var description: String {
+    public var errorDescription: String? {
         switch self {
         case .malformedHeader:
             return "Git object header is malformed"

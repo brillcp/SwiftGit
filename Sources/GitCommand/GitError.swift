@@ -1,6 +1,6 @@
 import Foundation
 
-enum GitError: Error {
+public enum GitError: LocalizedError {
     case gitNotFound
     case commandFailed(command: GitCommand, result: CommandResult)
     case notARepository
@@ -10,7 +10,7 @@ enum GitError: Error {
     case emptyCommitMessage
     case nothingToCommit
 
-    var userMessage: String {
+    public var errorDescription: String? {
         switch self {
         case .gitNotFound:
             return "Git binary not found. Please install Git."

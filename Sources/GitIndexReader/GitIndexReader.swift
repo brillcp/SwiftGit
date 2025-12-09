@@ -59,14 +59,14 @@ extension GitIndexReader: GitIndexReaderProtocol {
 }
 
 // MARK: - Error
-public enum GitIndexError: Error, CustomStringConvertible {
+public enum GitIndexError: LocalizedError {
     case invalidHeader
     case unsupportedVersion(Int)
     case corruptedIndex
     case truncatedEntry(at: Int)
     case fileNotFound(URL)
     
-    public var description: String {
+    public var errorDescription: String? {
         switch self {
         case .invalidHeader:
             return "Git index has invalid header"

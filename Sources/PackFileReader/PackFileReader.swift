@@ -219,10 +219,25 @@ private extension PackFileReader {
 }
 
 // MARK: - Pack Errors
-enum PackError: Error {
+enum PackError: LocalizedError {
     case objectNotFound
     case baseObjectNotFound(String)
     case unsupportedObjectType(String)
     case corruptedData
     case invalidPackFile
+
+    var errorDescription: String? {
+        switch self {
+        case .objectNotFound:
+            return "Object not found"
+        case .baseObjectNotFound(let hash):
+            return "Base object not found: \(hash)"
+        case .unsupportedObjectType(let type):
+            return "Unsupported object type: \(type)"
+        case .corruptedData:
+            return "Corrupted data"
+        case .invalidPackFile:
+            return "Invalid pack file"
+        }
+    }
 }

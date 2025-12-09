@@ -110,10 +110,19 @@ extension PackIndex: PackIndexProtocol {
 }
 
 // MARK: - Git Error
-public enum PackIndexError: Error {
-    case unsupportedPackVersion
-    case objectNotFound
-    case corruptedData
+public enum PackIndexError: LocalizedError {
+    case unsupportedPackVersion, objectNotFound, corruptedData
+    
+    public var errorDescription: String? {
+        switch self {
+        case .unsupportedPackVersion:
+            return "Unsupported pack version"
+        case .objectNotFound:
+            return "Object not found"
+        case .corruptedData:
+            return "Corrupted data"
+        }
+    }
 }
 
 // MARK: - Private

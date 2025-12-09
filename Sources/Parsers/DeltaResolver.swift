@@ -71,6 +71,17 @@ private extension DeltaResolver {
     }
 }
 
-enum DeltaError: Error {
+enum DeltaError: LocalizedError {
     case invalidHeader, sizeMismatch, outOfBounds
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidHeader:
+            return "Invalid header"
+        case .sizeMismatch:
+            return "Size mismatch"
+        case .outOfBounds:
+            return "Index out of bounds"
+        }
+    }
 }

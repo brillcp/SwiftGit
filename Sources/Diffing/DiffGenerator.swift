@@ -69,13 +69,13 @@ extension DiffGenerator: DiffGeneratorProtocol {
     }
 }
 
-enum DiffError: Error, CustomStringConvertible {
+enum DiffError: LocalizedError {
     case fileTooLarge(size: Int)
     case binaryFile
     case invalidEncoding
     case emptyContent
     
-    var description: String {
+    var errorDescription: String? {
         switch self {
         case .fileTooLarge(let size):
             return "File too large to diff: \(size) bytes (max 1MB)"
