@@ -65,6 +65,8 @@ public protocol GitRepositoryProtocol: Actor {
     func discardAllFiles() async throws
 
     func commit(message: String) async throws
+
+    func invalidateAllCaches() async
 }
 
 // MARK: -
@@ -409,9 +411,7 @@ extension GitRepository: GitRepositoryProtocol {
         )
         
         // Invalidate cache (index is reset after commit)
-        await workingTree.invalidateIndexCache()
-        await cache.remove(.head)
-        await cache.remove(.refs)
+        await invalidateAllCaches()
     }
 
     /// Stage files
@@ -525,6 +525,12 @@ extension GitRepository: GitRepositoryProtocol {
             stdin: patch,
             in: url
         )
+    }
+
+    public func invalidateAllCaches() async {
+        await workingTree.invalidateIndexCache()
+        await cache.remove(.head)
+        await cache.remove(.refs)
     }
 }
 
