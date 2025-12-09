@@ -37,7 +37,7 @@ public actor ObjectLocator {
 // MARK: - ObjectLocatorProtocol
 extension ObjectLocator: ObjectLocatorProtocol {
     public func locate(_ hash: String) async throws -> ObjectLocation? {
-        if let looseURL = try await findLooseObject(hash) {
+        if let looseURL = await findLooseObject(hash) {
             return .loose(url: looseURL)
         }
         
@@ -67,7 +67,7 @@ private extension ObjectLocator {
         gitURL.appendingPathComponent(GitPath.objects.rawValue)
     }
 
-    func findLooseObject(_ hash: String) async throws -> URL? {
+    func findLooseObject(_ hash: String) async -> URL? {
         let hashLower = hash.lowercased()
         
         // Try direct path (fastest - single file check)
