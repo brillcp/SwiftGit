@@ -9,6 +9,8 @@ public enum GitError: LocalizedError {
     case fileNotInIndex(path: String)
     case emptyCommitMessage
     case nothingToCommit
+    case uncommittedChanges
+    case checkoutFailed(branch: String, stderr: String)
 
     public var errorDescription: String? {
         switch self {
@@ -32,6 +34,10 @@ public enum GitError: LocalizedError {
             return "Commit message cannot be empty."
         case .nothingToCommit:
             return "Nothing to commit."
+        case .uncommittedChanges:
+            return "The repository contains uncommitted changes."
+        case .checkoutFailed(let branch, let stderr):
+            return "Failed to checkout '\(branch)': \(stderr)"
         }
     }
 }

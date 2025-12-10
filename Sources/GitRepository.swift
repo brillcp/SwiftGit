@@ -65,6 +65,7 @@ public protocol GitRepositoryProtocol: Actor {
     func discardAllFiles() async throws
 
     func commit(message: String) async throws
+    func checkout(branch: String) async throws
 
     func invalidateAllCaches() async
 }
@@ -411,6 +412,28 @@ extension GitRepository: GitRepositoryProtocol {
         )
         
         // Invalidate cache (index is reset after commit)
+        await invalidateAllCaches()
+    }
+
+    /// Checkout branch
+    public func checkout(branch: String) async throws {
+        // Check for uncommitted changes
+        let status = try await getWorkingTreeStatus()
+        guard status.files.isEmpty else {
+            throw GitError.uncommittedChanges
+        }
+                
+        let result = try await commandRunner.run(
+            .checkout(branch: branch),
+            stdin: nil,
+            in: url
+        )
+        
+        guard result.exitCode == 0 else {
+            throw GitError.checkoutFailed(branch: branch, stderr: result.stderr)
+        }
+        
+        // Invalidate caches after checkout
         await invalidateAllCaches()
     }
 

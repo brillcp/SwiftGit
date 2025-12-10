@@ -6,6 +6,7 @@ public enum GitCommand: Sendable {
     case reset(path: String)
     case resetAll  // For "unstage all"
     case commit(message: String, author: String?)
+    case checkout(branch: String)
     case applyPatch(cached: Bool)
     case restore(path: String)
     case restoreAll
@@ -28,6 +29,8 @@ extension GitCommand {
                 args += ["--author", author]
             }
             return args
+        case .checkout(let branch):
+            return ["checkout", branch]
         case .applyPatch(let cached):
             var args = ["apply"]
             if cached {
