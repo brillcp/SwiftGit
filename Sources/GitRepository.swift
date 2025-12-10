@@ -65,7 +65,7 @@ public protocol GitRepositoryProtocol: Actor {
     func discardAllFiles() async throws
 
     func commit(message: String) async throws
-    func checkout(branch: String) async throws
+    func checkout(branch: String, createNew: Bool) async throws
 
     func invalidateAllCaches() async
 }
@@ -416,21 +416,25 @@ extension GitRepository: GitRepositoryProtocol {
     }
 
     /// Checkout branch
-    public func checkout(branch: String) async throws {
-        // Check for uncommitted changes
-        let status = try await getWorkingTreeStatus()
-        guard status.files.isEmpty else {
-            throw GitError.uncommittedChanges
+    public func checkout(branch: String, createNew: Bool) async throws {
+        // Only check for uncommitted changes if NOT creating new branch
+        // (creating new branch is safe with uncommitted changes)
+        if !createNew {
+            let status = try await getWorkingTreeStatus()
+            guard status.files.isEmpty else {
+                throw GitError.uncommittedChanges
+            }
         }
-                
+        
         let result = try await commandRunner.run(
-            .checkout(branch: branch),
+            .checkout(branch: branch, create: createNew),
             stdin: nil,
             in: url
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.checkoutFailed(branch: branch, stderr: result.stderr)
+            let action = createNew ? "create and checkout" : "checkout"
+            throw GitError.checkoutFailed(branch: branch, action: action, stderr: result.stderr)
         }
         
         // Invalidate caches after checkout

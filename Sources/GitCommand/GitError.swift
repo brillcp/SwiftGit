@@ -10,7 +10,7 @@ public enum GitError: LocalizedError {
     case emptyCommitMessage
     case nothingToCommit
     case uncommittedChanges
-    case checkoutFailed(branch: String, stderr: String)
+    case checkoutFailed(branch: String, action: String, stderr: String)
 
     public var errorDescription: String? {
         switch self {
@@ -36,8 +36,8 @@ public enum GitError: LocalizedError {
             return "Nothing to commit."
         case .uncommittedChanges:
             return "The repository contains uncommitted changes."
-        case .checkoutFailed(let branch, let stderr):
-            return "Failed to checkout '\(branch)': \(stderr)"
+        case .checkoutFailed(let branch, let action, let stderr):
+            return "Failed to \(action) '\(branch)': \(stderr)"
         }
     }
 }
