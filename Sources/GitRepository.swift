@@ -66,7 +66,7 @@ public protocol GitRepositoryProtocol: Actor {
 
     func commit(message: String) async throws
     func checkout(branch: String, createNew: Bool) async throws
-    func deleteBranch(_ name: String) async throws
+    func deleteBranch(_ name: String, force: Bool) async throws
 
     func invalidateAllCaches() async
 }
@@ -445,7 +445,7 @@ extension GitRepository: GitRepositoryProtocol {
     }
 
     /// Delete branch
-    public func deleteBranch(_ name: String) async throws {
+    public func deleteBranch(_ name: String, force: Bool) async throws {
         if let currentBranch = try await getHEADBranch(), currentBranch == name {
             throw GitError.cannotDeleteCurrentBranch
         }
@@ -456,7 +456,7 @@ extension GitRepository: GitRepositoryProtocol {
         }
 
         let result = try await commandRunner.run(
-            .deleteBranch(name: name, force: false),
+            .deleteBranch(name: name, force: force),
             stdin: nil,
             in: url
         )
