@@ -66,6 +66,7 @@ public protocol GitRepositoryProtocol: Actor {
 
     func commit(message: String) async throws
     func checkout(branch: String, createNew: Bool) async throws
+    func deleteBranch(_ name: String) async throws
 
     func invalidateAllCaches() async
 }
@@ -439,6 +440,25 @@ extension GitRepository: GitRepositoryProtocol {
         
         // Invalidate caches after checkout
         await invalidateAllCaches()
+    }
+
+    /// Delete branch
+    public func deleteBranch(_ name: String) async throws {
+        if let currentBranch = try await getHEADBranch(), currentBranch == name {
+            throw GitError.cannotDeleteCurrentBranch(name)
+        }
+
+        let result = try await commandRunner.run(
+            .deleteBranch(name: name, force: false),
+            stdin: nil,
+            in: url
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.deleteBranchFailed(branch: name, stderr: result.stderr)
+        }
+
+        await cache.remove(.refs)
     }
 
     /// Stage files

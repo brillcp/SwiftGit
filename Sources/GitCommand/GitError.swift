@@ -11,6 +11,8 @@ public enum GitError: LocalizedError {
     case nothingToCommit
     case uncommittedChanges
     case checkoutFailed(branch: String, action: String, stderr: String)
+    case cannotDeleteCurrentBranch(String)
+    case deleteBranchFailed(branch: String, stderr: String)
 
     public var errorDescription: String? {
         switch self {
@@ -38,6 +40,10 @@ public enum GitError: LocalizedError {
             return "The repository contains uncommitted changes."
         case .checkoutFailed(let branch, let action, let stderr):
             return "Failed to \(action) '\(branch)': \(stderr)"
+        case .cannotDeleteCurrentBranch(let name):
+            return "Cannot delete the current branch: \(name). Checkout a different branch first."
+        case .deleteBranchFailed(let branch, let stderr):
+            return "Failed to delete branch '\(branch)': \(stderr)"
         }
     }
 }

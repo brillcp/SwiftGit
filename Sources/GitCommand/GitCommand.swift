@@ -7,6 +7,7 @@ public enum GitCommand: Sendable {
     case resetAll  // For "unstage all"
     case commit(message: String, author: String?)
     case checkout(branch: String, create: Bool = false)
+    case deleteBranch(name: String, force: Bool = false)
     case applyPatch(cached: Bool)
     case restore(path: String)
     case restoreAll
@@ -35,6 +36,11 @@ extension GitCommand {
                 args.append("-b")
             }
             args.append(branch)
+            return args
+        case .deleteBranch(let name, let force):
+            var args = ["branch"]
+            args.append(force ? "-D" : "-d")
+            args.append(name)
             return args
         case .applyPatch(let cached):
             var args = ["apply"]
