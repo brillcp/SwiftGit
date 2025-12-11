@@ -73,6 +73,8 @@ public protocol GitRepositoryProtocol: Actor {
 
 // MARK: -
 public actor GitRepository {
+    private let protectedBranches = ["main", "master", "develop", "production", "staging"]
+
     private let cache: ObjectCacheProtocol
     private let locator: ObjectLocatorProtocol
     private let looseParser: LooseObjectParserProtocol
@@ -445,7 +447,12 @@ extension GitRepository: GitRepositoryProtocol {
     /// Delete branch
     public func deleteBranch(_ name: String) async throws {
         if let currentBranch = try await getHEADBranch(), currentBranch == name {
-            throw GitError.cannotDeleteCurrentBranch(name)
+            throw GitError.cannotDeleteCurrentBranch
+        }
+
+        // Can't delete protected branches
+        if protectedBranches.contains(name) {
+            throw GitError.cannotDeleteProtectedBranch(name)
         }
 
         let result = try await commandRunner.run(

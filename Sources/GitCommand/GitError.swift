@@ -11,7 +11,8 @@ public enum GitError: LocalizedError {
     case nothingToCommit
     case uncommittedChanges
     case checkoutFailed(branch: String, action: String, stderr: String)
-    case cannotDeleteCurrentBranch(String)
+    case cannotDeleteCurrentBranch
+    case cannotDeleteProtectedBranch(String)
     case deleteBranchFailed(branch: String, stderr: String)
 
     public var errorDescription: String? {
@@ -40,8 +41,10 @@ public enum GitError: LocalizedError {
             return "The repository contains uncommitted changes."
         case .checkoutFailed(let branch, let action, let stderr):
             return "Failed to \(action) '\(branch)': \(stderr)"
-        case .cannotDeleteCurrentBranch(let name):
-            return "Cannot delete the current branch: \(name). Checkout a different branch first."
+        case .cannotDeleteCurrentBranch:
+            return "Cannot delete the current branch. Checkout a different branch first."
+        case .cannotDeleteProtectedBranch(let name):
+            return "Cannot delete protected branch '\(name)'. This is a critical branch."
         case .deleteBranchFailed(let branch, let stderr):
             return "Failed to delete branch '\(branch)': \(stderr)"
         }
