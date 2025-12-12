@@ -377,7 +377,7 @@ struct CommitStreamTests {
         
         let repository = GitRepository(url: repoURL)
         
-        let commits = try await repository.getAllCommits(limit: nil)
+        let commits = try await repository.getAllCommits(limit: 512)
         
         print("\n=== STREAMED COMMITS ===")
         print("Total commits: \(commits.count)")
@@ -410,7 +410,7 @@ struct CommitStreamTests {
         var found = false
         var commitCount = 0
         
-        let commits = try await repository.getAllCommits(limit: nil)
+        let commits = try await repository.getAllCommits(limit: 512)
         for commit in commits {
             commitCount += 1
             if commit.id == expectedHash {
@@ -527,7 +527,7 @@ struct CommitStreamTests {
         var ourCommits: [Commit] = []
         var seenHashes = Set<String>()
         
-        let commits = try await repository.getAllCommits(limit: nil)
+        let commits = try await repository.getAllCommits(limit: 512)
 
         for commit in commits {
             if !seenHashes.contains(commit.id) {

@@ -32,7 +32,7 @@ public enum GitError: LocalizedError {
         case .cannotStageHunkFromUntrackedFile:
             return "Cannot stage individual hunks from untracked files. Please stage the entire file first."
         case .fileNotInIndex(let path):
-            return "Cannot stage hunk: '\(path)' is not in the index. Stage the entire file first."
+            return "Cannot stage hunk. File is not in the index. Stage the entire file first."
         case .emptyCommitMessage:
             return "Commit message cannot be empty."
         case .nothingToCommit:
