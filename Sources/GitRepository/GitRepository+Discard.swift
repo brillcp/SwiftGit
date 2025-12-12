@@ -3,8 +3,8 @@ import Foundation
 extension GitRepository: DiscardManageable {
     public func discardFile(at path: String) async throws {
         // Get file status
-        let status = try await getWorkingTreeStatus()
-        guard let file = status.files[path] else {
+        let unstagedChanges = try await workingTree.unstagedChanges()
+        guard let file = unstagedChanges[path] else {
             return // File doesn't exist
         }
         
@@ -16,6 +16,7 @@ extension GitRepository: DiscardManageable {
             // Tracked file - restore from index/HEAD
             try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
         }
+        await workingTree.invalidateIndexCache()
     }
 
     public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
