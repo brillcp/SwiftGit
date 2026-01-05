@@ -7,8 +7,18 @@ public enum GitError: LocalizedError {
     case cannotStageHunkFromUntrackedFile
     case fileNotInIndex(path: String)
     case emptyCommitMessage
+    case commitFailed(stderr: String)
     case nothingToCommit
     case uncommittedChanges
+    case discardFileFailed(stderr: String)
+    case discardHunkFailed(stderr: String)
+    case discardAllFailed(stderr: String)
+    case stageFailed(stderr: String)
+    case stageAllFailed(stderr: String)
+    case unstageFailed(stderr: String)
+    case unstageAllFailed(stderr: String)
+    case stageHunkFailed(stderr: String)
+    case unstageHunkFailed(stderr: String)
     case checkoutFailed(branch: String, action: String, stderr: String)
     case cannotDeleteCurrentBranch
     case cannotDeleteProtectedBranch(String)
@@ -37,10 +47,30 @@ public enum GitError: LocalizedError {
             return "Cannot stage hunk. File is not in the index. Stage the entire file first."
         case .emptyCommitMessage:
             return "Commit message cannot be empty."
+        case .commitFailed(let stderr):
+            return "Failed to create commit: \(stderr)"
         case .nothingToCommit:
             return "Nothing to commit."
         case .uncommittedChanges:
             return "The repository contains uncommitted changes."
+        case .discardFileFailed(let stderr):
+            return "Failed to discard changes: \(stderr)"
+        case .discardHunkFailed(let stderr):
+            return "Failed to discard hunk: \(stderr)"
+        case .discardAllFailed(let stderr):
+            return "Failed to discard all changes: \(stderr)"
+        case .stageFailed(let stderr):
+            return "Failed to stage: \(stderr)"
+        case .stageAllFailed(let stderr):
+            return "Failed to stage all files: \(stderr)"
+        case .unstageFailed(let stderr):
+            return "Failed to unstage: \(stderr)"
+        case .unstageAllFailed(let stderr):
+            return "Failed to unstage all files: \(stderr)"
+        case .stageHunkFailed(let stderr):
+            return "Failed to stage hunk: \(stderr)"
+        case .unstageHunkFailed(let stderr):
+            return "Failed to unstage hunk: \(stderr)"
         case .checkoutFailed(let branch, let action, let stderr):
             return "Failed to \(action) '\(branch)': \(stderr)"
         case .cannotDeleteCurrentBranch:

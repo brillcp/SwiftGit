@@ -14,7 +14,11 @@ extension GitRepository: DiscardManageable {
             try fileManager.removeItem(at: fileURL)
         } else {
             // Tracked file - restore from index/HEAD
-            try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
+            let result = try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
+
+            guard result.exitCode == 0 else {
+                throw GitError.discardFileFailed(stderr: result.stderr)
+            }
         }
         await workingTree.invalidateIndexCache()
     }
@@ -22,16 +26,24 @@ extension GitRepository: DiscardManageable {
     public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
         
-        try await commandRunner.run(
+        let result = try await commandRunner.run(
             .applyPatch(cached: false),
             stdin: patch,
             in: url
         )
+
+        guard result.exitCode == 0 else {
+            throw GitError.discardHunkFailed(stderr: result.stderr)
+        }
     }
 
     public func discardAllFiles() async throws {
         // Reset tracked files and staged changes to HEAD
-        try await commandRunner.run(.resetHardHEAD, stdin: nil, in: url)
+        let result = try await commandRunner.run(.resetHardHEAD, stdin: nil, in: url)
+
+        guard result.exitCode == 0 else {
+            throw GitError.discardAllFailed(stderr: result.stderr)
+        }
 
         // Remove untracked files and directories
         try await commandRunner.run(.clean(force: true, directories: true), stdin: nil, in: url)

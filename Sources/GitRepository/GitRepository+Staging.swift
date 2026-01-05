@@ -2,22 +2,42 @@ import Foundation
 
 extension GitRepository: StagingManageable {
     public func stageFile(at path: String) async throws {
-        try await commandRunner.run(.add(path: path), stdin: nil, in: url)
+        let result = try await commandRunner.run(.add(path: path), stdin: nil, in: url)
+
+        guard result.exitCode == 0 else {
+            throw GitError.stageFailed(stderr: result.stderr)
+        }
+
         await workingTree.invalidateIndexCache()
     }
     
     public func stageFiles() async throws {
-        try await commandRunner.run(.addAll, stdin: nil, in: url)
+        let result = try await commandRunner.run(.addAll, stdin: nil, in: url)
+
+        guard result.exitCode == 0 else {
+            throw GitError.stageAllFailed(stderr: result.stderr)
+        }
+
         await workingTree.invalidateIndexCache()
     }
     
     public func unstageFile(at path: String) async throws {
-        try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+        let result = try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+
+        guard result.exitCode == 0 else {
+            throw GitError.unstageFailed(stderr: result.stderr)
+        }
+
         await workingTree.invalidateIndexCache()
     }
     
     public func unstageFiles() async throws {
-        try await commandRunner.run(.resetAll, stdin: nil, in: url)
+        let result = try await commandRunner.run(.resetAll, stdin: nil, in: url)
+
+        guard result.exitCode == 0 else {
+            throw GitError.unstageAllFailed(stderr: result.stderr)
+        }
+
         await workingTree.invalidateIndexCache()
     }
     
@@ -39,11 +59,15 @@ extension GitRepository: StagingManageable {
 
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
         
-        try await commandRunner.run(
+        let result = try await commandRunner.run(
             .applyPatch(cached: true),
             stdin: patch,
             in: url
         )
+
+        guard result.exitCode == 0 else {
+            throw GitError.stageHunkFailed(stderr: result.stderr)
+        }
 
         await workingTree.invalidateIndexCache()
         
@@ -63,12 +87,16 @@ extension GitRepository: StagingManageable {
 
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
         
-        try await commandRunner.run(
+        let result = try await commandRunner.run(
             .applyPatch(cached: true),
             stdin: patch,
             in: url
         )
         
+        guard result.exitCode == 0 else {
+            throw GitError.unstageHunkFailed(stderr: result.stderr)
+        }
+
         await workingTree.invalidateIndexCache()
 
         try await cleanupTrailingNewlineChange(for: file.path)

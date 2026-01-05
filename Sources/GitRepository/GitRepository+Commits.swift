@@ -69,12 +69,16 @@ extension GitRepository: CommitWritable {
             throw GitError.nothingToCommit
         }
         
-        try await commandRunner.run(
+        let result = try await commandRunner.run(
             .commit(message: message, author: nil),
             stdin: nil,
             in: url
         )
         
+        guard result.exitCode == 0 else {
+            throw GitError.commitFailed(stderr: result.stderr)
+        }
+
         // Invalidate cache (index is reset after commit)
         await invalidateAllCaches()
     }
