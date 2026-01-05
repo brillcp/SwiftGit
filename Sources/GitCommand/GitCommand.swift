@@ -11,6 +11,14 @@ public enum GitCommand: Sendable {
     case applyPatch(cached: Bool)
     case restore(path: String)
     case restoreAll
+    case resetHardHEAD
+    case clean(force: Bool, directories: Bool)
+    case stashPush(message: String?)
+    case stashPop(index: Int?)
+    case stashApply(index: Int?)
+    case stashDrop(index: Int)
+    case cherryPick(commitHash: String)
+    case revert(commitHash: String, noCommit: Bool)
 }
 
 extension GitCommand {
@@ -55,6 +63,46 @@ extension GitCommand {
             return ["restore", "--", path]
         case .restoreAll:
             return ["restore", "."]
+        case .resetHardHEAD:
+            return ["reset", "--hard", "HEAD"]
+        case .clean(let force, let directories):
+            var args = ["clean"]
+            if force { args.append("-f") }
+            if directories { args.append("-d") }
+            return args
+        case .stashPush(let message):
+            var args = ["stash", "push"]
+            if let message = message {
+                args += ["-m", message]
+            }
+            return args
+            
+        case .stashPop(let index):
+            var args = ["stash", "pop"]
+            if let index = index {
+                args.append("stash@{\(index)}")
+            }
+            return args
+            
+        case .stashApply(let index):
+            var args = ["stash", "apply"]
+            if let index = index {
+                args.append("stash@{\(index)}")
+            }
+            return args
+            
+        case .stashDrop(let index):
+            return ["stash", "drop", "stash@{\(index)}"]
+        case .cherryPick(let commitHash):
+            return ["cherry-pick", commitHash]
+            
+        case .revert(let commitHash, let noCommit):
+            var args = ["revert"]
+            if noCommit {
+                args.append("--no-commit")
+            }
+            args.append(commitHash)
+            return args
         }
     }
 }

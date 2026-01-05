@@ -14,6 +14,15 @@ public enum GitError: LocalizedError {
     case cannotDeleteCurrentBranch
     case cannotDeleteProtectedBranch(String)
     case deleteBranchFailed(branch: String, stderr: String)
+    case nothingToStash
+    case stashFailed(stderr: String)
+    case stashPopFailed(stderr: String)
+    case stashApplyFailed(stderr: String)
+    case stashDropFailed(stderr: String)
+    case cherryPickFailed(commit: String, stderr: String)
+    case cherryPickConflict(commit: String)
+    case revertFailed(commit: String, stderr: String)
+    case revertConflict(commit: String)
 
     public var errorDescription: String? {
         switch self {
@@ -31,7 +40,7 @@ public enum GitError: LocalizedError {
             return "conflict"
         case .cannotStageHunkFromUntrackedFile:
             return "Cannot stage individual hunks from untracked files. Please stage the entire file first."
-        case .fileNotInIndex(let path):
+        case .fileNotInIndex:
             return "Cannot stage hunk. File is not in the index. Stage the entire file first."
         case .emptyCommitMessage:
             return "Commit message cannot be empty."
@@ -45,8 +54,26 @@ public enum GitError: LocalizedError {
             return "Cannot delete the current branch. Checkout a different branch first."
         case .cannotDeleteProtectedBranch(let name):
             return "Cannot delete protected branch '\(name)'. This is a critical branch."
-        case .deleteBranchFailed(let branch, let stderr):
-            return "Failed to delete branch '\(branch)': \(stderr)"
+        case .deleteBranchFailed(let branch, _):
+            return "Failed to delete branch '\(branch)."
+        case .nothingToStash:
+            return "No changes to stash."
+        case .stashFailed:
+            return "Failed to stash changes."
+        case .stashPopFailed:
+            return "Failed to pop stash."
+        case .stashApplyFailed:
+            return "Failed to apply stash."
+        case .stashDropFailed:
+            return "Failed to drop stash."
+        case .cherryPickFailed(let commit, _):
+            return "Failed to cherry-pick commit \(commit.prefix(7))."
+        case .cherryPickConflict(let commit):
+            return "Cherry-pick of \(commit.prefix(7)) resulted in conflicts. Resolve conflicts and commit."
+        case .revertFailed(let commit, _):
+            return "Failed to revert commit \(commit.prefix(7))."
+        case .revertConflict(let commit):
+            return "Revert of \(commit.prefix(7)) resulted in conflicts. Resolve conflicts and commit."
         }
     }
 }

@@ -8,8 +8,76 @@ extension GitRepository: StashReadable {
 
 // MARK: - StashManageable
 extension GitRepository: StashManageable {
-    public func stashPush(message: String?) async throws {}
-    public func stashPop(index: Int?) async throws {}
-    public func stashApply(index: Int?) async throws {}
-    public func stashDrop(index: Int) async throws {}
+    /// Save current changes to stash
+    public func stashPush(message: String? = nil) async throws {
+        // Check if there are changes to stash
+        let status = try await getWorkingTreeStatus()
+        guard !status.files.isEmpty else {
+            throw GitError.nothingToStash
+        }
+        
+        let result = try await commandRunner.run(
+            .stashPush(message: message),
+            stdin: nil,
+            in: url
+        )
+        
+        guard result.exitCode == 0 else {
+            throw GitError.stashFailed(stderr: result.stderr)
+        }
+        
+        // Invalidate caches
+        await workingTree.invalidateIndexCache()
+        await cache.remove(.refs) // Stash refs might have changed
+    }
+    
+    /// Apply and remove most recent stash
+    public func stashPop(index: Int? = nil) async throws {
+        let result = try await commandRunner.run(
+            .stashPop(index: index),
+            stdin: nil,
+            in: url
+        )
+        
+        guard result.exitCode == 0 else {
+            throw GitError.stashPopFailed(stderr: result.stderr)
+        }
+        
+        // Invalidate caches
+        await workingTree.invalidateIndexCache()
+        await cache.remove(.refs) // Stash list changed
+    }
+    
+    /// Apply stash without removing it
+    public func stashApply(index: Int? = nil) async throws {
+        let result = try await commandRunner.run(
+            .stashApply(index: index),
+            stdin: nil,
+            in: url
+        )
+        
+        guard result.exitCode == 0 else {
+            throw GitError.stashApplyFailed(stderr: result.stderr)
+        }
+        
+        // Invalidate caches
+        await workingTree.invalidateIndexCache()
+        // Note: refs don't change (stash still exists)
+    }
+    
+    /// Delete a stash
+    public func stashDrop(index: Int) async throws {
+        let result = try await commandRunner.run(
+            .stashDrop(index: index),
+            stdin: nil,
+            in: url
+        )
+        
+        guard result.exitCode == 0 else {
+            throw GitError.stashDropFailed(stderr: result.stderr)
+        }
+        
+        // Invalidate refs cache (stash list changed)
+        await cache.remove(.refs)
+    }
 }

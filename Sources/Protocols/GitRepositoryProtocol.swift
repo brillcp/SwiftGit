@@ -13,7 +13,9 @@ public protocol GitRepositoryProtocol:
     StashReadable,
     StashManageable,
     ObjectReadable,
-    CacheManageable
+    CacheManageable,
+    CherryPickManageable,
+    RevertManageable
 {
     /// The URL of the repository
     var url: URL { get }
