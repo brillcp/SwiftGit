@@ -76,26 +76,22 @@ extension GitCommand {
                 args += ["-m", message]
             }
             return args
-            
         case .stashPop(let index):
             var args = ["stash", "pop"]
             if let index = index {
                 args.append("stash@{\(index)}")
             }
             return args
-            
         case .stashApply(let index):
             var args = ["stash", "apply"]
             if let index = index {
                 args.append("stash@{\(index)}")
             }
             return args
-            
         case .stashDrop(let index):
             return ["stash", "drop", "stash@{\(index)}"]
         case .cherryPick(let commitHash):
             return ["cherry-pick", commitHash]
-            
         case .revert(let commitHash, let noCommit):
             var args = ["revert"]
             if noCommit {

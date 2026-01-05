@@ -50,7 +50,6 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         let snapshot = try await indexReader.readIndex(at: indexURL)
         return snapshot.entries
     }
-    
 
     public func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus {
         let untracked = try await scanForUntrackedFiles(indexEntries: snapshot.index)

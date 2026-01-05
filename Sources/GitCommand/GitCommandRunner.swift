@@ -58,16 +58,11 @@ extension CommandRunner: GitCommandable {
         let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
 
-        let stdout = String(data: outputData, encoding: .utf8) ?? ""
-        let stderr = String(data: errorData, encoding: .utf8) ?? ""
-        let exitCode = Int(process.terminationStatus)
-
-        let result = CommandResult(stdout: stdout, stderr: stderr, exitCode: exitCode)
-
-        if exitCode != 0 {
-            throw GitError.commandFailed(command: command, result: result)
-        }
-        return result
+        return CommandResult(
+            stdout: String(data: outputData, encoding: .utf8) ?? "",
+            stderr: String(data: errorData, encoding: .utf8) ?? "",
+            exitCode: Int(process.terminationStatus)
+        )
     }
 }
 
