@@ -5,17 +5,17 @@ extension GitRepository: StagingManageable {
         let result = try await commandRunner.run(.add(path: path), stdin: nil, in: url)
 
         guard result.exitCode == 0 else {
-            throw GitError.stageFailed(stderr: result.stderr)
+            throw GitError.stageFailed(path: path)
         }
 
         await workingTree.invalidateIndexCache()
     }
     
-    public func stageFiles() async throws {
+    public func stageAllFiles() async throws {
         let result = try await commandRunner.run(.addAll, stdin: nil, in: url)
 
         guard result.exitCode == 0 else {
-            throw GitError.stageAllFailed(stderr: result.stderr)
+            throw GitError.stageAllFailed
         }
 
         await workingTree.invalidateIndexCache()
@@ -25,17 +25,17 @@ extension GitRepository: StagingManageable {
         let result = try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
 
         guard result.exitCode == 0 else {
-            throw GitError.unstageFailed(stderr: result.stderr)
+            throw GitError.unstageFailed(path: path)
         }
 
         await workingTree.invalidateIndexCache()
     }
     
-    public func unstageFiles() async throws {
+    public func unstageAllFiles() async throws {
         let result = try await commandRunner.run(.resetAll, stdin: nil, in: url)
 
         guard result.exitCode == 0 else {
-            throw GitError.unstageAllFailed(stderr: result.stderr)
+            throw GitError.unstageAllFailed
         }
 
         await workingTree.invalidateIndexCache()
@@ -66,7 +66,7 @@ extension GitRepository: StagingManageable {
         )
 
         guard result.exitCode == 0 else {
-            throw GitError.stageHunkFailed(stderr: result.stderr)
+            throw GitError.stageHunkFailed(path: file.path)
         }
 
         await workingTree.invalidateIndexCache()
@@ -94,7 +94,7 @@ extension GitRepository: StagingManageable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.unstageHunkFailed(stderr: result.stderr)
+            throw GitError.unstageHunkFailed(path: file.path)
         }
 
         await workingTree.invalidateIndexCache()

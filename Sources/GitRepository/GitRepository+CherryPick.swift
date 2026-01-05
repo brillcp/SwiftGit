@@ -14,7 +14,7 @@ extension GitRepository: CherryPickManageable {
             if result.stderr.contains("conflict") || result.stderr.contains("CONFLICT") {
                 throw GitError.cherryPickConflict(commit: commitHash)
             }
-            throw GitError.cherryPickFailed(commit: commitHash, stderr: result.stderr)
+            throw GitError.cherryPickFailed(commit: commitHash)
         }
         
         // Invalidate caches after successful cherry-pick

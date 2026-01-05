@@ -17,7 +17,7 @@ extension GitRepository: DiscardManageable {
             let result = try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
 
             guard result.exitCode == 0 else {
-                throw GitError.discardFileFailed(stderr: result.stderr)
+                throw GitError.discardFileFailed(path: path)
             }
         }
         await workingTree.invalidateIndexCache()
@@ -33,7 +33,7 @@ extension GitRepository: DiscardManageable {
         )
 
         guard result.exitCode == 0 else {
-            throw GitError.discardHunkFailed(stderr: result.stderr)
+            throw GitError.discardHunkFailed(path: file.path)
         }
     }
 
@@ -42,7 +42,7 @@ extension GitRepository: DiscardManageable {
         let result = try await commandRunner.run(.resetHardHEAD, stdin: nil, in: url)
 
         guard result.exitCode == 0 else {
-            throw GitError.discardAllFailed(stderr: result.stderr)
+            throw GitError.discardAllFailed
         }
 
         // Remove untracked files and directories

@@ -30,8 +30,7 @@ extension GitRepository: BranchManageable {
         )
         
         guard result.exitCode == 0 else {
-            let action = createNew ? "create and checkout" : "checkout"
-            throw GitError.checkoutFailed(branch: branch, action: action, stderr: result.stderr)
+            throw GitError.checkoutFailed(branch: branch)
         }
         
         // Invalidate caches after checkout
@@ -55,7 +54,7 @@ extension GitRepository: BranchManageable {
         )
 
         guard result.exitCode == 0 else {
-            throw GitError.deleteBranchFailed(branch: name, stderr: result.stderr)
+            throw GitError.deleteBranchFailed(branch: name)
         }
 
         await cache.remove(.refs)

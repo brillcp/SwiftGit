@@ -150,7 +150,7 @@ struct StagingTests {
         }
         
         // Stage all changes
-        _ = try await repository.stageFiles()
+        _ = try await repository.stageAllFiles()
         
         // Verify all files are staged
         let status = try gitStatus(in: repoURL)
@@ -215,10 +215,10 @@ struct StagingTests {
         for file in testFiles {
             try createTestFile(in: repoURL, named: file, content: "test")
         }
-        _ = try await repository.stageFiles()
+        _ = try await repository.stageAllFiles()
         
         // Unstage all
-        _ = try await repository.unstageFiles()
+        _ = try await repository.unstageAllFiles()
         
         // Verify all files are unstaged
         for file in testFiles {
@@ -312,7 +312,7 @@ struct StagingTests {
         for file in testFiles {
             try createTestFile(in: repoURL, named: file, content: "test")
         }
-        try await repository.stageFiles()
+        try await repository.stageAllFiles()
         
         // Commit
         try await repository.commit(message: "Add multiple test files")

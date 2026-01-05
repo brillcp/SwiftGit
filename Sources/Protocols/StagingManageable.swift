@@ -6,13 +6,13 @@ public protocol StagingManageable: Actor {
     func stageFile(at path: String) async throws
     
     /// Stage all files
-    func stageFiles() async throws
+    func stageAllFiles() async throws
     
     /// Unstage a single file
     func unstageFile(at path: String) async throws
     
     /// Unstage all files
-    func unstageFiles() async throws
+    func unstageAllFiles() async throws
     
     /// Stage a specific hunk
     func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws

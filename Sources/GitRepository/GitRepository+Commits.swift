@@ -76,7 +76,7 @@ extension GitRepository: CommitWritable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.commitFailed(stderr: result.stderr)
+            throw GitError.commitFailed
         }
 
         // Invalidate cache (index is reset after commit)

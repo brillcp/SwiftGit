@@ -14,7 +14,7 @@ extension GitRepository: RevertManageable {
             if result.stderr.contains("conflict") || result.stderr.contains("CONFLICT") {
                 throw GitError.revertConflict(commit: commitHash)
             }
-            throw GitError.revertFailed(commit: commitHash, stderr: result.stderr)
+            throw GitError.revertFailed(commit: commitHash)
         }
         
         // Invalidate caches after successful revert

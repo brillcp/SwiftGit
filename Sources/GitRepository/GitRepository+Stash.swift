@@ -23,7 +23,7 @@ extension GitRepository: StashManageable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.stashFailed(stderr: result.stderr)
+            throw GitError.stashFailed
         }
         
         // Invalidate caches
@@ -40,7 +40,7 @@ extension GitRepository: StashManageable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.stashPopFailed(stderr: result.stderr)
+            throw GitError.stashPopFailed
         }
         
         // Invalidate caches
@@ -57,7 +57,7 @@ extension GitRepository: StashManageable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.stashApplyFailed(stderr: result.stderr)
+            throw GitError.stashApplyFailed
         }
         
         // Invalidate caches
@@ -74,7 +74,7 @@ extension GitRepository: StashManageable {
         )
         
         guard result.exitCode == 0 else {
-            throw GitError.stashDropFailed(stderr: result.stderr)
+            throw GitError.stashDropFailed
         }
         
         // Invalidate refs cache (stash list changed)

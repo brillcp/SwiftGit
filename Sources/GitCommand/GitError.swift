@@ -1,102 +1,135 @@
 import Foundation
 
 public enum GitError: LocalizedError {
+    // MARK: - Setup & Environment
     case gitNotFound
     case notARepository
-    case conflictDetected
-    case cannotStageHunkFromUntrackedFile
-    case fileNotInIndex(path: String)
+    
+    // MARK: - Commit Operations
     case emptyCommitMessage
-    case commitFailed(stderr: String)
     case nothingToCommit
+    case commitFailed
+    
+    // MARK: - Branch Operations
     case uncommittedChanges
-    case discardFileFailed(stderr: String)
-    case discardHunkFailed(stderr: String)
-    case discardAllFailed(stderr: String)
-    case stageFailed(stderr: String)
-    case stageAllFailed(stderr: String)
-    case unstageFailed(stderr: String)
-    case unstageAllFailed(stderr: String)
-    case stageHunkFailed(stderr: String)
-    case unstageHunkFailed(stderr: String)
-    case checkoutFailed(branch: String, action: String, stderr: String)
+    case checkoutFailed(branch: String)
     case cannotDeleteCurrentBranch
     case cannotDeleteProtectedBranch(String)
-    case deleteBranchFailed(branch: String, stderr: String)
+    case deleteBranchFailed(branch: String)
+    
+    // MARK: - Staging Operations
+    case cannotStageHunkFromUntrackedFile
+    case fileNotInIndex(path: String)
+    case stageFailed(path: String)
+    case stageAllFailed
+    case unstageFailed(path: String)
+    case unstageAllFailed
+    case stageHunkFailed(path: String)
+    case unstageHunkFailed(path: String)
+    
+    // MARK: - Discard Operations
+    case discardFileFailed(path: String)
+    case discardHunkFailed(path: String)
+    case discardAllFailed
+    
+    // MARK: - Stash Operations
     case nothingToStash
-    case stashFailed(stderr: String)
-    case stashPopFailed(stderr: String)
-    case stashApplyFailed(stderr: String)
-    case stashDropFailed(stderr: String)
-    case cherryPickFailed(commit: String, stderr: String)
+    case stashFailed
+    case stashPopFailed
+    case stashPopConflict
+    case stashApplyFailed
+    case stashDropFailed
+    
+    // MARK: - Advanced Operations
+    case cherryPickFailed(commit: String)
     case cherryPickConflict(commit: String)
-    case revertFailed(commit: String, stderr: String)
+    case revertFailed(commit: String)
     case revertConflict(commit: String)
+    
+    // MARK: - Conflict Detection
+    case conflictDetected
 
     public var errorDescription: String? {
         switch self {
+        // MARK: - Setup & Environment
         case .gitNotFound:
-            return "Git binary not found. Please install Git."
+            return "Git is not installed. Please install Git to continue."
         case .notARepository:
-            return "Not a Git repository"
-        case .conflictDetected:
-            return "conflict"
-        case .cannotStageHunkFromUntrackedFile:
-            return "Cannot stage individual hunks from untracked files. Please stage the entire file first."
-        case .fileNotInIndex:
-            return "Cannot stage hunk. File is not in the index. Stage the entire file first."
+            return "This folder is not a Git repository."
+            
+        // MARK: - Commit Operations
         case .emptyCommitMessage:
             return "Commit message cannot be empty."
-        case .commitFailed(let stderr):
-            return "Failed to create commit: \(stderr)"
         case .nothingToCommit:
-            return "Nothing to commit."
+            return "No changes to commit. Stage files first."
+        case .commitFailed:
+            return "Failed to create commit. Please try again."
+            
+        // MARK: - Branch Operations
         case .uncommittedChanges:
-            return "The repository contains uncommitted changes."
-        case .discardFileFailed(let stderr):
-            return "Failed to discard changes: \(stderr)"
-        case .discardHunkFailed(let stderr):
-            return "Failed to discard hunk: \(stderr)"
-        case .discardAllFailed(let stderr):
-            return "Failed to discard all changes: \(stderr)"
-        case .stageFailed(let stderr):
-            return "Failed to stage: \(stderr)"
-        case .stageAllFailed(let stderr):
-            return "Failed to stage all files: \(stderr)"
-        case .unstageFailed(let stderr):
-            return "Failed to unstage: \(stderr)"
-        case .unstageAllFailed(let stderr):
-            return "Failed to unstage all files: \(stderr)"
-        case .stageHunkFailed(let stderr):
-            return "Failed to stage hunk: \(stderr)"
-        case .unstageHunkFailed(let stderr):
-            return "Failed to unstage hunk: \(stderr)"
-        case .checkoutFailed(let branch, let action, let stderr):
-            return "Failed to \(action) '\(branch)': \(stderr)"
+            return "You have uncommitted changes. Commit or stash them before switching branches."
+        case .checkoutFailed(let branch):
+            return "Failed to checkout '\(branch)'. The branch may not exist."
         case .cannotDeleteCurrentBranch:
-            return "Cannot delete the current branch. Checkout a different branch first."
+            return "Cannot delete the current branch. Switch to another branch first."
         case .cannotDeleteProtectedBranch(let name):
-            return "Cannot delete protected branch '\(name)'. This is a critical branch."
-        case .deleteBranchFailed(let branch, _):
-            return "Failed to delete branch '\(branch)."
+            return "Cannot delete '\(name)'. This is a protected branch (main, master, develop, etc.)."
+        case .deleteBranchFailed(let branch):
+            return "Failed to delete '\(branch)'. The branch may have unmerged changes."
+            
+        // MARK: - Staging Operations
+        case .cannotStageHunkFromUntrackedFile:
+            return "Cannot stage individual changes from a new file. Stage the entire file first."
+        case .fileNotInIndex(let path):
+            return "'\(path)' is not tracked. Stage the entire file before staging individual changes."
+        case .stageFailed(let path):
+            return "Failed to stage '\(path)'."
+        case .stageAllFailed:
+            return "Failed to stage files."
+        case .unstageFailed(let path):
+            return "Failed to unstage '\(path)'."
+        case .unstageAllFailed:
+            return "Failed to unstage files."
+        case .stageHunkFailed(let path):
+            return "Failed to stage changes in '\(path)'."
+        case .unstageHunkFailed(let path):
+            return "Failed to unstage changes in '\(path)'."
+            
+        // MARK: - Discard Operations
+        case .discardFileFailed(let path):
+            return "Failed to discard changes in '\(path)'."
+        case .discardHunkFailed(let path):
+            return "Failed to discard selected changes in '\(path)'."
+        case .discardAllFailed:
+            return "Failed to discard changes."
+            
+        // MARK: - Stash Operations
         case .nothingToStash:
             return "No changes to stash."
         case .stashFailed:
             return "Failed to stash changes."
         case .stashPopFailed:
-            return "Failed to pop stash."
+            return "Failed to apply stash."
+        case .stashPopConflict:
+            return "Cannot apply stash: your current changes would be overwritten. Commit or stash your changes first."
         case .stashApplyFailed:
             return "Failed to apply stash."
         case .stashDropFailed:
-            return "Failed to drop stash."
-        case .cherryPickFailed(let commit, _):
+            return "Failed to delete stash."
+            
+        // MARK: - Advanced Operations
+        case .cherryPickFailed(let commit):
             return "Failed to cherry-pick commit \(commit.prefix(7))."
         case .cherryPickConflict(let commit):
-            return "Cherry-pick of \(commit.prefix(7)) resulted in conflicts. Resolve conflicts and commit."
-        case .revertFailed(let commit, _):
+            return "Cherry-picking \(commit.prefix(7)) caused conflicts. Resolve them and commit."
+        case .revertFailed(let commit):
             return "Failed to revert commit \(commit.prefix(7))."
         case .revertConflict(let commit):
-            return "Revert of \(commit.prefix(7)) resulted in conflicts. Resolve conflicts and commit."
+            return "Reverting \(commit.prefix(7)) caused conflicts. Resolve them and commit."
+            
+        // MARK: - Conflict Detection
+        case .conflictDetected:
+            return "Merge conflicts detected. Resolve them before continuing."
         }
     }
 }
