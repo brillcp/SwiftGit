@@ -117,7 +117,7 @@ private extension GitIndexReader {
             entries.append(entry)
         }
         
-        return GitIndexSnapshot(entries: entries, version: version)
+        return try GitIndexSnapshot(entries: entries, version: version)
     }
     
     static func parseEntry(

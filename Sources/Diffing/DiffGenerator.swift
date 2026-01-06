@@ -37,7 +37,7 @@ extension DiffGenerator: DiffGeneratorProtocol {
         
         // Early exit: both empty
         if oldContent.isEmpty && newContent.isEmpty {
-            return []
+            throw DiffError.emptyContent
         }
         
         // Size check
@@ -71,18 +71,12 @@ extension DiffGenerator: DiffGeneratorProtocol {
 
 enum DiffError: LocalizedError {
     case fileTooLarge(size: Int)
-    case binaryFile
-    case invalidEncoding
     case emptyContent
     
     var errorDescription: String? {
         switch self {
         case .fileTooLarge(let size):
             return "File too large to diff: \(size) bytes (max 1MB)"
-        case .binaryFile:
-            return "Cannot diff binary files"
-        case .invalidEncoding:
-            return "File contains invalid UTF-8"
         case .emptyContent:
             return "Both files are empty"
         }

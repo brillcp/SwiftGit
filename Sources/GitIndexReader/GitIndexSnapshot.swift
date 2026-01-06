@@ -6,11 +6,23 @@ public struct GitIndexSnapshot: Sendable {
     public let version: Int
     public let entryCount: Int
     
-    public init(entries: [IndexEntry], version: Int) {
+    public init(entries: [IndexEntry], version: Int) throws {
         self.entries = entries
-        self.entriesByPath = Dictionary(uniqueKeysWithValues: entries.map { ($0.path, $0) })
         self.version = version
         self.entryCount = entries.count
+        
+        // Detect duplicates (conflicts in index)
+        var tempDict: [String: IndexEntry] = [:]
+        
+        for entry in entries {
+            if tempDict[entry.path] != nil {
+                // Duplicate path = corrupted/conflicted index
+                throw GitIndexError.corruptedIndex
+            }
+            tempDict[entry.path] = entry
+        }
+        
+        self.entriesByPath = tempDict
     }
     
     public subscript(path: String) -> IndexEntry? {
