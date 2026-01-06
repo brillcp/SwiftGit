@@ -17,7 +17,7 @@ public struct GitIndexSnapshot: Sendable {
         for entry in entries {
             if tempDict[entry.path] != nil {
                 // Duplicate path = corrupted/conflicted index
-                throw GitIndexError.corruptedIndex
+                throw GitIndexError.indexConflict
             }
             tempDict[entry.path] = entry
         }

@@ -62,7 +62,7 @@ extension GitIndexReader: GitIndexReaderProtocol {
 public enum GitIndexError: LocalizedError {
     case invalidHeader
     case unsupportedVersion(Int)
-    case corruptedIndex
+    case indexConflict
     case truncatedEntry(at: Int)
     case fileNotFound(URL)
     
@@ -72,8 +72,8 @@ public enum GitIndexError: LocalizedError {
             return "Git index has invalid header"
         case .unsupportedVersion(let v):
             return "Git index version \(v) is not supported (only v2 and v3)"
-        case .corruptedIndex:
-            return "Git index is corrupted"
+        case .indexConflict:
+            return "Git index is corrupted or has unresolved conflicts. Try resolving conflicts or running 'git reset'."
         case .truncatedEntry(let index):
             return "Git index entry \(index) is truncated"
         case .fileNotFound(let url):

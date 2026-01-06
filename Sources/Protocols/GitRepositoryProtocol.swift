@@ -15,7 +15,8 @@ public protocol GitRepositoryProtocol:
     ObjectReadable,
     CacheManageable,
     CherryPickManageable,
-    RevertManageable
+    RevertManageable,
+    ConflictManageable
 {
     /// The URL of the repository
     var url: URL { get }

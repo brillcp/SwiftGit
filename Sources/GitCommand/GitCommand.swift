@@ -19,6 +19,9 @@ public enum GitCommand: Sendable {
     case stashDrop(index: Int)
     case cherryPick(commitHash: String)
     case revert(commitHash: String, noCommit: Bool)
+    case mergeAbort
+    case cherryPickAbort
+    case revertAbort
 }
 
 extension GitCommand {
@@ -99,6 +102,12 @@ extension GitCommand {
             }
             args.append(commitHash)
             return args
+        case .mergeAbort:
+            return ["merge", "--abort"]
+        case .cherryPickAbort:
+            return ["cherry-pick", "--abort"]
+        case .revertAbort:
+            return ["revert", "--abort"]
         }
     }
 }

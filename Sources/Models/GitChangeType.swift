@@ -6,4 +6,5 @@ public enum GitChangeType: Hashable, Sendable {
     case deleted
     case renamed(from: String)
     case untracked
+    case conflicted
 }
