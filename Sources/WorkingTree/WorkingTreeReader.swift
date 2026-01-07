@@ -2,7 +2,7 @@ import Foundation
 import CommonCrypto
 
 public protocol WorkingTreeReaderProtocol: Actor {
-    func readIndex() async throws -> [IndexEntry]
+    func indexSnapshot() async throws -> GitIndexSnapshot
 
     /// Compute the current working tree status
     func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus
@@ -11,7 +11,7 @@ public protocol WorkingTreeReaderProtocol: Actor {
     func stagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile]
 
     /// Get unstaged changes (Index → Working Tree)
-    func unstagedChanges() async throws -> [String: WorkingTreeFile]
+    func unstagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile]
     
     /// Get untracked files
     func untrackedFiles() async throws -> [String]
@@ -42,13 +42,11 @@ public actor WorkingTreeReader {
 
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
-    public func readIndex() async throws -> [IndexEntry] {
+    public func indexSnapshot() async throws -> GitIndexSnapshot {
         guard fileManager.fileExists(atPath: indexURL.path) else {
-            return []
+            return GitIndexSnapshot(entries: [], version: 2)
         }
-        
-        let snapshot = try await indexReader.readIndex(at: indexURL)
-        return snapshot.entries
+        return try await indexReader.readIndex(at: indexURL)
     }
 
     public func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus {
@@ -57,11 +55,22 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
 
         workingComplete.merge(untracked) { _, new in new }
         
-        return compareStates(
+        var status = compareStates(
             headTree: snapshot.headTree,
             index: snapshot.indexMap,
             workingTree: workingComplete
         )
+        
+        // Mark conflicted files (now available from snapshot)
+        for path in snapshot.conflictedPaths {
+            status.files[path] = WorkingTreeFile(
+                path: path,
+                staged: .conflicted,
+                unstaged: .conflicted
+            )
+        }
+        
+        return status
     }
 
     public func stagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile] {
@@ -95,11 +104,10 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         return files
     }
 
-    public func unstagedChanges() async throws -> [String: WorkingTreeFile] {
-        let indexEntries = try await readIndex()
-        let indexMap = Dictionary(uniqueKeysWithValues: indexEntries.map { ($0.path, $0.sha1) })
-        let workingTree = try await checkWorkingTreeAgainstIndex(indexEntries: indexEntries)
-        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
+    public func unstagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile] {
+        let indexMap = snapshot.indexMap
+        let workingTree = try await checkWorkingTreeAgainstIndex(indexEntries: snapshot.index)
+        let untracked = try await scanForUntrackedFiles(indexEntries: snapshot.index)
         
         var workingComplete = workingTree
         workingComplete.merge(untracked) { _, new in new }
@@ -135,8 +143,8 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
     }
     
     public func untrackedFiles() async throws -> [String] {
-        let indexEntries = try await readIndex()
-        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries)
+        let indexEntries = try await indexSnapshot()
+        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries.entries)
         return Array(untracked.keys)
     }
 

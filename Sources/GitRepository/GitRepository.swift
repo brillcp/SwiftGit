@@ -82,8 +82,20 @@ public struct RepoSnapshot: Sendable {
     let head: String
     let commit: Commit
     let headTree: [String: String]
-    let index: [IndexEntry]
-    let indexMap: [String: String]
+    let indexSnapshot: GitIndexSnapshot
+    
+    // Convenience accessors
+    var index: [IndexEntry] {
+        indexSnapshot.entries
+    }
+    
+    var indexMap: [String: String] {
+        indexSnapshot.entriesByPath.mapValues(\.sha1)
+    }
+    
+    var conflictedPaths: [String] {
+        indexSnapshot.conflictedPaths
+    }
 }
 
 // MARK: - Helper functions
@@ -92,17 +104,12 @@ extension GitRepository {
         guard let head = try await getHEAD(), let commit = try await getCommit(head) else {
             throw GitError.notARepository
         }
-        
-        let headTree = try await getTreePaths(commit.tree)
-        let index = try await workingTree.readIndex()
-        let indexMap = Dictionary(uniqueKeysWithValues: index.map { ($0.path, $0.sha1) })
-        
+
         return RepoSnapshot(
             head: head,
             commit: commit,
-            headTree: headTree,
-            index: index,
-            indexMap: indexMap
+            headTree: try await getTreePaths(commit.tree),
+            indexSnapshot: try await workingTree.indexSnapshot()
         )
     }
 

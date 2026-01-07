@@ -43,8 +43,9 @@ extension GitRepository: StagingManageable {
     
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Check if file is in index
-        let snapshot = try await workingTree.readIndex()
-        let fileInIndex = snapshot.contains { $0.path == file.path }
+        let snapshot = try await workingTree.indexSnapshot()
+        let entries = snapshot.entries
+        let fileInIndex = entries.contains { $0.path == file.path }
         
         if !fileInIndex {
             throw GitError.fileNotInIndex(path: file.path)
@@ -55,7 +56,7 @@ extension GitRepository: StagingManageable {
         }
 
         // Save old blob SHA BEFORE staging
-        let oldBlobSha = snapshot.first(where: { $0.path == file.path })?.sha1
+        let oldBlobSha = entries.first(where: { $0.path == file.path })?.sha1
 
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
         
@@ -78,8 +79,9 @@ extension GitRepository: StagingManageable {
 
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Validation
-        let snapshot = try await workingTree.readIndex()
-        let fileInIndex = snapshot.contains { $0.path == file.path }
+        let snapshot = try await workingTree.indexSnapshot()
+        let entries = snapshot.entries
+        let fileInIndex = entries.contains { $0.path == file.path }
         
         if !fileInIndex {
             throw GitError.fileNotInIndex(path: file.path)

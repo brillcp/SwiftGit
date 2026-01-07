@@ -3,7 +3,8 @@ import Foundation
 extension GitRepository: DiscardManageable {
     public func discardFile(at path: String) async throws {
         // Get file status
-        let unstagedChanges = try await workingTree.unstagedChanges()
+        let snapshot = try await getRepoSnapshot()
+        let unstagedChanges = try await workingTree.unstagedChanges(snapshot: snapshot)
         guard let file = unstagedChanges[path] else {
             return // File doesn't exist
         }

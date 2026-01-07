@@ -12,6 +12,7 @@ extension GitRepository: WorkingTreeReadable {
     }
     
     public func getUnstagedChanges() async throws -> [String: WorkingTreeFile] {
-        try await workingTree.unstagedChanges()
+        let snapshot = try await getRepoSnapshot()
+        return try await workingTree.unstagedChanges(snapshot: snapshot)
     }
 }
