@@ -10,12 +10,6 @@ extension GitRepository: StashReadable {
 extension GitRepository: StashManageable {
     /// Save current changes to stash
     public func stashPush(message: String? = nil) async throws {
-        // Check if there are changes to stash
-        let status = try await getWorkingTreeStatus()
-        guard !status.files.isEmpty else {
-            throw GitError.nothingToStash
-        }
-        
         let result = try await commandRunner.run(
             .stashPush(message: message),
             stdin: nil,
@@ -23,12 +17,16 @@ extension GitRepository: StashManageable {
         )
         
         guard result.exitCode == 0 else {
+            // Check if "No local changes to save"
+            let output = result.stderr + result.stdout
+            if output.contains("No local changes") {
+                throw GitError.nothingToStash
+            }
             throw GitError.stashFailed
         }
         
-        // Invalidate caches
         await workingTree.invalidateIndexCache()
-        await cache.remove(.refs) // Stash refs might have changed
+        await cache.remove(.refs)
     }
     
     /// Apply and remove most recent stash

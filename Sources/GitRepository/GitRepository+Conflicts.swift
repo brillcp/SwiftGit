@@ -17,43 +17,30 @@ extension GitRepository: ConflictManageable {
     
     /// Get list of conflicted file paths
     public func getConflictedFiles() async throws -> [String] {
-        let status = try await getWorkingTreeStatus()
-        
-        return status.files.compactMap { path, file in
-            // Files with conflicts show as modified in both staged and unstaged
-            // Or specifically marked as conflicted
-            if file.unstaged == .conflicted || file.staged == .conflicted {
-                return path
-            }
-            return nil
-        }
+        try await getRepoSnapshot().conflictedPaths
     }
     
     /// Get the type of operation causing conflicts
     public func conflictOperation() async -> ConflictOperation? {
-        let gitURL = url.appendingPathComponent(".git")
-        
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent("MERGE_HEAD").path) {
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             return .merge
         }
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent("CHERRY_PICK_HEAD").path) {
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
             return .cherryPick
         }
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent("REVERT_HEAD").path) {
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             return .revert
         }
         return nil
     }
     
     /// Abort current operation (merge/cherry-pick/revert)
-    public func abortOperation() async throws {
-        let gitURL = url.appendingPathComponent(".git")
-        
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent("MERGE_HEAD").path) {
+    public func abortOperation() async throws {        
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             try await commandRunner.run(.mergeAbort, stdin: nil, in: url)
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent("CHERRY_PICK_HEAD").path) {
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
             try await commandRunner.run(.cherryPickAbort, stdin: nil, in: url)
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent("REVERT_HEAD").path) {
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             try await commandRunner.run(.revertAbort, stdin: nil, in: url)
         }
         

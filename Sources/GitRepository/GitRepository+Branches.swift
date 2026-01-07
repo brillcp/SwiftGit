@@ -33,7 +33,6 @@ extension GitRepository: BranchManageable {
             throw GitError.checkoutFailed(branch: branch)
         }
         
-        // Invalidate caches after checkout
         await invalidateAllCaches()
     }
 

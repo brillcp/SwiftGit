@@ -7,4 +7,7 @@ enum GitPath: String {
     case index
     case packedRefs = "packed-refs"
     case head = "HEAD"
+    case mergeHead = "MERGE_HEAD"
+    case cherryPickHead = "CHERRY_PICK_HEAD"
+    case revertHead = "REVERT_HEAD"
 }

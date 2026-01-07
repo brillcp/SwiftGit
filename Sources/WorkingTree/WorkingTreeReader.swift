@@ -7,12 +7,6 @@ public protocol WorkingTreeReaderProtocol: Actor {
     /// Compute the current working tree status
     func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus
     
-    /// Get staged changes (HEAD → Index)
-    func stagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile]
-
-    /// Get unstaged changes (Index → Working Tree)
-    func unstagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile]
-    
     /// Get untracked files
     func untrackedFiles() async throws -> [String]
 
@@ -71,75 +65,6 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         }
         
         return status
-    }
-
-    public func stagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile] {
-        var files: [String: WorkingTreeFile] = [:]
-        let allPaths = Set(snapshot.headTree.keys).union(snapshot.indexMap.keys)
-        
-        for path in allPaths {
-            let headOid = snapshot.headTree[path]
-            let indexOid = snapshot.indexMap[path]
-            
-            var staged: GitChangeType?
-            
-            // Staged changes (HEAD → Index)
-            if let indexOid = indexOid {
-                if let headOid = headOid {
-                    if indexOid != headOid {
-                        staged = .modified
-                    }
-                } else {
-                    staged = .added
-                }
-            } else if headOid != nil {
-                staged = .deleted
-            }
-            
-            if let staged = staged {
-                files[path] = WorkingTreeFile(path: path, staged: staged, unstaged: nil)
-            }
-        }
-        
-        return files
-    }
-
-    public func unstagedChanges(snapshot: RepoSnapshot) async throws -> [String: WorkingTreeFile] {
-        let indexMap = snapshot.indexMap
-        let workingTree = try await checkWorkingTreeAgainstIndex(indexEntries: snapshot.index)
-        let untracked = try await scanForUntrackedFiles(indexEntries: snapshot.index)
-        
-        var workingComplete = workingTree
-        workingComplete.merge(untracked) { _, new in new }
-        
-        // Only unstaged changes (Index → Working)
-        var files: [String: WorkingTreeFile] = [:]
-        let allPaths = Set(indexMap.keys).union(workingComplete.keys)
-        
-        for path in allPaths {
-            let indexOid = indexMap[path]
-            let workingOid = workingComplete[path]
-            
-            var unstaged: GitChangeType?
-            
-            if let workingOid = workingOid {
-                if let indexOid = indexOid {
-                    if workingOid != indexOid {
-                        unstaged = .modified
-                    }
-                } else {
-                    unstaged = .untracked
-                }
-            } else if indexOid != nil {
-                unstaged = .deleted
-            }
-            
-            if let unstaged = unstaged {
-                files[path] = WorkingTreeFile(path: path, staged: nil, unstaged: unstaged)
-            }
-        }
-        
-        return files
     }
     
     public func untrackedFiles() async throws -> [String] {

@@ -57,16 +57,8 @@ extension GitRepository: CommitReadable {
 // MARK: - CommitWritable
 extension GitRepository: CommitWritable {
     public func commit(message: String) async throws {
-        // Validate message
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw GitError.emptyCommitMessage
-        }
-        
-        // Check if there are staged changes
-        let snapshot = try await getRepoSnapshot()
-        let staged = try await workingTree.stagedChanges(snapshot: snapshot)
-        guard !staged.isEmpty else {
-            throw GitError.nothingToCommit
         }
         
         let result = try await commandRunner.run(
@@ -76,10 +68,14 @@ extension GitRepository: CommitWritable {
         )
         
         guard result.exitCode == 0 else {
+            // Check if it's "nothing to commit"
+            let output = result.stderr + result.stdout
+            if output.contains("nothing to commit") {
+                throw GitError.nothingToCommit
+            }
             throw GitError.commitFailed
         }
 
-        // Invalidate cache (index is reset after commit)
         await invalidateAllCaches()
     }
 }

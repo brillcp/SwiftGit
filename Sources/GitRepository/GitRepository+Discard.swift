@@ -2,24 +2,25 @@ import Foundation
 
 extension GitRepository: DiscardManageable {
     public func discardFile(at path: String) async throws {
-        // Get file status
-        let snapshot = try await getRepoSnapshot()
-        let unstagedChanges = try await workingTree.unstagedChanges(snapshot: snapshot)
-        guard let file = unstagedChanges[path] else {
-            return // File doesn't exist
-        }
+        let fileURL = url.appendingPathComponent(path)
+        let indexSnapshot = try await workingTree.indexSnapshot()
         
-        if file.unstaged == .untracked {
-            // Untracked file - delete from filesystem
-            let fileURL = url.appendingPathComponent(path)
-            try fileManager.removeItem(at: fileURL)
-        } else {
+        // Check if file is in the index (tracked)
+        let isTracked = indexSnapshot.entriesByPath[path] != nil
+        
+        if isTracked {
             // Tracked file - restore from index/HEAD
             let result = try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
-
+            
             guard result.exitCode == 0 else {
                 throw GitError.discardFileFailed(path: path)
             }
+        } else {
+            // Untracked file - delete from filesystem
+            guard fileManager.fileExists(atPath: fileURL.path) else {
+                return // Already gone
+            }
+            try fileManager.removeItem(at: fileURL)
         }
         await workingTree.invalidateIndexCache()
     }

@@ -18,6 +18,10 @@ public actor GitRepository: GitRepositoryProtocol {
     let cache: ObjectCacheProtocol
     let fileManager: FileManager
 
+    var gitURL: URL {
+        url.appendingPathComponent(GitPath.git.rawValue)
+    }
+
     // MARK: - Public properties
     public let url: URL
 
