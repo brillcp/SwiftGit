@@ -70,7 +70,8 @@ extension GitRepository: CommitWritable {
         guard result.exitCode == 0 else {
             // Check if it's "nothing to commit"
             let output = result.stderr + result.stdout
-            if output.contains("nothing to commit") {
+            if output.contains("nothing to commit") ||
+               output.contains("no changes added to commit") {
                 throw GitError.nothingToCommit
             }
             throw GitError.commitFailed
