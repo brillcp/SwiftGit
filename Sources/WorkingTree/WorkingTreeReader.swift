@@ -37,10 +37,11 @@ public actor WorkingTreeReader {
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
     public func indexSnapshot() async throws -> GitIndexSnapshot {
-        guard fileManager.fileExists(atPath: indexURL.path) else {
+        do {
+            return try await indexReader.readIndex(at: indexURL)
+        } catch GitIndexError.fileNotFound {
             return GitIndexSnapshot(entries: [], version: 2)
         }
-        return try await indexReader.readIndex(at: indexURL)
     }
 
     public func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus {

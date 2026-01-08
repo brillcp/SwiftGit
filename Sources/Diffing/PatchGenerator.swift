@@ -10,51 +10,72 @@ extension PatchGenerator {
     /// Generate a patch for a single hunk
     public func generatePatch(hunk: DiffHunk, file: WorkingTreeFile) -> String {
         var patch = ""
-        
-        // Header
         patch += makeHeader(for: file)
-        
-        // Hunk
         patch += hunk.header + String.newLine
         
-        for line in hunk.lines {
+        for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
+            let isLastLine = (index == hunk.lines.count - 1)
             
             switch line.type {
             case .added:
-                patch += "+\(lineText)\n"
+                patch += "+\(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
             case .removed:
-                patch += "-\(lineText)\n"
+                patch += "-\(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
             case .unchanged:
-                patch += " \(lineText)\n"
+                patch += " \(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
             }
         }
         
+        if hunk.hasNoNewlineAtEnd {
+            patch += "\n\\ No newline at end of file\n"
+        }
+
         return patch
     }
     
     /// Generate a patch for multiple hunks in a file
     public func generatePatch(hunks: [DiffHunk], file: WorkingTreeFile) -> String {
         var patch = ""
-        
-        // Header
         patch += makeHeader(for: file)
         
-        // All hunks
         for hunk in hunks {
             patch += hunk.header + String.newLine
             
-            for line in hunk.lines {
+            for (index, line) in hunk.lines.enumerated() {
                 let lineText = line.segments.map { $0.text }.joined()
+                let isLastLine = (index == hunk.lines.count - 1)
                 
                 switch line.type {
                 case .added:
-                    patch += "+\(lineText)\n"
+                    patch += "+\(lineText)"
+                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                        patch += String.newLine
+                    }
                 case .removed:
-                    patch += "-\(lineText)\n"
+                    patch += "-\(lineText)"
+                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                        patch += String.newLine
+                    }
                 case .unchanged:
-                    patch += " \(lineText)\n"
+                    patch += " \(lineText)"
+                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                        patch += String.newLine
+                    }
                 }
+            }
+            
+            if hunk.hasNoNewlineAtEnd {
+                patch += "\n\\ No newline at end of file\n"
             }
         }
         
@@ -71,27 +92,36 @@ extension PatchGenerator {
     /// Generate a reverse patch (for unstaging/discarding)
     public func generateReversePatch(hunk: DiffHunk, file: WorkingTreeFile) -> String {
         var patch = ""
-        
-        // Header
         patch += makeHeader(for: file)
-        
-        // Reversed hunk header
         patch += reverseHunkHeader(hunk.header) + String.newLine
         
-        // Reversed lines (swap +/-)
-        for line in hunk.lines {
+        for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
+            let isLastLine = (index == hunk.lines.count - 1)
             
             switch line.type {
-            case .added:
-                patch += "-\(lineText)\n"  // Swap
-            case .removed:
-                patch += "+\(lineText)\n"  // Swap
+            case .added:  // Swap: becomes removed
+                patch += "-\(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
+            case .removed:  // Swap: becomes added
+                patch += "+\(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
             case .unchanged:
-                patch += " \(lineText)\n"
+                patch += " \(lineText)"
+                if !isLastLine || !hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine
+                }
             }
         }
         
+        if hunk.hasNoNewlineAtEnd {
+            patch += "\n\\ No newline at end of file\n"
+        }
+
         return patch
     }
 }

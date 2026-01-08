@@ -192,8 +192,6 @@ private extension WorkingTreeDiffResolver {
         let header = "blob \(data.count)\0"
         var combined = Data(header.utf8)
         combined.append(data)
-        
-        let hash = Insecure.SHA1.hash(data: combined)
-        return hash.map { String(format: "%02x", $0) }.joined()
+        return combined.sha1()
     }
 }

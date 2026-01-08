@@ -65,7 +65,22 @@ extension DiffGenerator: DiffGeneratorProtocol {
         let diff = makeDiff(oldLines: filteredOld, newLines: filteredNew)
         
         // Group into hunks
-        return groupIntoHunks(diff: diff, contextLines: contextLines)
+        var hunks = groupIntoHunks(diff: diff, contextLines: contextLines)
+        
+        // Check if file ends with newline
+        let fileEndsWithNewline = newContent.hasSuffix(String.newLine)
+        
+        // Set flag on last hunk if no trailing newline
+        if !fileEndsWithNewline, let lastIndex = hunks.indices.last {
+            hunks[lastIndex] = DiffHunk(
+                id: hunks[lastIndex].id,
+                header: hunks[lastIndex].header,
+                lines: hunks[lastIndex].lines,
+                hasNoNewlineAtEnd: true
+            )
+        }
+        
+        return hunks
     }
 }
 
@@ -218,6 +233,8 @@ private extension DiffGenerator {
         var unchangedBuffer: [DiffLine] = []
         var hunkId = 0
         
+        var hasNoNewline = false
+
         for line in diff {
             switch line.type {
             case .unchanged:

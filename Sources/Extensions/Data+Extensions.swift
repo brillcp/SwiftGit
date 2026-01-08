@@ -33,14 +33,6 @@ extension Data {
         return result
     }
 
-    @discardableResult
-    mutating func remove(upTo separator: Element) -> Data {
-        let part = prefix(while: { $0 != separator })
-        removeFirst(part.count)
-        _ = popFirst()
-        return part
-    }
-
     func readUInt16(at offset: inout Int) -> UInt16 {
         let value = self[offset..<offset+2].withUnsafeBytes { $0.load(as: UInt16.self).bigEndian }
         offset += 2
