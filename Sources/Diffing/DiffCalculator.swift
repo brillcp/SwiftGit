@@ -25,7 +25,7 @@ extension DiffCalculator: DiffCalculatorProtocol {
         guard let parentTree else {
             return try await buildAddedFiles(from: currentTree, blobLoader: blobLoader)
         }
-        
+
         // Compare trees
         return try await compareTrees(
             current: currentTree,
@@ -42,31 +42,31 @@ private extension DiffCalculator {
         blobLoader: @Sendable (String) async throws -> Blob?
     ) async throws -> [String: CommitedFile] {
         var result: [String: CommitedFile] = [:]
-        
+
         for (path, blobHash) in paths {
             guard let blob = try await blobLoader(blobHash) else { continue }
-            
+
             result[path] = CommitedFile(
                 path: path,
                 blob: blob,
                 changeType: .added
             )
         }
-        
+
         return result
     }
-    
+
     func compareTrees(
         current: [String: String],
         parent: [String: String],
         blobLoader: @Sendable (String) async throws -> Blob?
     ) async throws -> [String: CommitedFile] {
         var result: [String: CommitedFile] = [:]
-        
+
         // Track which files we've processed
         var processedCurrent = Set<String>()
         var processedParent = Set<String>()
-        
+
         // 1. Process all files in current tree
         for (newPath, newBlobHash) in current {
             // Check if this exact path existed in parent
@@ -90,7 +90,7 @@ private extension DiffCalculator {
                     continue
                 }
             }
-            
+
             // Path doesn't exist in parent - could be added or renamed
             // Check if this blob existed at a different path in parent
             if let oldPath = parent.first(where: { $0.value == newBlobHash })?.key,
@@ -117,7 +117,7 @@ private extension DiffCalculator {
                 processedCurrent.insert(newPath)
             }
         }
-        
+
         // 2. Detect deleted files (files in parent but not processed yet)
         for (oldPath, oldBlobHash) in parent where !processedParent.contains(oldPath) {
             if let blob = try await blobLoader(oldBlobHash) {
@@ -128,7 +128,7 @@ private extension DiffCalculator {
                 )
             }
         }
-        
+
         return result
     }
 }
