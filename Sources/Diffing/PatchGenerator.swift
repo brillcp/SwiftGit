@@ -12,9 +12,7 @@ extension PatchGenerator {
         var patch = ""
         
         // Header
-        patch += "diff --git a/\(file.path) b/\(file.path)\n"
-        patch += "--- a/\(file.path)\n"
-        patch += "+++ b/\(file.path)\n"
+        patch += makeHeader(for: file)
         
         // Hunk
         patch += hunk.header + String.newLine
@@ -40,9 +38,7 @@ extension PatchGenerator {
         var patch = ""
         
         // Header
-        patch += "diff --git a/\(file.path) b/\(file.path)\n"
-        patch += "--- a/\(file.path)\n"
-        patch += "+++ b/\(file.path)\n"
+        patch += makeHeader(for: file)
         
         // All hunks
         for hunk in hunks {
@@ -77,9 +73,7 @@ extension PatchGenerator {
         var patch = ""
         
         // Header
-        patch += "diff --git a/\(file.path) b/\(file.path)\n"
-        patch += "--- a/\(file.path)\n"
-        patch += "+++ b/\(file.path)\n"
+        patch += makeHeader(for: file)
         
         // Reversed hunk header
         patch += reverseHunkHeader(hunk.header) + String.newLine
@@ -104,6 +98,14 @@ extension PatchGenerator {
 
 // MARK: - Private Helpers
 private extension PatchGenerator {
+    func makeHeader(for file: WorkingTreeFile) -> String {
+        var header = ""
+        header += "diff --git a/\(file.path) b/\(file.path)\n"
+        header += "--- a/\(file.path)\n"
+        header += "+++ b/\(file.path)\n"
+        return header
+    }
+    
     func reverseHunkHeader(_ header: String) -> String {
         // Input:  "@@ -10,5 +12,7 @@"
         // Output: "@@ -12,7 +10,5 @@"
