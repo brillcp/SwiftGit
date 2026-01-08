@@ -233,8 +233,6 @@ private extension DiffGenerator {
         var unchangedBuffer: [DiffLine] = []
         var hunkId = 0
 
-        var hasNoNewline = false
-
         for line in diff {
             switch line.type {
             case .unchanged:
