@@ -25,43 +25,63 @@ struct EdgeCasesTests {
         let location = try await locator.locate(fakeHash)
         #expect(location == nil)
     }
-
-    @Test func testRepositoryWithOnlyPackedData() async throws {
+    
+    @Test func testEmptyCommitMessage() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
-
-
-        let commitHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         
-        let packedRefsContent = """
-        # pack-refs with: peeled fully-peeled sorted
-        \(commitHash) refs/heads/main
-        """
-        try writePackedRefs(packedRefsContent, to: repoURL)
-        try writeHEAD("ref: refs/heads/main", to: repoURL)
+        let repository = GitRepository(url: repoURL)
         
-        let refReader = RefReader(repoURL: repoURL, cache: ObjectCache())
+        // Create and stage a file
+        try createTestFile(in: repoURL, named: "file.txt", content: "Content")
+        try await repository.stageFile(at: "file.txt")
         
-        let refs = try await refReader.getRefs().flatMap(\.value)
-        #expect(refs.count == 1)
-        #expect(refs.first?.name == "main")
-        #expect(refs.first?.hash == commitHash)
+        // Try to commit with empty message
+        do {
+            try await repository.commit(message: "")
+            Issue.record("Expected commit to throw GitError.emptyCommitMessage for empty message")
+        } catch {
+            // Verify it's the expected error without requiring Equatable conformance
+            if let gitError = error as? GitError {
+                switch gitError {
+                case .emptyCommitMessage:
+                    break // expected
+                default:
+                    Issue.record("Unexpected GitError thrown: \(gitError)")
+                }
+            } else {
+                Issue.record("Unexpected error type thrown: \(error)")
+            }
+        }
         
-        // HEAD resolution without objectExistsCheck
-        let refReaderNoCheck = RefReader(
-            repoURL: repoURL,
-            objectExistsCheck: nil,
-            cache: ObjectCache()
-        )
+        // Try with whitespace only
+        do {
+            try await repository.commit(message: "   \n\t  ")
+            Issue.record("Expected commit to throw GitError.emptyCommitMessage for whitespace-only message")
+        } catch {
+            if let gitError = error as? GitError {
+                switch gitError {
+                case .emptyCommitMessage:
+                    break // expected
+                default:
+                    Issue.record("Unexpected GitError thrown: \(gitError)")
+                }
+            } else {
+                Issue.record("Unexpected error type thrown: \(error)")
+            }
+        }
         
-        let head = try await refReaderNoCheck.getHEAD()
-        #expect(head == commitHash)
+        // Valid message should work
+        try await repository.commit(message: "Valid message")
+        
+        let commits = try await repository.getAllCommits(limit: 1)
+        #expect(commits.count == 1, "Should have created commit with valid message")
     }
 
     @Test func testInvalidPackedRefsFormat() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
-
+        
         // Malformed packed-refs
         let packedRefsContent = """
         # pack-refs with: peeled fully-peeled sorted
@@ -90,6 +110,31 @@ struct EdgeCasesTests {
         
         let head = try await refReader.getHEAD()
         #expect(head == nil) // Should handle gracefully
+    }
+    
+    @Test func testDetachedHEAD() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+        
+        let repository = GitRepository(url: repoURL)
+        
+        // Create commit
+        try createTestFile(in: repoURL, named: "file.txt", content: "Content")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Test")
+        
+        guard let hash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+        
+        // Detach HEAD (write hash directly)
+        let headFile = repoURL.appendingPathComponent(".git/HEAD")
+        try hash.write(to: headFile, atomically: true, encoding: .utf8)
+        
+        // Should still work
+        let detachedHead = try await repository.getHEAD()
+        #expect(detachedHead == hash, "Should read detached HEAD")
     }
 }
 

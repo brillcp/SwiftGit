@@ -307,11 +307,6 @@ struct StagingTests {
 
 // MARK: - Test Helpers
 private extension StagingTests {    
-    func createTestFile(in repoURL: URL, named: String, content: String) throws {
-        let fileURL = repoURL.appendingPathComponent(named)
-        try content.write(to: fileURL, atomically: true, encoding: .utf8)
-    }
-    
     func modifyTestFile(in repoURL: URL, named: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
         let content = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
@@ -321,28 +316,5 @@ private extension StagingTests {
     func deleteTestFile(in repoURL: URL, named: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
         try FileManager.default.removeItem(at: fileURL)
-    }
-    
-    func gitStatus(in repoURL: URL) throws -> String {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "status", "--porcelain"]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launch()
-        task.waitUntilExit()
-        
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
-    }
-    
-    func statusLine(for file: String, in repoURL: URL) throws -> String? {
-        let output = try gitStatus(in: repoURL)
-        // Each line is two status columns + space + path
-        return output
-            .split(separator: "\n")
-            .map(String.init)
-            .first { $0.hasSuffix(" \(file)") || $0.hasSuffix(file) }
     }
 }

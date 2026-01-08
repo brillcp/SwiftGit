@@ -5,136 +5,75 @@ import CryptoKit
 
 @Suite("Integration Tests")
 struct IntegrationTests {
-    @Test func testFullWorkflowAfterGitGC() async throws {
+    @Test func testFullCommitWorkflow() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let commitContent = """
-        tree b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3
-        author Test <test@test.com> 1234567890 +0000
-        committer Test <test@test.com> 1234567890 +0000
         
-        Test commit
-        """
+        let repository = GitRepository(url: repoURL)
         
-        let commitHash = try writeLooseObject(commitContent: commitContent, to: repoURL)
+        // Initial commit (realistic - repo has history)
+        try createTestFile(in: repoURL, named: "README.md", content: "Initial")
+        try await repository.stageFile(at: "README.md")
+        try await repository.commit(message: "Initial commit")
         
-        let packedRefsContent = """
-        # pack-refs with: peeled fully-peeled sorted
-        \(commitHash) refs/heads/main
-        """
-        try writePackedRefs(packedRefsContent, to: repoURL)
-        try writeHEAD("ref: refs/heads/main", to: repoURL)
+        // NOW test the workflow (this is what users do daily)
         
-        let locator = ObjectLocator(
-            repoURL: repoURL,
-            packIndexManager: PackIndexManager(repoURL: repoURL)
-        )
+        // Create file
+        try createTestFile(in: repoURL, named: "file.txt", content: "Content")
         
-        let refReader = RefReader(
-            repoURL: repoURL,
-            objectExistsCheck: { hash in
-                try await locator.exists(hash)
-            },
-            cache: ObjectCache()
-        )
+        // Check status - untracked
+        let status1 = try await repository.getWorkingTreeStatus()
+        #expect(status1.files["file.txt"]?.unstaged == .untracked)
         
-        // Step 1: Get HEAD
-        let head = try await refReader.getHEAD()
-        #expect(head == commitHash)
+        // Stage
+        try await repository.stageFile(at: "file.txt")
+        let status2 = try await repository.getWorkingTreeStatus()
+        #expect(status2.files["file.txt"]?.staged == .added)
         
-        // Step 2: Verify object exists
-        let exists = try await locator.exists(commitHash)
-        #expect(exists)
+        // Commit
+        try await repository.commit(message: "Add file")
         
-        // Step 3: Locate the object
-        let location = try await locator.locate(commitHash)
-        #expect(location != nil)
+        // Verify committed (no changes left)
+        let status3 = try await repository.getWorkingTreeStatus()
+        #expect(status3.files["file.txt"] == nil, "No changes after commit")
         
-        if case .loose = location {
-            // Good - found as loose object
-        } else {
-            Issue.record("Expected loose object")
+        // Read commit
+        guard let hash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
         }
+        let commit = try await repository.getCommit(hash)
+        #expect(commit?.title == "Add file")
     }
 
-    @Test func testRealRepositoryIntegration() async throws {
-        // Point to your actual repo - update this path
-        let repoPath = "/Users/vg/Documents/Dev/Odin"
-        let repoURL = URL(fileURLWithPath: repoPath)
+    @Test func testStageUnstageWorkflow() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
         
-        guard FileManager.default.fileExists(atPath: repoURL.path) else {
-            return // Skip if repo not found
-        }
+        let repository = GitRepository(url: repoURL)
         
-        let locator = ObjectLocator(
-            repoURL: repoURL,
-            packIndexManager: PackIndexManager(repoURL: repoURL)
-        )
+        // Create initial commit
+        try createTestFile(in: repoURL, named: "file.txt", content: "Initial")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial")
         
-        let refReader = RefReader(
-            repoURL: repoURL,
-            objectExistsCheck: { hash in
-                try await locator.exists(hash)
-            },
-            cache: ObjectCache()
-        )
+        // Modify file
+        try createTestFile(in: repoURL, named: "file.txt", content: "Modified")
         
-        // Get HEAD
-        let head = try await refReader.getHEAD()
-        #expect(head != nil)
+        // Stage
+        try await repository.stageFile(at: "file.txt")
+        let status1 = try await repository.getWorkingTreeStatus()
+        #expect(status1.files["file.txt"]?.staged == .modified)
         
-        guard let head = head else { return }
+        // Unstage
+        try await repository.unstageFile(at: "file.txt")
+        let status2 = try await repository.getWorkingTreeStatus()
+        #expect(status2.files["file.txt"]?.unstaged == .modified)
+        #expect(status2.files["file.txt"]?.staged == nil)
         
-        // Verify object exists
-        let exists = try await locator.exists(head)
-        #expect(exists)
-        
-        // Locate the object
-        let location = try await locator.locate(head)
-        #expect(location != nil)
-        
-        // Get all refs
-        let refs = try await refReader.getRefs()
-        #expect(refs.count > 0)
-    }
-}
-
-// MARK: - Private helpers
-private extension IntegrationTests {
-    func writePackedRefs(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
-        let packedFile = gitDir.appendingPathComponent(GitPath.packedRefs.rawValue)
-        try content.write(to: packedFile, atomically: true, encoding: .utf8)
-    }
-    
-    func writeHEAD(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
-        let headFile = gitDir.appendingPathComponent(GitPath.head.rawValue)
-        try content.write(to: headFile, atomically: true, encoding: .utf8)
-    }
-    
-    func writeLooseObject(commitContent: String, to repoURL: URL) throws -> String {
-        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
-        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
-        
-        let commitData = Data(commitContent.utf8)
-        let header = "commit \(commitData.count)\0"
-        var fullContent = Data(header.utf8)
-        fullContent.append(commitData)
-        
-        let hashString = fullContent.sha1()
-
-        let prefix = String(hashString.prefix(2))
-        let suffix = String(hashString.dropFirst(2))
-        
-        let prefixDir = objectsDir.appendingPathComponent(prefix)
-        try FileManager.default.createDirectory(at: prefixDir, withIntermediateDirectories: true)
-        
-        let objectFile = prefixDir.appendingPathComponent(suffix)
-        let compressed = try (fullContent as NSData).compressed(using: .zlib) as Data
-        try compressed.write(to: objectFile)
-        
-        return hashString
+        // Stage again
+        try await repository.stageFile(at: "file.txt")
+        let status3 = try await repository.getWorkingTreeStatus()
+        #expect(status3.files["file.txt"]?.staged == .modified)
     }
 }

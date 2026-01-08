@@ -2,8 +2,8 @@ import Testing
 import Foundation
 @testable import SwiftGit
 
-@Suite("Commit Stream Tests")
-struct CommitStreamTests {
+@Suite("Commit Tests")
+struct CommitTests {
     @Test func testMultipleLoadAfterCommit() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -147,12 +147,7 @@ struct CommitStreamTests {
 }
 
 // MARK: - Test Helpers
-private extension CommitStreamTests {
-    func createTestFile(in repoURL: URL, named: String, content: String) throws {
-        let fileURL = repoURL.appendingPathComponent(named)
-        try content.write(to: fileURL, atomically: true, encoding: .utf8)
-    }
-
+private extension CommitTests {
     func gitReset(in repoURL: URL, hard: Bool = false) throws {
         let task = Process()
         task.launchPath = "/usr/bin/git"
@@ -165,4 +160,63 @@ private extension CommitStreamTests {
         task.launch()
         task.waitUntilExit()
     }
+}
+
+func createIsolatedTestRepo() throws -> URL {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("test-repo-\(UUID().uuidString)")
+    
+    let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+    let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
+    let refsHeadsDir = gitDir.appendingPathComponent("refs/heads")
+    
+    try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: refsHeadsDir, withIntermediateDirectories: true)
+    
+    // Add HEAD file
+    let headFile = gitDir.appendingPathComponent("HEAD")
+    try "ref: refs/heads/main\n".write(to: headFile, atomically: true, encoding: .utf8)
+    
+    // Add config file
+    let configFile = gitDir.appendingPathComponent("config")
+    let config = """
+    [core]
+        repositoryformatversion = 0
+        filemode = true
+    [user]
+        name = Test User
+        email = test@example.com
+    
+    """
+    try config.write(to: configFile, atomically: true, encoding: .utf8)
+    
+    return tempDir
+}
+
+func createTestFile(in repoURL: URL, named: String, content: String) throws {
+    let fileURL = repoURL.appendingPathComponent(named)
+    try content.write(to: fileURL, atomically: true, encoding: .utf8)
+}
+
+func statusLine(for file: String, in repoURL: URL) throws -> String? {
+    let output = try gitStatus(in: repoURL)
+    // Each line is two status columns + space + path
+    return output
+        .split(separator: "\n")
+        .map(String.init)
+        .first { $0.hasSuffix(" \(file)") || $0.hasSuffix(file) }
+}
+
+func gitStatus(in repoURL: URL) throws -> String {
+    let task = Process()
+    task.launchPath = "/usr/bin/git"
+    task.arguments = ["-C", repoURL.path, "status", "--porcelain"]
+    
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.launch()
+    task.waitUntilExit()
+    
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8) ?? ""
 }
