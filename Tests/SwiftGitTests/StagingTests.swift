@@ -111,7 +111,7 @@ struct StagingTests {
         
         // Try to stage a file that doesn't exist
         do {
-            _ = try await repository.stageFile(at: "nonexistent_file.txt")
+            try await repository.stageFile(at: "nonexistent_file.txt")
             Issue.record("Should have thrown an error for non-existent file")
         } catch {
             // Expected to fail
@@ -167,7 +167,7 @@ struct StagingTests {
         }
         
         // Unstage the file
-        _ = try await repository.unstageFile(at: testFile)
+        try await repository.unstageFile(at: testFile)
         
         // Verify file is unstaged
         if let line = try statusLine(for: testFile, in: repoURL) {

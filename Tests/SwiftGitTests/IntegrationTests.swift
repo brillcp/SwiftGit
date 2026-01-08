@@ -6,11 +6,9 @@ import CryptoKit
 @Suite("Integration Tests")
 struct IntegrationTests {
     @Test func testFullWorkflowAfterGitGC() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        try createTestRepo(in: tempDir)
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let commitContent = """
         tree b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3
         author Test <test@test.com> 1234567890 +0000
@@ -19,22 +17,22 @@ struct IntegrationTests {
         Test commit
         """
         
-        let commitHash = try writeLooseObject(commitContent: commitContent, to: tempDir)
+        let commitHash = try writeLooseObject(commitContent: commitContent, to: repoURL)
         
         let packedRefsContent = """
         # pack-refs with: peeled fully-peeled sorted
         \(commitHash) refs/heads/main
         """
-        try writePackedRefs(packedRefsContent, to: tempDir)
-        try writeHEAD("ref: refs/heads/main", to: tempDir)
+        try writePackedRefs(packedRefsContent, to: repoURL)
+        try writeHEAD("ref: refs/heads/main", to: repoURL)
         
         let locator = ObjectLocator(
-            repoURL: tempDir,
-            packIndexManager: PackIndexManager(repoURL: tempDir)
+            repoURL: repoURL,
+            packIndexManager: PackIndexManager(repoURL: repoURL)
         )
         
         let refReader = RefReader(
-            repoURL: tempDir,
+            repoURL: repoURL,
             objectExistsCheck: { hash in
                 try await locator.exists(hash)
             },
@@ -104,14 +102,6 @@ struct IntegrationTests {
 
 // MARK: - Private helpers
 private extension IntegrationTests {
-    func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
-        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
-        let refsDir = gitDir.appendingPathComponent("refs/heads")
-        try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: refsDir, withIntermediateDirectories: true)
-    }
-    
     func writePackedRefs(_ content: String, to repoURL: URL) throws {
         let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
         let packedFile = gitDir.appendingPathComponent(GitPath.packedRefs.rawValue)

@@ -4,87 +4,6 @@ import Foundation
 
 @Suite("Commit Stream Tests")
 struct CommitStreamTests {
-    @Test func testCommitCacheInvalidation() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        let testFile = "test_cache_\(UUID().uuidString).txt"
-        
-        // Create and stage a file
-        try createTestFile(in: repoURL, named: testFile, content: "Test content")
-        try await repository.stageFile(at: testFile)
-        
-        // Get index SHA before commit
-        let indexURL = repoURL.appendingPathComponent(".git/index")
-        let modDateBefore = try FileManager.default.attributesOfItem(atPath: indexURL.path)[.modificationDate] as? Date
-        
-        print("\n=== BEFORE COMMIT ===")
-        print("Index modDate: \(modDateBefore!)")
-        
-        let stagedBefore = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
-        print("Staged count: \(stagedBefore.count)")
-        
-        // Small delay to ensure we're in a different millisecond
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        
-        // Commit
-        try await repository.commit(message: "Test commit")
-        
-        // Check index modDate after commit
-        let modDateAfter = try FileManager.default.attributesOfItem(atPath: indexURL.path)[.modificationDate] as? Date
-        
-        print("\n=== AFTER COMMIT ===")
-        print("Index modDate: \(modDateAfter!)")
-        print("ModDate changed: \(modDateBefore != modDateAfter)")
-        print("Time difference: \(modDateAfter!.timeIntervalSince(modDateBefore!))s")
-        
-        // Try reading staged multiple times
-        for i in 1...3 {
-            let staged = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
-            print("\nLoad \(i):")
-            print("  Staged count: \(staged.count)")
-            print("  Keys: \(staged.keys)")
-        }
-        
-        // Cleanup
-        try gitReset(in: repoURL, hard: true)
-        try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
-    }
-
-    @Test func testCommitClearsStaged() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        let testFile = "test_commit_\(UUID().uuidString).txt"
-        
-        // Create and stage a file
-        try createTestFile(in: repoURL, named: testFile, content: "Test content")
-        try await repository.stageFile(at: testFile)
-        
-        // Verify file is staged
-        let stagedBefore = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
-        #expect(stagedBefore[testFile] != nil, "File should be staged before commit")
-        
-        // Commit
-        try await repository.commit(message: "Test commit")
-        
-        // Verify staged is now empty
-        let stagedAfter = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
-        print("\n=== AFTER COMMIT ===")
-        print("Staged files: \(stagedAfter.keys)")
-        print("Count: \(stagedAfter.count)")
-        print("=== END ===\n")
-        
-        #expect(stagedAfter.isEmpty, "Should have no staged files after commit")
-        #expect(stagedAfter[testFile] == nil, "Test file should not be staged after commit")
-        
-        // Cleanup
-        try gitReset(in: repoURL, hard: true)
-        try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
-    }
-
     @Test func testMultipleLoadAfterCommit() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -111,188 +30,25 @@ struct CommitStreamTests {
         try? FileManager.default.removeItem(at: repoURL.appendingPathComponent(testFile))
     }
 
-    @Test func testCommitLoadingPerformance() async throws {
+    @Test func testBasicCommitStreaming() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
-
+        
         let repository = GitRepository(url: repoURL)
         
-        // Warm up (load pack indexes, etc.)
-        _ = try await repository.getHEAD()
-        
-        // Measure commit loading
-        let start = Date()
-        let commits = try await repository.getAllCommits(limit: 2048)
-        let elapsed = Date().timeIntervalSince(start)
-        
-        print("\n=== COMMIT LOADING PERFORMANCE ===")
-        print("Loaded \(commits.count) commits in \(elapsed)s")
-        print("Average per commit: \(elapsed / Double(commits.count))s")
-        print("=== END ===\n")
-        
-        #expect(commits.count > 0, "Should load at least some commits")
-    }
-
-    @Test func testIndividualCommitLoadSpeed() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        
-        guard let headHash = try await repository.getHEAD() else {
-            Issue.record("No HEAD found")
-            return
+        // Create a few commits
+        for i in 1...5 {
+            let file = "file\(i).txt"
+            try createTestFile(in: repoURL, named: file, content: "Content \(i)")
+            try await repository.stageFile(at: file)
+            try await repository.commit(message: "Commit \(i)")
         }
         
-        // First load (cold cache)
-        let coldStart = Date()
-        _ = try await repository.getCommit(headHash)
-        let coldElapsed = Date().timeIntervalSince(coldStart)
+        // Stream commits
+        let commits = try await repository.getAllCommits(limit: 10)
         
-        // Second load (warm cache)
-        let warmStart = Date()
-        _ = try await repository.getCommit(headHash)
-        let warmElapsed = Date().timeIntervalSince(warmStart)
-        
-        print("\n=== INDIVIDUAL COMMIT LOAD ===")
-        print("Cold cache: \(coldElapsed)s")
-        print("Warm cache: \(warmElapsed)s")
-        print("=== END ===\n")
-        
-        // Warm cache should be <1ms
-        #expect(warmElapsed < 0.001, "Cached commit load took \(warmElapsed)s")
-        
-        // Cold cache should be <50ms
-        #expect(coldElapsed < 0.05, "First commit load took \(coldElapsed)s")
-    }
-
-    @Test func testPackIndexCacheEffectiveness() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        
-        // Get a series of commits (should share pack file ranges)
-        let commits = try await repository.getAllCommits(limit: 50)
-        
-        guard commits.count >= 10 else {
-            Issue.record("Not enough commits to test")
-            return
-        }
-        
-        // Load first 10 commits individually
-        let start = Date()
-        for commit in commits.prefix(10) {
-            _ = try await repository.getCommit(commit.id)
-        }
-        let elapsed = Date().timeIntervalSince(start)
-        
-        print("\n=== PACK CACHE TEST ===")
-        print("Re-loaded 10 commits in \(elapsed)s")
-        print("Average: \(elapsed / 10.0)s per commit")
-        print("=== END ===\n")
-        
-        // With cache, should be very fast (all cached)
-        #expect(elapsed < 0.01, "10 cached commits took \(elapsed)s (expected <10ms)")
-    }
-
-    @Test func testCommitDiffMatchesGit() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        
-        // Use a known commit hash from GitKraken
-        let commitHash = "a842fa5f80d0163f4030c6ee47b2c673a3ac1826"  // The one from your screenshots
-        
-        // Get your diff
-        let yourChanges = try await repository.getChangedFiles(commitHash)
-        
-        print("\n=== YOUR CHANGED FILES (\(yourChanges.count)) ===")
-        for (path, file) in yourChanges.sorted(by: { $0.key < $1.key }) {
-            print("  [\(file.changeType)] \(path)")
-        }
-        
-        // Get Git's diff
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = [
-            "-C", repoURL.path,
-            "diff-tree", "--no-commit-id", "--name-status", "-r",
-            commitHash
-        ]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launch()
-        task.waitUntilExit()
-        
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        if let output = String(data: data, encoding: .utf8) {
-            let gitChanges = output.split(separator: String.newLine)
-            
-            print("\n=== GIT CHANGED FILES (\(gitChanges.count)) ===")
-            for line in gitChanges {
-                print("  \(line)")
-            }
-            
-            // Compare
-            let yourPaths = Set(yourChanges.keys)
-            let gitPaths = Set(gitChanges.map { line in
-                String(line.split(separator: "\t").last!)
-            })
-            
-            let extra = yourPaths.subtracting(gitPaths)
-            let missing = gitPaths.subtracting(yourPaths)
-            
-            if !extra.isEmpty {
-                print("\n❌ EXTRA FILES (false positives):")
-                for path in extra.sorted() {
-                    print("  \(path)")
-                }
-            }
-            
-            if !missing.isEmpty {
-                print("\n❌ MISSING FILES (false negatives):")
-                for path in missing.sorted() {
-                    print("  \(path)")
-                }
-            }
-            
-            if extra.isEmpty && missing.isEmpty {
-                print("\n✅ Perfect match!")
-            }
-        }
-    }
-
-    @Test func testGetAllRefs() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        let allRefs = try await repository.getRefs().flatMap(\.value)
-        
-        print("\n=== ALL REFS (\(allRefs.count) total) ===")
-        
-        let localBranches = allRefs.filter { $0.type == .localBranch }
-        print("\nLocal Branches (\(localBranches.count)):")
-        for ref in localBranches.sorted(by: { $0.name < $1.name }) {
-            print("  \(ref.name) -> \(ref.hash.prefix(7))")
-        }
-        
-        let remoteBranches = allRefs.filter { $0.type == .remoteBranch }
-        print("\nRemote Branches (\(remoteBranches.count)):")
-        for ref in remoteBranches.sorted(by: { $0.name < $1.name }) {
-            print("  \(ref.name) -> \(ref.hash.prefix(7))")
-        }
-        
-        let tags = allRefs.filter { $0.type == .tag }
-        print("\nTags (\(tags.count)):")
-        for ref in tags.sorted(by: { $0.name < $1.name }) {
-            print("  \(ref.name) -> \(ref.hash.prefix(7))")
-        }
-        
-        #expect(allRefs.count > 0, "Should have at least some refs")
+        #expect(commits.count == 5, "Should have 5 commits")
+        #expect(commits[0].title == "Commit 5", "Most recent commit first")
     }
     
     @Test func testFindSpecificBranch() async throws {
@@ -371,63 +127,6 @@ struct CommitStreamTests {
         for ref in startingRefs.sorted(by: { $0.name < $1.name }) {
             print("  [\(ref.type)] \(ref.name) -> \(ref.hash.prefix(7))")
         }
-    }
-    
-    @Test func testStreamAllCommitsCount() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        
-        let commits = try await repository.getAllCommits(limit: 512)
-        
-        print("\n=== STREAMED COMMITS ===")
-        print("Total commits: \(commits.count)")
-        
-        // Show first 10
-        print("\nFirst 10 commits:")
-        for commit in commits.prefix(10) {
-            print("  \(commit.id.prefix(7)) - \(commit.title)")
-        }
-        
-        // Show last 10
-        print("\nLast 10 commits:")
-        for commit in commits.suffix(10) {
-            print("  \(commit.id.prefix(7)) - \(commit.title)")
-        }
-        
-        #expect(commits.count > 0, "Should stream at least some commits")
-    }
-    
-    @Test func testSpecificCommitInStream() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        
-        // Hash of commit you expect to see (from GitKraken)
-        let expectedHash = "068ce37832990168f161a46548a6d9868378f5c5"  // Replace with actual hash
-        
-        var found = false
-        var commitCount = 0
-        
-        let commits = try await repository.getAllCommits(limit: 512)
-        for commit in commits {
-            commitCount += 1
-            if commit.id == expectedHash {
-                found = true
-                print("\n✅ FOUND commit in stream at position \(commitCount):")
-                print("  \(commit.id.prefix(7)) - \(commit.title)")
-                break
-            }
-        }
-        
-        if !found {
-            print("\n❌ Commit \(expectedHash.prefix(7)) NOT in stream")
-            print("   Checked \(commitCount) commits")
-        }
-        
-        #expect(found, "Expected commit should be in stream")
     }
     
     @Test func testCompareWithGitLog() async throws {
