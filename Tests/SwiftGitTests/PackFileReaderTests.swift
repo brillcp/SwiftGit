@@ -4,10 +4,10 @@ import Foundation
 
 @Suite("PackFileReader Tests")
 struct PackFileReaderTests {
-    
     @Test func testPackIndexLoad() throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let packFiles = try getPackFiles(in: repoURL)
         guard let (idxURL, packURL) = packFiles.first else {
             Issue.record("No pack files found")
@@ -21,8 +21,9 @@ struct PackFileReaderTests {
     }
     
     @Test func testFindKnownObject() throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let packFiles = try getPackFiles(in: repoURL)
         guard let (idxURL, packURL) = packFiles.first else {
             Issue.record("No pack files found")
@@ -47,8 +48,9 @@ struct PackFileReaderTests {
     }
     
     @Test func testFindHeadCommit() throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let packFiles = try getPackFiles(in: repoURL)
         guard !packFiles.isEmpty else {
             Issue.record("No pack files found")
@@ -76,7 +78,8 @@ struct PackFileReaderTests {
     }
 
     @Test func testObjectParsing() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
         
         let packFiles = try getPackFiles(in: repoURL)
         guard let (idxURL, packURL) = packFiles.first else {
@@ -132,8 +135,9 @@ struct PackFileReaderTests {
     }
     
     @Test func testNonExistentObject() throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let packFiles = try getPackFiles(in: repoURL)
         guard let (idxURL, packURL) = packFiles.first else {
             Issue.record("No pack files found")
@@ -153,17 +157,6 @@ struct PackFileReaderTests {
 
 // MARK: - Private helpers
 private extension PackFileReaderTests {
-    func getTestRepoURL() -> URL? {
-        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"
-        let url = URL(fileURLWithPath: testRepoPath)
-        
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        
-        return url
-    }
-    
     func getPackFiles(in repoURL: URL) throws -> [(idxURL: URL, packURL: URL)] {
         let packDir = repoURL.appendingPathComponent(".git/objects/pack")
         
@@ -226,4 +219,35 @@ private extension PackFileReaderTests {
         
         return Array(hashes.prefix(count))
     }
+}
+
+func createIsolatedTestRepo() throws -> URL {
+    let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("test-repo-\(UUID().uuidString)")
+    
+    let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
+    let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
+    let refsHeadsDir = gitDir.appendingPathComponent("refs/heads")
+    
+    try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: refsHeadsDir, withIntermediateDirectories: true)
+    
+    // Add HEAD file
+    let headFile = gitDir.appendingPathComponent("HEAD")
+    try "ref: refs/heads/main\n".write(to: headFile, atomically: true, encoding: .utf8)
+    
+    // Add config file
+    let configFile = gitDir.appendingPathComponent("config")
+    let config = """
+    [core]
+        repositoryformatversion = 0
+        filemode = true
+    [user]
+        name = Test User
+        email = test@example.com
+    
+    """
+    try config.write(to: configFile, atomically: true, encoding: .utf8)
+    
+    return tempDir
 }

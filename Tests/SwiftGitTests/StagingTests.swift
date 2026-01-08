@@ -5,17 +5,16 @@ import Foundation
 @Suite("Staging Operations Tests")
 struct StagingTests {
     @Test func testStageModifiedFile() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFile = "test_stage_modified.txt"
         let repository = GitRepository(url: repoURL)
         
         // Setup: Create and commit a file
         try createTestFile(in: repoURL, named: testFile, content: "original")
-        try gitAdd(in: repoURL, pathspec: testFile)
-        try gitCommit(in: repoURL, message: "add test file")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "add test file")
         
         // Modify the file
         try modifyTestFile(in: repoURL, named: testFile)
@@ -28,7 +27,7 @@ struct StagingTests {
         }
         
         // Stage the file
-        _ = try await repository.stageFile(at: testFile)
+        try await repository.stageFile(at: testFile)
         
         // Verify file is staged
         if let line = try statusLine(for: testFile, in: repoURL) {
@@ -36,17 +35,12 @@ struct StagingTests {
         } else {
             Issue.record("No status line for file")
         }
-        
-        // Cleanup
-        try gitReset(in: repoURL)
-        try gitCheckout(in: repoURL, file: testFile)
     }
     
     @Test func testStageNewFile() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFile = "test_stage_new_\(UUID().uuidString).txt"
         let repository = GitRepository(url: repoURL)
         
@@ -61,7 +55,7 @@ struct StagingTests {
         }
         
         // Stage the file
-        _ = try await repository.stageFile(at: testFile)
+        try await repository.stageFile(at: testFile)
         
         // Verify file is staged
         if let line = try statusLine(for: testFile, in: repoURL) {
@@ -69,25 +63,21 @@ struct StagingTests {
         } else {
             Issue.record("No status line for file")
         }
-        
-        // Cleanup
-        try gitReset(in: repoURL)
         try deleteTestFile(in: repoURL, named: testFile)
     }
     
     @Test func testStageDeletedFile() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFile = "test_stage_deleted.txt"
         let repository = GitRepository(url: repoURL)
         
         // Setup: Create and commit a file (assume it exists in repo)
         // For this test, use an existing tracked file or create one first
         try createTestFile(in: repoURL, named: testFile, content: "to delete")
-        try gitAdd(in: repoURL, pathspec: testFile)
-        try gitCommit(in: repoURL, message: "add file to delete")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "add file to delete")
         
         // Delete the file
         try deleteTestFile(in: repoURL, named: testFile)
@@ -100,7 +90,7 @@ struct StagingTests {
         }
         
         // Stage the deletion
-        _ = try await repository.stageFile(at: testFile)
+        try await repository.stageFile(at: testFile)
         
         // Verify deletion is staged
         if let line = try statusLine(for: testFile, in: repoURL) {
@@ -110,15 +100,13 @@ struct StagingTests {
         }
         
         // Cleanup
-        try gitReset(in: repoURL)
-        try gitCheckout(in: repoURL, file: testFile)
+        try await repository.discardFile(at: testFile)
     }
     
     @Test func testStageNonExistentFile() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Try to stage a file that doesn't exist
@@ -134,10 +122,9 @@ struct StagingTests {
     // MARK: - Stage All Tests
     
     @Test func testStageAll() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFiles = [
             "test_all_1_\(UUID().uuidString).txt",
             "test_all_2_\(UUID().uuidString).txt"
@@ -150,34 +137,27 @@ struct StagingTests {
         }
         
         // Stage all changes
-        _ = try await repository.stageAllFiles()
+        try await repository.stageAllFiles()
         
         // Verify all files are staged
         let status = try gitStatus(in: repoURL)
         for file in testFiles {
             #expect(status.contains("A  \(file)"), "\(file) should be staged")
         }
-        
-        // Cleanup
-        try gitReset(in: repoURL)
-        for file in testFiles {
-            try deleteTestFile(in: repoURL, named: file)
-        }
     }
     
     // MARK: - Unstage Tests
     
     @Test func testUnstageFile() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFile = "test_unstage_\(UUID().uuidString).txt"
         let repository = GitRepository(url: repoURL)
         
         // Create and stage a file
         try createTestFile(in: repoURL, named: testFile, content: "test")
-        _ = try await repository.stageFile(at: testFile)
+        try await repository.stageFile(at: testFile)
         
         // Verify file is staged
         if let line = try statusLine(for: testFile, in: repoURL) {
@@ -201,10 +181,9 @@ struct StagingTests {
     }
     
     @Test func testUnstageAll() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFiles = [
             "test_unstage_all_1_\(UUID().uuidString).txt",
             "test_unstage_all_2_\(UUID().uuidString).txt"
@@ -215,10 +194,10 @@ struct StagingTests {
         for file in testFiles {
             try createTestFile(in: repoURL, named: file, content: "test")
         }
-        _ = try await repository.stageAllFiles()
+        try await repository.stageAllFiles()
         
         // Unstage all
-        _ = try await repository.unstageAllFiles()
+        try await repository.unstageAllFiles()
         
         // Verify all files are unstaged
         for file in testFiles {
@@ -237,8 +216,9 @@ struct StagingTests {
     
     // MARK: - Commit Tests
     @Test func testCommit() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFile = "test_commit_\(UUID().uuidString).txt"
         let repository = GitRepository(url: repoURL)
         
@@ -255,7 +235,7 @@ struct StagingTests {
         try await repository.commit(message: "Add test file")
         
         // Verify no staged changes
-        let staged = try await repository.getStagedChanges()
+        let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
         #expect(staged.isEmpty, "Should have no staged changes after commit")
         
         // Verify file is now tracked and clean
@@ -263,13 +243,13 @@ struct StagingTests {
         #expect(!status.contains(testFile), "File should not appear in status (clean)")
         
         // Cleanup
-        try gitReset(in: repoURL)
-        try? deleteTestFile(in: repoURL, named: testFile)
+        try await repository.discardFile(at: testFile)
     }
 
     @Test func testCommitEmptyMessage() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Try to commit with empty message
@@ -284,8 +264,9 @@ struct StagingTests {
     }
 
     @Test func testCommitNothingStaged() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Try to commit with nothing staged
@@ -300,8 +281,9 @@ struct StagingTests {
     }
 
     @Test func testCommitMultipleFiles() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let testFiles = [
             "test_commit_multi_1_\(UUID().uuidString).txt",
             "test_commit_multi_2_\(UUID().uuidString).txt"
@@ -318,30 +300,16 @@ struct StagingTests {
         try await repository.commit(message: "Add multiple test files")
         
         // Verify no staged changes
-        let staged = try await repository.getStagedChanges()
+        let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
         #expect(staged.isEmpty, "Should have no staged changes after commit")
         
         // Cleanup
-        try gitReset(in: repoURL)
-        for file in testFiles {
-            try? deleteTestFile(in: repoURL, named: file)
-        }
+        try await repository.discardAllFiles()
     }
 }
 
 // MARK: - Test Helpers
 private extension StagingTests {    
-    func getTestRepoURL() -> URL? {
-        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"
-        let url = URL(fileURLWithPath: testRepoPath)
-        
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        
-        return url
-    }
-    
     func createTestFile(in repoURL: URL, named: String, content: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
         try content.write(to: fileURL, atomically: true, encoding: .utf8)
@@ -370,38 +338,6 @@ private extension StagingTests {
         
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8) ?? ""
-    }
-    
-    func gitReset(in repoURL: URL) throws {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "reset", "HEAD", "."]
-        task.launch()
-        task.waitUntilExit()
-    }
-    
-    func gitCheckout(in repoURL: URL, file: String) throws {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "checkout", "HEAD", "--", file]
-        task.launch()
-        task.waitUntilExit()
-    }
-
-    func gitAdd(in repoURL: URL, pathspec: String = ".") throws {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "add", pathspec]
-        task.launch()
-        task.waitUntilExit()
-    }
-    
-    func gitCommit(in repoURL: URL, message: String) throws {
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "commit", "-m", message]
-        task.launch()
-        task.waitUntilExit()
     }
     
     func statusLine(for file: String, in repoURL: URL) throws -> String? {

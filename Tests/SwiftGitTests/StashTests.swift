@@ -6,18 +6,6 @@ import Foundation
 struct StashTests {
     
     // MARK: - Test Helpers
-    
-    func getTestRepoURL() -> URL? {
-        let testRepoPath = "/path/to/test/repo"  // Update this
-        let url = URL(fileURLWithPath: testRepoPath)
-        
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        
-        return url
-    }
-    
     func createTestStashLog(at url: URL, stashes: [(hash: String, message: String, timestamp: Int)]) throws {
         let lines = stashes.map { stash in
             "0000000000000000000000000000000000000000 \(stash.hash) Test User <test@example.com> \(stash.timestamp) -0800\t\(stash.message)"
@@ -30,10 +18,9 @@ struct StashTests {
     // MARK: - RefLog Parsing Tests
     
     @Test func testParseStashReflog() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return // Skip if no test repo
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         
@@ -59,10 +46,9 @@ struct StashTests {
     }
     
     @Test func testStashIndicesDescending() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         
@@ -79,10 +65,9 @@ struct StashTests {
     // MARK: - Stash Commit Tests
     
     @Test func testGetStashCommit() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         
@@ -102,10 +87,9 @@ struct StashTests {
     }
     
     @Test func testStashCommitStructure() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         
@@ -131,10 +115,9 @@ struct StashTests {
     // MARK: - Stash Changes Tests
     
     @Test func testGetStashChanges() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         
@@ -180,10 +163,9 @@ struct StashTests {
     // MARK: - Date Parsing Tests
     
     @Test func testStashDateParsing() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let stashes = try await repository.getStashes()
         

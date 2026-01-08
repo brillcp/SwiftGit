@@ -5,8 +5,9 @@ import Foundation
 @Suite("Commit Stream Tests")
 struct CommitStreamTests {
     @Test func testCommitCacheInvalidation() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let testFile = "test_cache_\(UUID().uuidString).txt"
         
@@ -21,7 +22,7 @@ struct CommitStreamTests {
         print("\n=== BEFORE COMMIT ===")
         print("Index modDate: \(modDateBefore!)")
         
-        let stagedBefore = try await repository.getStagedChanges()
+        let stagedBefore = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
         print("Staged count: \(stagedBefore.count)")
         
         // Small delay to ensure we're in a different millisecond
@@ -40,7 +41,7 @@ struct CommitStreamTests {
         
         // Try reading staged multiple times
         for i in 1...3 {
-            let staged = try await repository.getStagedChanges()
+            let staged = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
             print("\nLoad \(i):")
             print("  Staged count: \(staged.count)")
             print("  Keys: \(staged.keys)")
@@ -52,8 +53,9 @@ struct CommitStreamTests {
     }
 
     @Test func testCommitClearsStaged() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let testFile = "test_commit_\(UUID().uuidString).txt"
         
@@ -62,14 +64,14 @@ struct CommitStreamTests {
         try await repository.stageFile(at: testFile)
         
         // Verify file is staged
-        let stagedBefore = try await repository.getStagedChanges()
+        let stagedBefore = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
         #expect(stagedBefore[testFile] != nil, "File should be staged before commit")
         
         // Commit
         try await repository.commit(message: "Test commit")
         
         // Verify staged is now empty
-        let stagedAfter = try await repository.getStagedChanges()
+        let stagedAfter = try await repository.getWorkingTreeStatus().files.filter(\.value.isStaged)
         print("\n=== AFTER COMMIT ===")
         print("Staged files: \(stagedAfter.keys)")
         print("Count: \(stagedAfter.count)")
@@ -84,8 +86,9 @@ struct CommitStreamTests {
     }
 
     @Test func testMultipleLoadAfterCommit() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let testFile = "test_multi_load_\(UUID().uuidString).txt"
         
@@ -98,7 +101,7 @@ struct CommitStreamTests {
         
         // Load staged multiple times (simulating what your UI does)
         for i in 1...3 {
-            let staged = try await repository.getStagedChanges()
+            let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
             print("Load \(i): \(staged.count) staged files")
             #expect(staged.isEmpty, "Load \(i) should show no staged files")
         }
@@ -109,8 +112,9 @@ struct CommitStreamTests {
     }
 
     @Test func testCommitLoadingPerformance() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Warm up (load pack indexes, etc.)
@@ -130,8 +134,9 @@ struct CommitStreamTests {
     }
 
     @Test func testIndividualCommitLoadSpeed() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         guard let headHash = try await repository.getHEAD() else {
@@ -162,8 +167,9 @@ struct CommitStreamTests {
     }
 
     @Test func testPackIndexCacheEffectiveness() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Get a series of commits (should share pack file ranges)
@@ -191,8 +197,9 @@ struct CommitStreamTests {
     }
 
     @Test func testCommitDiffMatchesGit() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Use a known commit hash from GitKraken
@@ -259,10 +266,9 @@ struct CommitStreamTests {
     }
 
     @Test func testGetAllRefs() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let allRefs = try await repository.getRefs().flatMap(\.value)
         
@@ -290,10 +296,9 @@ struct CommitStreamTests {
     }
     
     @Test func testFindSpecificBranch() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         let allRefs = try await repository.getRefs().flatMap(\.value)
 
@@ -321,10 +326,9 @@ struct CommitStreamTests {
     // MARK: - Commit Reachability Tests
     
     @Test func testCommitExists() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Test with a known commit hash from GitKraken
@@ -346,10 +350,9 @@ struct CommitStreamTests {
     }
     
     @Test func testStreamAllCommitsStartingPoints() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Manually replicate streamAllCommits logic to see starting points
@@ -371,10 +374,9 @@ struct CommitStreamTests {
     }
     
     @Test func testStreamAllCommitsCount() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         let commits = try await repository.getAllCommits(limit: 512)
@@ -398,10 +400,9 @@ struct CommitStreamTests {
     }
     
     @Test func testSpecificCommitInStream() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Hash of commit you expect to see (from GitKraken)
@@ -430,10 +431,9 @@ struct CommitStreamTests {
     }
     
     @Test func testCompareWithGitLog() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         // Get our commits
         let ourCommits: [String] = try await repository.getAllCommits(limit: 100).map(\.id)
@@ -481,10 +481,9 @@ struct CommitStreamTests {
     }
     
     @Test func testStashesInStream() async throws {
-        guard let repoURL = getTestRepoURL() else {
-            return
-        }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Get stashes separately
@@ -519,8 +518,9 @@ struct CommitStreamTests {
     }
 
     @Test func testCommitComparison() async throws {
-        guard let repoURL = getTestRepoURL() else { return }
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let repository = GitRepository(url: repoURL)
         
         // Get OUR commits
@@ -580,17 +580,6 @@ struct CommitStreamTests {
 
 // MARK: - Test Helpers
 private extension CommitStreamTests {
-    func getTestRepoURL() -> URL? {
-        let testRepoPath = "/Users/vg/Documents/Dev/TestRepo"
-        let url = URL(fileURLWithPath: testRepoPath)
-        
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        
-        return url
-    }
-
     func createTestFile(in repoURL: URL, named: String, content: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
         try content.write(to: fileURL, atomically: true, encoding: .utf8)

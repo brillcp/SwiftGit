@@ -51,17 +51,10 @@ struct PackIndexTests {
 //    }
 
     @Test func testPackIndexMultipleFiles() async throws {
-        // This test would require a repo with multiple pack files
-        // Most test repos have just one, so we test the structure works
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
         
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
-        let packDir = gitDir.appendingPathComponent("objects/pack")
-        try FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
-        
-        let packIndexManager = PackIndexManager(repoURL: tempDir)
+        let packIndexManager = PackIndexManager(repoURL: repoURL)
         let indexes = await packIndexManager.packIndexes
         
         #expect(indexes.count == 0) // No pack files in empty dir

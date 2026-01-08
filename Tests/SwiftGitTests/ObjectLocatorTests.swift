@@ -6,16 +6,14 @@ import CryptoKit
 @Suite("ObjectLocator Tests")
 struct ObjectLocatorTests {
     @Test func testLocateLooseObject() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        try createTestRepo(in: tempDir)
-        
-        let hash = try writeLooseObject(content: "test content", to: tempDir)
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let hash = try writeLooseObject(content: "test content", to: repoURL)
         
         let locator = ObjectLocator(
-            repoURL: tempDir,
-            packIndexManager: PackIndexManager(repoURL: tempDir)
+            repoURL: repoURL,
+            packIndexManager: PackIndexManager(repoURL: repoURL)
         )
         
         let location = try await locator.locate(hash)
@@ -30,14 +28,12 @@ struct ObjectLocatorTests {
     }
     
     @Test func testObjectNotFound() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        try createTestRepo(in: tempDir)
-        
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
         let locator = ObjectLocator(
-            repoURL: tempDir,
-            packIndexManager: PackIndexManager(repoURL: tempDir)
+            repoURL: repoURL,
+            packIndexManager: PackIndexManager(repoURL: repoURL)
         )
 
         let fakeHash = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
@@ -47,16 +43,14 @@ struct ObjectLocatorTests {
     }
 
     @Test func testCaseInsensitiveHashLookup() async throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        
-        try createTestRepo(in: tempDir)
-        
-        let hash = try writeLooseObject(content: "case test", to: tempDir)
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let hash = try writeLooseObject(content: "case test", to: repoURL)
         
         let locator = ObjectLocator(
-            repoURL: tempDir,
-            packIndexManager: PackIndexManager(repoURL: tempDir)
+            repoURL: repoURL,
+            packIndexManager: PackIndexManager(repoURL: repoURL)
         )
 
         // Test lowercase
@@ -135,12 +129,6 @@ struct ObjectLocatorTests {
 
 // MARK: - Private helpers
 private extension ObjectLocatorTests {
-    func createTestRepo(in tempDir: URL) throws {
-        let gitDir = tempDir.appendingPathComponent(GitPath.git.rawValue)
-        let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
-        try FileManager.default.createDirectory(at: objectsDir, withIntermediateDirectories: true)
-    }
-    
     func writeLooseObject(content: String, to repoURL: URL) throws -> String {
         let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
         let objectsDir = gitDir.appendingPathComponent(GitPath.objects.rawValue)
