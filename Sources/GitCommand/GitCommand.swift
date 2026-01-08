@@ -34,7 +34,7 @@ extension GitCommand {
         case .reset(let path):
             return ["reset", "HEAD", "--", path]
         case .resetAll:
-            return ["reset", "HEAD"]
+            return ["reset", "HEAD", "--", "."]
         case .commit(let message, let author):
             var args = ["commit", "-m", message]
             if let author {
