@@ -75,30 +75,30 @@ private extension CommandRunner {
             "/opt/homebrew/bin/git",
             "/usr/local/bin/git"
         ]
-        
+
         for path in paths {
             if fileManager.fileExists(atPath: path) {
                 return URL(fileURLWithPath: path)
             }
         }
-        
+
         // Try xcrun (finds Xcode's git)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
         process.arguments = ["-f", "git"]
-        
+
         let pipe = Pipe()
         process.standardOutput = pipe
-        
+
         try process.run()
         process.waitUntilExit()
-        
+
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !path.isEmpty {
             return URL(fileURLWithPath: path)
         }
-        
+
         throw GitError.gitNotFound
     }
 }

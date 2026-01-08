@@ -8,7 +8,7 @@ extension GitRepository: CherryPickManageable {
             stdin: nil,
             in: url
         )
-        
+
         // Check for conflicts
         if result.exitCode != 0 {
             if result.stderr.contains("conflict") || result.stderr.contains("CONFLICT") {
@@ -16,7 +16,7 @@ extension GitRepository: CherryPickManageable {
             }
             throw GitError.cherryPickFailed(commit: commitHash)
         }
-        
+
         // Invalidate caches after successful cherry-pick
         await invalidateAllCaches()
     }

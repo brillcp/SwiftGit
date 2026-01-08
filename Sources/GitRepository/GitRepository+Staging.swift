@@ -10,7 +10,7 @@ extension GitRepository: StagingManageable {
 
         await workingTree.invalidateIndexCache()
     }
-    
+
     public func stageAllFiles() async throws {
         let result = try await commandRunner.run(.addAll, stdin: nil, in: url)
 
@@ -20,7 +20,7 @@ extension GitRepository: StagingManageable {
 
         await workingTree.invalidateIndexCache()
     }
-    
+
     public func unstageFile(at path: String) async throws {
         let result = try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
 
@@ -30,7 +30,7 @@ extension GitRepository: StagingManageable {
 
         await workingTree.invalidateIndexCache()
     }
-    
+
     public func unstageAllFiles() async throws {
         let result = try await commandRunner.run(.resetAll, stdin: nil, in: url)
 
@@ -40,13 +40,13 @@ extension GitRepository: StagingManageable {
 
         await workingTree.invalidateIndexCache()
     }
-    
+
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         // Check if file is in index
         let snapshot = try await workingTree.indexSnapshot()
         let entries = snapshot.entries
         let fileInIndex = entries.contains { $0.path == file.path }
-        
+
         if !fileInIndex {
             throw GitError.fileNotInIndex(path: file.path)
         }
@@ -59,7 +59,7 @@ extension GitRepository: StagingManageable {
         let oldBlobSha = entries.first(where: { $0.path == file.path })?.sha1
 
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
-        
+
         let result = try await commandRunner.run(
             .applyPatch(cached: true),
             stdin: patch,
@@ -71,7 +71,7 @@ extension GitRepository: StagingManageable {
         }
 
         await workingTree.invalidateIndexCache()
-        
+
         if let oldBlobSha {
             await cache.remove(.blob(hash: oldBlobSha))
         }
@@ -82,19 +82,19 @@ extension GitRepository: StagingManageable {
         let snapshot = try await workingTree.indexSnapshot()
         let entries = snapshot.entries
         let fileInIndex = entries.contains { $0.path == file.path }
-        
+
         if !fileInIndex {
             throw GitError.fileNotInIndex(path: file.path)
         }
 
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
-        
+
         let result = try await commandRunner.run(
             .applyPatch(cached: true),
             stdin: patch,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             throw GitError.unstageHunkFailed(path: file.path)
         }
@@ -114,19 +114,19 @@ private extension GitRepository {
               let headBlob = try await getBlob(blobHash) else {
             return
         }
-        
+
         // Get INDEX content
         guard let indexEntry = snapshot.indexMap[path],
               let indexBlob = try await getBlob(indexEntry)
         else { return }
-        
+
         let headContent = headBlob.text
         let indexContent = indexBlob.text
-        
+
         // Check if only difference is trailing newline
         let headTrimmed = headContent?.trimmingCharacters(in: .newlines)
         let indexTrimmed = indexContent?.trimmingCharacters(in: .newlines)
-        
+
         if headTrimmed == indexTrimmed && headContent != indexContent {
             // Only difference is trailing newlines - unstage it
             try await commandRunner.run(.reset(path: path), stdin: nil, in: url)

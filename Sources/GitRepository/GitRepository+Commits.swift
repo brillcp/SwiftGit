@@ -4,38 +4,38 @@ extension GitRepository: CommitReadable {
     public func getCommit(_ hash: String) async throws -> Commit? {
         // Check cache first
         if let cached: Commit = await cache.get(.commit(hash: hash)) { return cached }
-        
+
         // Load from storage
         guard let parsedObject = try await loadObject(hash: hash),
               case .commit(let commit) = parsedObject
         else { return nil }
-        
+
         // Cache it
         await cache.set(.commit(hash: hash), value: commit)
         return commit
     }
-    
+
     public func getAllCommits(limit: Int) async throws -> [Commit] {
         var streamedCommits = [Commit]()
-        
+
         for try await commit in streamAllCommits(limit: limit) {
             streamedCommits.append(commit)
         }
-        
+
         return streamedCommits.sorted { $0.author.timestamp < $1.author.timestamp }
     }
 
     public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
         guard let commit = try await getCommit(commitId) else { return [:] }
-        
+
         let currentTree = try await getTreePaths(commit.tree)
-        
+
         var parentTree: [String: String]? = nil
         if let parentId = commit.parents.first,
            let parentCommit = try await getCommit(parentId) {
             parentTree = try await getTreePaths(parentCommit.tree)
         }
-        
+
         return try await diffCalculator.calculateDiff(
             currentTree: currentTree,
             parentTree: parentTree,
@@ -48,7 +48,7 @@ extension GitRepository: CommitReadable {
     public func getHEAD() async throws -> String? {
         try await refReader.getHEAD()
     }
-    
+
     public func getHEADBranch() async throws -> String? {
         try await refReader.getHEADBranch()
     }
@@ -60,13 +60,13 @@ extension GitRepository: CommitWritable {
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw GitError.emptyCommitMessage
         }
-        
+
         let result = try await commandRunner.run(
             .commit(message: message, author: nil),
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             // Check if it's "nothing to commit"
             let output = result.stderr + result.stdout
@@ -98,7 +98,7 @@ private extension GitRepository {
                         default: true
                         }
                     }
-                    
+
                     var stashInternalCommits = Set<String>()  // Track commits to hide
                     let stashes = try await getStashes()
                     for stash in stashes {
@@ -110,7 +110,7 @@ private extension GitRepository {
                                 type: .stash
                             )
                         )
-                        
+
                         // Track its internal commits (don't show these)
                         if let stashCommit = try await getCommit(stash.id) {
                             if stashCommit.parents.count >= 2 {
@@ -121,7 +121,7 @@ private extension GitRepository {
                             }
                         }
                     }
-                    
+
                     // If no refs, try HEAD
                     if startingRefs.isEmpty {
                         if let head = try await getHEAD() {
@@ -135,47 +135,47 @@ private extension GitRepository {
                             return
                         }
                     }
-                    
+
                     var visited = Set<String>()
                     var queue: [String] = []
                     var count = 0
-                    
+
                     // Start from all branch/tag/stash heads
                     for ref in startingRefs {
                         queue.append(ref.hash)
                     }
-                    
+
                     // BFS traversal
                     while let commitHash = queue.popLast() {
                         // Check limit
                         if count >= limit {
                             break
                         }
-                        
+
                         // Skip if already visited
                         guard !visited.contains(commitHash) else {
                             continue
                         }
                         visited.insert(commitHash)
-                        
+
                         // Load commit
                         guard let commit = try await getCommit(commitHash) else {
                             continue
                         }
-                        
+
                         // Skip internal stash commits
                         if stashInternalCommits.contains(commit.id) {
                             continue
                         }
-                        
+
                         // Yield commit to stream
                         continuation.yield(commit)
                         count += 1
-                        
+
                         // Add parents to queue
                         queue.insert(contentsOf: commit.parents, at: 0)
                     }
-                    
+
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)

@@ -6,7 +6,7 @@ public struct GitIndexSnapshot: Sendable {
     public let conflictedPaths: [String]
     public let version: Int
     public let entryCount: Int
-    
+
     public var hasConflicts: Bool {
         !conflictedPaths.isEmpty
     }
@@ -15,7 +15,7 @@ public struct GitIndexSnapshot: Sendable {
         self.entries = entries
         self.version = version
         self.entryCount = entries.count
-        
+
         // Detect duplicates (conflicts in index)
         var tempDict: [String: IndexEntry] = [:]
         var conflicts: Set<String> = []
@@ -27,11 +27,11 @@ public struct GitIndexSnapshot: Sendable {
             }
             tempDict[entry.path] = entry
         }
-        
+
         self.entriesByPath = tempDict
         self.conflictedPaths = Array(conflicts).sorted()
     }
-    
+
     public subscript(path: String) -> IndexEntry? {
         entriesByPath[path]
     }

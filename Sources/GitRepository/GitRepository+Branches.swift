@@ -22,17 +22,17 @@ extension GitRepository: BranchManageable {
                 throw GitError.uncommittedChanges
             }
         }
-        
+
         let result = try await commandRunner.run(
             .checkout(branch: branch, create: createNew),
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             throw GitError.checkoutFailed(branch: branch)
         }
-        
+
         await invalidateAllCaches()
     }
 

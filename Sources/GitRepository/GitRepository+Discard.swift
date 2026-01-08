@@ -4,14 +4,14 @@ extension GitRepository: DiscardManageable {
     public func discardFile(at path: String) async throws {
         let fileURL = url.appendingPathComponent(path)
         let indexSnapshot = try await workingTree.indexSnapshot()
-        
+
         // Check if file is in the index (tracked)
         let isTracked = indexSnapshot.entriesByPath[path] != nil
-        
+
         if isTracked {
             // Tracked file - restore from index/HEAD
             let result = try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
-            
+
             guard result.exitCode == 0 else {
                 throw GitError.discardFileFailed(path: path)
             }
@@ -27,7 +27,7 @@ extension GitRepository: DiscardManageable {
 
     public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
-        
+
         let result = try await commandRunner.run(
             .applyPatch(cached: false),
             stdin: patch,

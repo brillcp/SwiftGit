@@ -22,22 +22,22 @@ public struct CacheStats {
 public protocol ObjectCacheProtocol: Actor {
     /// Get an object from cache
     func get<T>(_ key: CacheKey) async -> T?
-    
+
     /// Store an object in cache
     func set<T>(_ key: CacheKey, value: T) async
-    
+
     /// Remove an object from cache
     func remove(_ key: CacheKey) async
-    
+
     /// Check if key exists without retrieving value
     func contains(_ key: CacheKey) async -> Bool
-    
+
     /// Clear all cached objects
     func clear() async
-    
+
     /// Clear objects matching a predicate
     func clear(where predicate: (CacheKey) -> Bool) async
-    
+
     /// Get current cache statistics
     func stats() async -> CacheStats
 }
@@ -45,15 +45,15 @@ public protocol ObjectCacheProtocol: Actor {
 public actor ObjectCache {
     private var storage: [CacheKey: CacheEntry] = [:]
     private var accessOrder: LinkedList<CacheKey> = LinkedList()
-    
+
     private var hitCount: Int = 0
     private var missCount: Int = 0
     private var evictionCount: Int = 0
     private var currentMemoryUsage: Int = 0
-    
+
     private let maxObjects: Int
     private let maxMemory: Int
-    
+
     public init(maxObjects: Int = 5000, maxMemory: Int = 200_000_000) {
         self.maxObjects = maxObjects
         self.maxMemory = maxMemory
@@ -70,10 +70,10 @@ extension ObjectCache: ObjectCacheProtocol {
         entry.lastAccessed = .now
         return entry.value as? T
     }
-    
+
     public func set<T>(_ key: CacheKey, value: T) async {
         let estimatedSize = estimateSize(value)
-        
+
         // If object already exists, update it
         if let existingEntry = storage[key] {
             currentMemoryUsage -= existingEntry.estimatedSize
@@ -86,7 +86,7 @@ extension ObjectCache: ObjectCacheProtocol {
             accessOrder.moveToFront(key)
             return
         }
-        
+
         // Add new entry
         storage[key] = CacheEntry(
             value: value,
@@ -95,11 +95,11 @@ extension ObjectCache: ObjectCacheProtocol {
         )
         accessOrder.append(key)
         currentMemoryUsage += estimatedSize
-        
+
         // Evict if needed
         evictIfNeeded()
     }
-    
+
     public func remove(_ key: CacheKey) async {
         guard let entry = storage[key] else { return }
 
@@ -107,17 +107,17 @@ extension ObjectCache: ObjectCacheProtocol {
         storage.removeValue(forKey: key)
         accessOrder.remove(key)
     }
-    
+
     public func contains(_ key: CacheKey) async -> Bool {
         storage[key] != nil
     }
-    
+
     public func clear() async {
         storage.removeAll()
         accessOrder.removeAll()
         currentMemoryUsage = 0
     }
-    
+
     public func clear(where predicate: (CacheKey) -> Bool) async {
         let keysToRemove = storage.keys.filter(predicate)
         for key in keysToRemove {
@@ -128,7 +128,7 @@ extension ObjectCache: ObjectCacheProtocol {
             }
         }
     }
-    
+
     public func stats() async -> CacheStats {
         CacheStats(
             hits: hitCount,
@@ -147,12 +147,12 @@ private extension ObjectCache {
         var lastAccessed: Date
         let estimatedSize: Int
     }
-    
+
     func evictIfNeeded() {
         // Evict until we're under both limits
         while storage.count > maxObjects || currentMemoryUsage > maxMemory {
             guard let lruKey = accessOrder.first else { break }
-            
+
             if let entry = storage[lruKey] {
                 currentMemoryUsage -= entry.estimatedSize
                 storage.removeValue(forKey: lruKey)
@@ -161,7 +161,7 @@ private extension ObjectCache {
             }
         }
     }
-    
+
     func estimateSize(_ value: Any) -> Int {
         switch value {
         case let commit as Commit:
@@ -190,24 +190,24 @@ private class LinkedList<T: Hashable> {
         let value: T
         var prev: Node?
         var next: Node?
-        
+
         init(value: T) {
             self.value = value
         }
     }
-    
+
     private var head: Node?
     private var tail: Node?
     private var nodeMap: [T: Node] = [:]
-    
+
     var first: T? {
         head?.value
     }
-    
+
     func append(_ value: T) {
         let node = Node(value: value)
         nodeMap[value] = node
-        
+
         if head == nil {
             head = node
             tail = node
@@ -217,45 +217,45 @@ private class LinkedList<T: Hashable> {
             tail = node
         }
     }
-    
+
     func remove(_ value: T) {
         guard let node = nodeMap[value] else { return }
-        
+
         if node === head {
             head = node.next
         }
         if node === tail {
             tail = node.prev
         }
-        
+
         node.prev?.next = node.next
         node.next?.prev = node.prev
-        
+
         nodeMap.removeValue(forKey: value)
     }
-    
+
     func removeFirst() {
         guard let head = head else { return }
         remove(head.value)
     }
-    
+
     func moveToFront(_ value: T) {
         guard let node = nodeMap[value], node !== tail else { return }
-        
+
         // Remove from current position
         if node === head {
             head = node.next
         }
         node.prev?.next = node.next
         node.next?.prev = node.prev
-        
+
         // Move to tail (most recently used)
         tail?.next = node
         node.prev = tail
         node.next = nil
         tail = node
     }
-    
+
     func removeAll() {
         head = nil
         tail = nil

@@ -21,11 +21,11 @@ public actor PackFileReader: @unchecked Sendable {
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
     private var packHandles: [URL: FileHandle] = [:]
-    
+
     public var isMapped: Bool {
         !packHandles.isEmpty
     }
-    
+
     public init(
         deltaResolver: DeltaResolverProtocol = DeltaResolver(),
         commitParser: any CommitParserProtocol = CommitParser(),
@@ -46,9 +46,9 @@ extension PackFileReader: PackFileReaderProtocol {
         packIndex: PackIndexProtocol
     ) throws -> ParsedObject {
         let handle = try getPackHandle(for: location.packURL)
-        
+
         var cache: [Int: (type: String, data: Data)] = [:]
-        
+
         guard let (typeStr, data) = try readPackObjectAtOffset(
             handle: handle,
             offset: location.offset,
@@ -57,7 +57,7 @@ extension PackFileReader: PackFileReaderProtocol {
         ) else {
             throw PackError.objectNotFound
         }
-        
+
         switch typeStr {
         case "commit":
             let commit = try commitParser.parse(hash: location.hash, data: data)
@@ -110,18 +110,18 @@ private extension PackFileReader {
         cache: inout [Int: (type: String, data: Data)]
     ) throws -> (String, Data)? {
         if let cached = cache[offset] { return cached }
-        
+
         // Read header bytes (up to 10 bytes for variable-length encoding)
         let headerData = try readBytes(from: handle, offset: offset, count: 10)
-        
+
         var pos = 0
         var byte = headerData[pos]
         pos += 1
-        
+
         let type = Int((byte >> 4) & 0x07)
         var size = Int(byte & 0x0f)
         var shift = 4
-        
+
         // Read variable-length size
         while byte & 0x80 != 0 {
             guard pos < headerData.count else { throw PackError.corruptedData }
@@ -130,9 +130,9 @@ private extension PackFileReader {
             size |= Int(byte & 0x7f) << shift
             shift += 7
         }
-        
+
         let dataOffset = offset + pos
-        
+
         switch type {
         case 1, 2, 3, 4:
             // Non-delta types: decompress and return
@@ -141,7 +141,7 @@ private extension PackFileReader {
             let compressedData = try readBytes(from: handle, offset: dataOffset, count: estimatedCompressed)
             let decompressed = compressedData.decompressed
             let actualData = decompressed.prefix(size)
-            
+
             let typeStr: String
             switch type {
             case 1: typeStr = "commit"
@@ -152,7 +152,7 @@ private extension PackFileReader {
             }
             cache[offset] = (typeStr, Data(actualData))
             return (typeStr, Data(actualData))
-            
+
         case 6: // OFS_DELTA
             // Read offset encoding
             let offsetData = try readBytes(from: handle, offset: dataOffset, count: 10)
@@ -167,13 +167,13 @@ private extension PackFileReader {
                 baseOffset = (baseOffset << 7) + (c & 0x7f)
             }
             let baseObjectOffset = offset - baseOffset
-            
+
             // Read delta data
             let deltaOffset = dataOffset + basePos
             let estimatedDeltaSize = Int(Double(size) * 1.5) + 1024
             let compressedDelta = try readBytes(from: handle, offset: deltaOffset, count: estimatedDeltaSize)
             let deltaData = compressedDelta.decompressed
-            
+
             // Recursively resolve base
             guard let base = try readPackObjectAtOffset(
                 handle: handle,
@@ -181,26 +181,26 @@ private extension PackFileReader {
                 packIndex: packIndex,
                 cache: &cache
             ) else { return nil }
-            
+
             let result = try deltaResolver.apply(delta: deltaData, to: base.1)
             cache[offset] = (base.0, result)
             return (base.0, result)
-            
+
         case 7: // REF_DELTA
             let baseHashData = try readBytes(from: handle, offset: dataOffset, count: 20)
             let baseHash = baseHashData.toHexString()
-            
+
             // ✅ Lazy lookup - only loads this hash's range
             guard let baseLoc = packIndex.findObject(baseHash) else {
                 throw PackError.baseObjectNotFound(baseHash)
             }
-            
+
             // Read delta data
             let deltaOffset = dataOffset + 20
             let estimatedDeltaSize = Int(Double(size) * 1.5) + 1024
             let compressedDelta = try readBytes(from: handle, offset: deltaOffset, count: estimatedDeltaSize)
             let deltaData = compressedDelta.decompressed
-            
+
             // Recursively resolve base
             guard let base = try readPackObjectAtOffset(
                 handle: handle,
@@ -208,7 +208,7 @@ private extension PackFileReader {
                 packIndex: packIndex,
                 cache: &cache
             ) else { return nil }
-            
+
             let result = try deltaResolver.apply(delta: deltaData, to: base.1)
             cache[offset] = (base.0, result)
             return (base.0, result)

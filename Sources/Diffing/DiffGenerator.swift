@@ -34,12 +34,12 @@ extension DiffGenerator: DiffGeneratorProtocol {
         if oldContent == newContent {
             return []
         }
-        
+
         // Early exit: both empty
         if oldContent.isEmpty && newContent.isEmpty {
             throw DiffError.emptyContent
         }
-        
+
         // Size check
         guard oldContent.count <= maxFileSize else {
             throw DiffError.fileTooLarge(size: oldContent.count)
@@ -47,29 +47,29 @@ extension DiffGenerator: DiffGeneratorProtocol {
         guard newContent.count <= maxFileSize else {
             throw DiffError.fileTooLarge(size: newContent.count)
         }
-        
+
         // Binary detection
         if isBinary(oldContent) || isBinary(newContent) {
             return [makeBinaryPlaceholder()]
         }
-        
+
         // Split into lines (keep as Substring for memory efficiency)
         let oldLines = oldContent.split(separator: String.newLine, omittingEmptySubsequences: false)
         let newLines = newContent.split(separator: String.newLine, omittingEmptySubsequences: false)
-        
+
         // Filter out ONLY the final empty element if it exists
         let filteredOld = oldLines.last?.isEmpty == true ? oldLines.dropLast() : oldLines
         let filteredNew = newLines.last?.isEmpty == true ? newLines.dropLast() : newLines
 
         // Generate diff
         let diff = makeDiff(oldLines: filteredOld, newLines: filteredNew)
-        
+
         // Group into hunks
         var hunks = groupIntoHunks(diff: diff, contextLines: contextLines)
-        
+
         // Check if file ends with newline
         let fileEndsWithNewline = newContent.hasSuffix(String.newLine)
-        
+
         // Set flag on last hunk if no trailing newline
         if !fileEndsWithNewline, let lastIndex = hunks.indices.last {
             hunks[lastIndex] = DiffHunk(
@@ -79,7 +79,7 @@ extension DiffGenerator: DiffGeneratorProtocol {
                 hasNoNewlineAtEnd: true
             )
         }
-        
+
         return hunks
     }
 }
@@ -87,7 +87,7 @@ extension DiffGenerator: DiffGeneratorProtocol {
 enum DiffError: LocalizedError {
     case fileTooLarge(size: Int)
     case emptyContent
-    
+
     var errorDescription: String? {
         switch self {
         case .fileTooLarge(let size):
@@ -106,7 +106,7 @@ private extension DiffGenerator {
         let prefix = content.utf8.prefix(8192)
         return prefix.contains(0)
     }
-    
+
     /// Create placeholder for binary files
     func makeBinaryPlaceholder() -> DiffHunk {
         DiffHunk(
@@ -123,25 +123,25 @@ private extension DiffGenerator {
             ]
         )
     }
-    
+
     /// Generate line-by-line diff using Myers' algorithm
     func makeDiff(oldLines: [Substring], newLines: [Substring]) -> [DiffLine] {
         // Convert to arrays for difference (still views, not copies)
         let oldArray = Array(oldLines)
         let newArray = Array(newLines)
-        
+
         // Use Swift's built-in Myers' algorithm
         let difference = newArray.difference(from: oldArray)
-        
+
         var results: [DiffLine] = []
         var lineId = 0
         var oldIndex = 0
         var newIndex = 0
-        
+
         // Build a map of changes for efficient lookup
         var removals: [Int: Substring] = [:]
         var insertions: [Int: Substring] = [:]
-        
+
         for change in difference {
             switch change {
             case .remove(let offset, let element, _):
@@ -150,17 +150,17 @@ private extension DiffGenerator {
                 insertions[offset] = element
             }
         }
-        
+
         // Walk through both arrays and generate diff lines
         while oldIndex < oldLines.count || newIndex < newLines.count {
             let isRemoved = removals[oldIndex] != nil
             let isInserted = insertions[newIndex] != nil
-            
+
             if isRemoved && isInserted {
                 // Modified line - check if we should do word diff
                 let oldLine = oldLines[oldIndex]
                 let newLine = newLines[newIndex]
-                
+
                 if oldLine.count <= maxLineLength && newLine.count <= maxLineLength {
                     // Word-level diff for reasonable line lengths
                     let oldSegments = wordDiff(old: oldLine, new: newLine, forOld: true)
@@ -218,7 +218,7 @@ private extension DiffGenerator {
                 }
             }
         }
-        
+
         return results
     }
 
@@ -232,7 +232,7 @@ private extension DiffGenerator {
         var newLineNum = 0
         var unchangedBuffer: [DiffLine] = []
         var hunkId = 0
-        
+
         var hasNoNewline = false
 
         for line in diff {
@@ -241,7 +241,7 @@ private extension DiffGenerator {
                 unchangedBuffer.append(line)
                 oldLineNum += 1
                 newLineNum += 1
-                
+
                 // If we have too many unchanged lines, close the current hunk
                 if unchangedBuffer.count > contextLines * 2 {
                     if !currentHunk.isEmpty {
@@ -275,14 +275,14 @@ private extension DiffGenerator {
                     let contextToAdd = unchangedBuffer.suffix(contextLines)
                     hunkOldStart = oldLineNum - contextToAdd.count
                     hunkNewStart = newLineNum - contextToAdd.count
-                    
+
                     // Add leading context
                     currentHunk.append(contentsOf: contextToAdd)
                 } else {
                     currentHunk.append(contentsOf: unchangedBuffer)
                 }
                 unchangedBuffer.removeAll()
-                
+
                 currentHunk.append(line)
                 newLineNum += 1
             case .removed:
@@ -295,12 +295,12 @@ private extension DiffGenerator {
                     currentHunk.append(contentsOf: unchangedBuffer)
                 }
                 unchangedBuffer.removeAll()
-                
+
                 currentHunk.append(line)
                 oldLineNum += 1
             }
         }
-        
+
         // Close final hunk
         if !currentHunk.isEmpty {
             currentHunk.append(contentsOf: unchangedBuffer.prefix(contextLines))
@@ -310,7 +310,7 @@ private extension DiffGenerator {
             let addedCount = currentHunk.filter { $0.type == .added }.count
             let oldCount = unchangedCount + removedCount
             let newCount = unchangedCount + addedCount
-            
+
             let header = makeHunkHeader(
                 oldStart: hunkOldStart,
                 oldCount: oldCount,
@@ -319,34 +319,34 @@ private extension DiffGenerator {
             )
             hunks.append(DiffHunk(id: hunkId, header: header, lines: currentHunk))
         }
-        
+
         return hunks
     }
-    
+
     /// Word-level diff using Myers' algorithm (via difference)
     func wordDiff(old: Substring, new: Substring, forOld: Bool) -> [Segment] {
         // Extract and preserve leading whitespace
         let oldLeading = old.prefix(while: { $0.isWhitespace })
         let newLeading = new.prefix(while: { $0.isWhitespace })
-        
+
         // Get content after leading whitespace
         let oldContent = old.drop(while: { $0.isWhitespace })
         let newContent = new.drop(while: { $0.isWhitespace })
-        
+
         // Split content into words (now safe to split on whitespace)
         let oldWords = oldContent.split(whereSeparator: { $0.isWhitespace })
         let newWords = newContent.split(whereSeparator: { $0.isWhitespace })
-        
+
         // Use Myers' algorithm for word diff
         let difference = Array(newWords).difference(from: Array(oldWords))
-        
+
         var segments: [Segment] = []
         var segmentId = 0
-        
+
         // Build change maps
         var removals = Set<Int>()
         var insertions = Set<Int>()
-        
+
         for change in difference {
             switch change {
             case .remove(let offset, _, _):
@@ -355,7 +355,7 @@ private extension DiffGenerator {
                 insertions.insert(offset)
             }
         }
-        
+
         // Add leading whitespace as first segment (not highlighted)
         let leadingSpace = forOld ? String(oldLeading) : String(newLeading)
         if !leadingSpace.isEmpty {
@@ -366,7 +366,7 @@ private extension DiffGenerator {
             ))
             segmentId += 1
         }
-        
+
         // Generate segments based on which version we're building
         if forOld {
             for (index, word) in oldWords.enumerated() {
@@ -389,7 +389,7 @@ private extension DiffGenerator {
                 segmentId += 1
             }
         }
-        
+
         // Add spaces between words (skip first if it's the leading whitespace)
         let startIndex = leadingSpace.isEmpty ? 0 : 1
         return segments.enumerated().map { index, segment in
@@ -403,19 +403,19 @@ private extension DiffGenerator {
             return segment
         }
     }
-    
+
     /// Longest Common Subsequence algorithm
     func longestCommonSubsequence<T: Equatable>(_ a: [T], _ b: [T]) -> [T] {
         let m = a.count
         let n = b.count
-        
+
         // Handle empty arrays
         if m == 0 || n == 0 {
             return []
         }
-        
+
         var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
-        
+
         for i in 1...m {
             for j in 1...n {
                 if a[i-1] == b[j-1] {
@@ -425,7 +425,7 @@ private extension DiffGenerator {
                 }
             }
         }
-        
+
         // Backtrack to find the LCS
         var lcs: [T] = []
         var i = m, j = n
@@ -442,7 +442,7 @@ private extension DiffGenerator {
         }
         return lcs
     }
-    
+
     /// Generate hunk header string
     func makeHunkHeader(oldStart: Int, oldCount: Int, newStart: Int, newCount: Int) -> String {
         "@@ -\(oldStart+1),\(oldCount) +\(newStart+1),\(newCount) @@"

@@ -8,7 +8,7 @@ extension GitRepository: RevertManageable {
             stdin: nil,
             in: url
         )
-        
+
         // Check for conflicts
         if result.exitCode != 0 {
             if result.stderr.contains("conflict") || result.stderr.contains("CONFLICT") {
@@ -16,7 +16,7 @@ extension GitRepository: RevertManageable {
             }
             throw GitError.revertFailed(commit: commitHash)
         }
-        
+
         // Invalidate caches after successful revert
         await invalidateAllCaches()
     }

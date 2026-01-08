@@ -17,7 +17,7 @@ public final class LooseObjectParser {
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
     private let blobParser: any BlobParserProtocol
-    
+
     public init(
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
@@ -60,32 +60,32 @@ private extension LooseObjectParser {
     /// Format: "type size\0content"
     func splitHeader(_ data: Data) throws -> (type: String, content: Data) {
         var remainder = data
-        
+
         // Read type (up to space)
         guard let spaceIndex = remainder.firstIndex(of: 0x20) else {
             throw ParseError.malformedHeader
         }
-        
+
         let typeData = remainder[..<spaceIndex]
         guard let type = String(data: typeData, encoding: .utf8) else {
             throw ParseError.invalidEncoding
         }
-        
+
         // Skip the space
         remainder = remainder[(spaceIndex + 1)...]
-        
+
         // Read size (up to null terminator)
         guard let nullIndex = remainder.firstIndex(of: 0x00) else {
             throw ParseError.malformedHeader
         }
-        
+
         // We could validate size here, but Git doesn't always match
         // let sizeData = remainder[..<nullIndex]
         // let size = Int(String(data: sizeData, encoding: .utf8) ?? "") ?? 0
-        
+
         // Skip the null byte and return remaining content
         let content = remainder[(nullIndex + 1)...]
-        
+
         return (type, Data(content))
     }
 }
@@ -98,7 +98,7 @@ public enum ParseError: LocalizedError {
     case malformedCommit
     case malformedTree
     case missingRequiredField(String)
-    
+
     public var errorDescription: String? {
         switch self {
         case .malformedHeader:

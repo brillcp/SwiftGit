@@ -87,16 +87,16 @@ public struct RepoSnapshot: Sendable {
     let commit: Commit
     let headTree: [String: String]
     let indexSnapshot: GitIndexSnapshot
-    
+
     // Convenience accessors
     var index: [IndexEntry] {
         indexSnapshot.entries
     }
-    
+
     var indexMap: [String: String] {
         indexSnapshot.entriesByPath.mapValues(\.sha1)
     }
-    
+
     var conflictedPaths: [String] {
         indexSnapshot.conflictedPaths
     }
@@ -120,7 +120,7 @@ extension GitRepository {
     /// Load an object from storage (loose or packed)
     func loadObject(hash: String) async throws -> ParsedObject? {
         guard let location = try await locator.locate(hash) else { return nil }
-        
+
         switch location {
         case .loose(let fileURL):
             let data = try Data(contentsOf: fileURL)

@@ -19,14 +19,14 @@ public extension DiffHunk {
         var result: [DiffLine] = []
         var removedBuffer: [DiffLine] = []
         var addedBuffer: [DiffLine] = []
-        
+
         func flush() {
             result.append(contentsOf: removedBuffer)  // All removed first
             result.append(contentsOf: addedBuffer)    // Then all added
             removedBuffer.removeAll()
             addedBuffer.removeAll()
         }
-        
+
         for line in lines {
             switch line.type {
             case .unchanged:
@@ -38,7 +38,7 @@ public extension DiffHunk {
                 addedBuffer.append(line)
             }
         }
-        
+
         flush()
         return result
     }

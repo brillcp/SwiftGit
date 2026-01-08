@@ -15,7 +15,7 @@ extension GitRepository: StashManageable {
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             // Check if "No local changes to save"
             let output = result.stderr + result.stdout
@@ -24,11 +24,11 @@ extension GitRepository: StashManageable {
             }
             throw GitError.stashFailed
         }
-        
+
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs)
     }
-    
+
     /// Apply and remove most recent stash
     public func stashPop(index: Int? = nil) async throws {
         let result = try await commandRunner.run(
@@ -36,16 +36,16 @@ extension GitRepository: StashManageable {
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             throw GitError.stashPopFailed
         }
-        
+
         // Invalidate caches
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs) // Stash list changed
     }
-    
+
     /// Apply stash without removing it
     public func stashApply(index: Int? = nil) async throws {
         let result = try await commandRunner.run(
@@ -53,16 +53,16 @@ extension GitRepository: StashManageable {
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             throw GitError.stashApplyFailed
         }
-        
+
         // Invalidate caches
         await workingTree.invalidateIndexCache()
         // Note: refs don't change (stash still exists)
     }
-    
+
     /// Delete a stash
     public func stashDrop(index: Int) async throws {
         let result = try await commandRunner.run(
@@ -70,11 +70,11 @@ extension GitRepository: StashManageable {
             stdin: nil,
             in: url
         )
-        
+
         guard result.exitCode == 0 else {
             throw GitError.stashDropFailed
         }
-        
+
         // Invalidate refs cache (stash list changed)
         await cache.remove(.refs)
     }

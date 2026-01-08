@@ -6,7 +6,7 @@ public protocol WorkingTreeReaderProtocol: Actor {
 
     /// Compute the current working tree status
     func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus
-    
+
     /// Get untracked files
     func untrackedFiles() async throws -> [String]
 
@@ -49,13 +49,13 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
         var workingComplete = try await checkWorkingTreeAgainstIndex(indexEntries: snapshot.index)
 
         workingComplete.merge(untracked) { _, new in new }
-        
+
         var status = compareStates(
             headTree: snapshot.headTree,
             index: snapshot.indexMap,
             workingTree: workingComplete
         )
-        
+
         // Mark conflicted files (now available from snapshot)
         for path in snapshot.conflictedPaths {
             status.files[path] = WorkingTreeFile(
@@ -64,10 +64,10 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
                 unstaged: .conflicted
             )
         }
-        
+
         return status
     }
-    
+
     public func untrackedFiles() async throws -> [String] {
         let indexEntries = try await indexSnapshot()
         let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries.entries)
@@ -93,37 +93,37 @@ private extension WorkingTreeReader {
     func checkWorkingTreeAgainstIndex(indexEntries: [IndexEntry]) async throws -> [String: String] {
         var result: [String: String] = [:]
         result.reserveCapacity(indexEntries.count)
-        
+
         for entry in indexEntries {
             let fileURL = repoURL.appendingPathComponent(entry.path)
-            
+
             if let hash = try await checkFile(entry: entry, fileURL: fileURL) {
                 result[entry.path] = hash
             }
         }
-        
+
         return result
     }
-    
+
     func checkFile(entry: IndexEntry, fileURL: URL) async throws -> String? {
         guard fileManager.fileExists(atPath: fileURL.path) else {
             return nil // File deleted
         }
-        
+
         // Get file stats - fast syscall
         let attrs = try fileManager.attributesOfItem(atPath: fileURL.path)
         guard let modDate = attrs[.modificationDate] as? Date,
               let sizeNum = attrs[.size] as? UInt64 else { return nil }
-        
+
         let sizeMatches = sizeNum == UInt64(entry.size)
         let mtimeMatches = abs(modDate.timeIntervalSince(entry.mtime)) < 0.001
-        
+
         // Git's optimization: if mtime + size match, reuse hash
         if mtimeMatches && sizeMatches {
             // File unchanged - reuse hash from index (NO HASHING!)
             return entry.sha1
         }
-        
+
         // Check cache by file identity (inode + dev + size + mtime)
         let devAttr = attrs[.systemNumber] as? NSNumber
         let inoAttr = attrs[.systemFileNumber] as? NSNumber
@@ -131,62 +131,62 @@ private extension WorkingTreeReader {
         let ino = UInt64(inoAttr?.uint64Value ?? 0)
         let mtimeNs = UInt64(entry.mtimeNSec)
         let identity = FileIdentity(dev: dev, ino: ino, size: sizeNum, mtimeNs: mtimeNs)
-        
+
         if let cached: String = await cache.get(.fileHash(identity: identity)) {
             return cached
         }
-        
+
         // Compute hash
         let computed = try computeFileHash(at: fileURL)
-        
+
         // Cache with eviction
         await cache.set(.fileHash(identity: identity), value: computed)
-        
+
         return computed
     }
-    
+
     func computeFileHash(at url: URL) throws -> String {
         let fileHandle = try FileHandle(forReadingFrom: url)
         defer { try? fileHandle.close() }
-        
+
         let fileSize = try fileHandle.seekToEnd()
         try fileHandle.seek(toOffset: 0)
-        
+
         // Git blob format: "blob <size>\0<content>"
         let header = "blob \(fileSize)\0"
-        
+
         var context = CC_SHA1_CTX()
         CC_SHA1_Init(&context)
-        
+
         // Hash header
         header.utf8.withContiguousStorageIfAvailable { ptr in
             _ = CC_SHA1_Update(&context, ptr.baseAddress, CC_LONG(ptr.count))
         }
-        
+
         // Stream file content in 64KB chunks
         while true {
             let chunk = fileHandle.readData(ofLength: 65536)
             if chunk.isEmpty { break }
-            
+
             chunk.withUnsafeBytes { ptr in
                 _ = CC_SHA1_Update(&context, ptr.baseAddress, CC_LONG(chunk.count))
             }
         }
-        
+
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
         CC_SHA1_Final(&digest, &context)
-        
+
         return digest.map { String(format: "%02x", $0) }.joined()
     }
-    
+
     func scanForUntrackedFiles(indexEntries: [IndexEntry]) async throws -> [String: String] {
         // Build indexed paths and dirs
         var indexedPaths = Set<String>(minimumCapacity: indexEntries.count)
         var indexedDirs = Set<String>(minimumCapacity: indexEntries.count)
-        
+
         for entry in indexEntries {
             indexedPaths.insert(entry.path)
-            
+
             // Add all parent directories
             var path = entry.path
             while let slashIdx = path.lastIndex(of: "/") {
@@ -194,9 +194,9 @@ private extension WorkingTreeReader {
                 indexedDirs.insert(path)
             }
         }
-        
+
         var result: [String: String] = [:]
-        
+
         try await scanDirectoryForUntracked(
             at: repoURL,
             relativePath: "",
@@ -204,7 +204,7 @@ private extension WorkingTreeReader {
             indexedDirs: indexedDirs,
             result: &result
         )
-        
+
         return result
     }
 
@@ -220,21 +220,21 @@ private extension WorkingTreeReader {
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         )
-        
+
         for itemURL in contents {
             let name = itemURL.lastPathComponent
-            
+
             if name == GitPath.git.rawValue { continue }
-            
+
             let fullPath = relativePath.isEmpty ? name : "\(relativePath)/\(name)"
-            
+
             // Skip if already in index
             if indexedPaths.contains(fullPath) {
                 continue
             }
-            
+
             let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
-            
+
             if resourceValues.isDirectory == true {
                 // Only recurse if directory isn't fully tracked
                 if !indexedDirs.contains(fullPath) {
@@ -253,7 +253,7 @@ private extension WorkingTreeReader {
             }
         }
     }
-    
+
     func compareStates(
         headTree: [String: String],
         index: [String: String],
@@ -262,15 +262,15 @@ private extension WorkingTreeReader {
         var files: [String: WorkingTreeFile] = [:]
         let allPaths = Set(headTree.keys).union(index.keys).union(workingTree.keys)
         files.reserveCapacity(allPaths.count)
-        
+
         for path in allPaths {
             let headOid = headTree[path]
             let indexOid = index[path]
             let workingOid = workingTree[path]
-            
+
             var staged: GitChangeType?
             var unstaged: GitChangeType?
-            
+
             // Staged changes (HEAD → Index)
             if let indexOid = indexOid {
                 if let headOid = headOid {
@@ -283,7 +283,7 @@ private extension WorkingTreeReader {
             } else if headOid != nil {
                 staged = .deleted
             }
-            
+
             // Unstaged changes (Index → Working Tree)
             if let workingOid = workingOid {
                 if let indexOid = indexOid {
@@ -296,7 +296,7 @@ private extension WorkingTreeReader {
             } else if indexOid != nil {
                 unstaged = .deleted
             }
-            
+
             // Only add if there are changes
             if staged != nil || unstaged != nil {
                 files[path] = WorkingTreeFile(
@@ -306,7 +306,7 @@ private extension WorkingTreeReader {
                 )
             }
         }
-        
+
         return WorkingTreeStatus(files: files)
     }
 }
