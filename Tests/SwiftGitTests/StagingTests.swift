@@ -302,9 +302,6 @@ struct StagingTests {
         // Verify no staged changes
         let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
         #expect(staged.isEmpty, "Should have no staged changes after commit")
-        
-        // Cleanup
-        try await repository.discardAllFiles()
     }
 }
 
