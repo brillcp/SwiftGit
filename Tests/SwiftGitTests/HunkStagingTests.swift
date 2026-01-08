@@ -387,6 +387,140 @@ struct HunkStagingTests {
         #expect(filePartial?.staged != nil, "Should still have staged changes")
         #expect(filePartial?.unstaged != nil, "Should have unstaged changes")
     }
+    
+    @Test func testGeneratePatchForMultipleHunks() async throws {
+        let generator = PatchGenerator()
+        
+        // Create two hunks (changes in different parts of file)
+        let hunk1 = DiffHunk(
+            id: 0,
+            header: "@@ -1,3 +1,3 @@",
+            lines: [
+                DiffLine(
+                    id: 0,
+                    type: .unchanged,
+                    segments: [Segment(id: 0, text: "Line 1", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 1,
+                    type: .removed,
+                    segments: [Segment(id: 0, text: "Old Line 2", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 2,
+                    type: .added,
+                    segments: [Segment(id: 0, text: "New Line 2", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 3,
+                    type: .unchanged,
+                    segments: [Segment(id: 0, text: "Line 3", isHighlighted: false)]
+                )
+            ]
+        )
+        
+        let hunk2 = DiffHunk(
+            id: 1,
+            header: "@@ -8,3 +8,3 @@",
+            lines: [
+                DiffLine(
+                    id: 0,
+                    type: .unchanged,
+                    segments: [Segment(id: 0, text: "Line 8", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 1,
+                    type: .removed,
+                    segments: [Segment(id: 0, text: "Old Line 9", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 2,
+                    type: .added,
+                    segments: [Segment(id: 0, text: "New Line 9", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 3,
+                    type: .unchanged,
+                    segments: [Segment(id: 0, text: "Line 10", isHighlighted: false)]
+                )
+            ]
+        )
+        
+        let file = WorkingTreeFile(
+            path: "Test.swift",
+            staged: nil,
+            unstaged: .modified
+        )
+        
+        let patch = generator.generatePatch(hunks: [hunk1, hunk2], file: file)
+        
+        // Verify patch has header
+        #expect(patch.contains("diff --git a/Test.swift b/Test.swift"))
+        
+        // Verify both hunks are included
+        #expect(patch.contains("@@ -1,3 +1,3 @@"), "First hunk header")
+        #expect(patch.contains("@@ -8,3 +8,3 @@"), "Second hunk header")
+        
+        // Verify first hunk content
+        #expect(patch.contains("-Old Line 2"))
+        #expect(patch.contains("+New Line 2"))
+        
+        // Verify second hunk content
+        #expect(patch.contains("-Old Line 9"))
+        #expect(patch.contains("+New Line 9"))
+    }
+    
+    @Test func testPatchWithNoNewlineAtEnd() async throws {
+        let generator = PatchGenerator()
+        
+        // Create hunk with no newline at end (flag set)
+        let hunk = DiffHunk(
+            id: 0,
+            header: "@@ -1,2 +1,2 @@",
+            lines: [
+                DiffLine(
+                    id: 0,
+                    type: .unchanged,
+                    segments: [Segment(id: 0, text: "Line 1", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 1,
+                    type: .removed,
+                    segments: [Segment(id: 0, text: "Old Line 2", isHighlighted: false)]
+                ),
+                DiffLine(
+                    id: 2,
+                    type: .added,
+                    segments: [Segment(id: 0, text: "New Line 2", isHighlighted: false)]
+                )
+            ],
+            hasNoNewlineAtEnd: true  // ← Flag set
+        )
+        
+        let file = WorkingTreeFile(
+            path: "NoNewline.txt",
+            staged: nil,
+            unstaged: .modified
+        )
+        
+        let patch = generator.generatePatch(hunk: hunk, file: file)
+        
+        // Verify patch contains the marker
+        #expect(patch.contains("\\ No newline at end of file"), "Should have no newline marker")
+        
+        // Verify last line doesn't have extra newline
+        let lines = patch.split(separator: "\n", omittingEmptySubsequences: false)
+        
+        // Find the last added line
+        let addedLineIndex = lines.lastIndex(where: { $0.hasPrefix("+New Line 2") })
+        #expect(addedLineIndex != nil, "Should find added line")
+        
+        // The marker should come after
+        if let index = addedLineIndex {
+            let nextLine = lines[index + 1]
+            #expect(nextLine.hasPrefix("\\"), "Next line should be the marker")
+        }
+    }
 }
 
 // MARK: - Test Helpers

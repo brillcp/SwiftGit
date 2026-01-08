@@ -138,8 +138,7 @@ private extension ObjectLocatorTests {
         var fullContent = Data(header.utf8)
         fullContent.append(data)
         
-        let hash = Insecure.SHA1.hash(data: fullContent)
-        let hashString = hash.map { String(format: "%02x", $0) }.joined()
+        let hashString = fullContent.sha1()
         
         let prefix = String(hashString.prefix(2))
         let suffix = String(hashString.dropFirst(2))
