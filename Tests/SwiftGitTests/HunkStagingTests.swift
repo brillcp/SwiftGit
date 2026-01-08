@@ -116,8 +116,6 @@ struct HunkStagingTests {
         try await repository.discardFile(at: testFile)
     }
 
-    // MARK: - Unstage Hunk Tests
-
     @Test func testUnstageHunk() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

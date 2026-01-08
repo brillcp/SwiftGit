@@ -4,180 +4,118 @@ import Foundation
 
 @Suite("Stash Tests")
 struct StashTests {
-
-    // MARK: - Test Helpers
-    func createTestStashLog(at url: URL, stashes: [(hash: String, message: String, timestamp: Int)]) throws {
-        let lines = stashes.map { stash in
-            "0000000000000000000000000000000000000000 \(stash.hash) Test User <test@example.com> \(stash.timestamp) -0800\t\(stash.message)"
-        }
-
-        let content = lines.joined(separator: .newLine)
-        try content.write(to: url, atomically: true, encoding: .utf8)
-    }
-
-    // MARK: - RefLog Parsing Tests
-
-    @Test func testParseStashReflog() async throws {
+    @Test func testCreateAndListStash() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
         let repository = GitRepository(url: repoURL)
+
+        // Create initial commit
+        try createTestFile(in: repoURL, named: "file.txt", content: "Initial")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial")
+
+        // Modify and stash
+        try createTestFile(in: repoURL, named: "file.txt", content: "Modified")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.stashPush(message: "Test stash")
+
+        // Verify stash exists
         let stashes = try await repository.getStashes()
+        #expect(stashes.count == 1, "Should have 1 stash")
+        #expect(stashes[0].index == 0, "First stash should have index 0")
+        #expect(stashes[0].message.contains("Test stash"), "Should have correct message")
 
-        // Should parse stashes if they exist
-        if stashes.isEmpty {
-            // No stashes in test repo - that's OK
-            return
-        }
-
-        // Verify structure
-        for stash in stashes {
-            #expect(!stash.id.isEmpty)
-            #expect(stash.id.count == 40) // Valid SHA-1
-            #expect(stash.index >= 0)
-            #expect(!stash.message.isEmpty)
-        }
-
-        // Indices should be sequential
-        let indices = stashes.map { $0.index }.sorted()
-        for (i, index) in indices.enumerated() {
-            #expect(index == i)
-        }
+        // Verify stash commit structure
+        let commit = try await repository.getCommit(stashes[0].id)
+        #expect(commit != nil, "Should be able to load stash commit")
+        #expect(commit!.parents.count >= 1, "Stash should have at least 1 parent")
     }
 
-    @Test func testStashIndicesDescending() async throws {
+    @Test func testApplyStash() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
         let repository = GitRepository(url: repoURL)
+
+        // Setup
+        try createTestFile(in: repoURL, named: "file.txt", content: "Initial")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial")
+
+        // Stash changes
+        try createTestFile(in: repoURL, named: "file.txt", content: "Modified")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.stashPush(message: "Test stash")
+
+        // Verify working tree is clean
+        let cleanStatus = try await repository.getWorkingTreeStatus()
+        #expect(cleanStatus.files.isEmpty, "Working tree should be clean after stash")
+
+        // Apply stash
+        try await repository.stashApply(index: 0)
+
+        // Verify changes are back
+        let afterStatus = try await repository.getWorkingTreeStatus()
+        #expect(!afterStatus.files.isEmpty, "Should have changes after apply")
+
+        // Stash should still exist (apply doesn't delete)
         let stashes = try await repository.getStashes()
-
-        guard stashes.count > 1 else {
-            return // Need multiple stashes
-        }
-
-        // Stashes should be returned newest first (index 0, 1, 2...)
-        for i in 0..<(stashes.count - 1) {
-            #expect(stashes[i].index < stashes[i + 1].index)
-        }
+        #expect(stashes.count == 1, "Apply should not delete stash")
     }
 
-    // MARK: - Stash Commit Tests
-
-    @Test func testGetStashCommit() async throws {
+    @Test func testPopStash() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
         let repository = GitRepository(url: repoURL)
+
+        // Setup
+        try createTestFile(in: repoURL, named: "file.txt", content: "Initial")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial")
+
+        // Stash changes
+        try createTestFile(in: repoURL, named: "file.txt", content: "Modified")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.stashPush(message: "Test stash")
+
+        // Pop stash
+        try await repository.stashPop(index: 0)
+
+        // Verify changes are back
+        let afterStatus = try await repository.getWorkingTreeStatus()
+        #expect(!afterStatus.files.isEmpty, "Should have changes after pop")
+
+        // Stash should be deleted (pop removes it)
         let stashes = try await repository.getStashes()
-
-        guard let firstStash = stashes.first else {
-            return // No stashes
-        }
-
-        // Should be able to get the commit
-        let commit = try await repository.getCommit(firstStash.id)
-
-        #expect(commit != nil)
-        #expect(commit?.id == firstStash.id)
-        #expect(!commit!.tree.isEmpty)
-
-        // Stash commits should have at least 1 parent (the base commit)
-        #expect(commit!.parents.count >= 1)
+        #expect(stashes.isEmpty, "Pop should delete stash")
     }
 
-    @Test func testStashCommitStructure() async throws {
+    @Test func testDropStash() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
         let repository = GitRepository(url: repoURL)
-        let stashes = try await repository.getStashes()
 
-        guard let firstStash = stashes.first else {
-            return
-        }
+        // Setup and create stash
+        try createTestFile(in: repoURL, named: "file.txt", content: "Initial")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial")
 
-        let commit = try await repository.getCommit(firstStash.id)
+        try createTestFile(in: repoURL, named: "file.txt", content: "Modified")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.stashPush(message: "Test stash")
 
-        guard let commit = commit else {
-            Issue.record("Could not load stash commit")
-            return
-        }
+        // Verify stash exists
+        let before = try await repository.getStashes()
+        #expect(before.count == 1)
 
-        // Stash commits typically have 2-3 parents:
-        // parent[0] = base commit
-        // parent[1] = index state
-        // parent[2] = untracked files (optional)
-        #expect(commit.parents.count >= 1)
-        #expect(commit.parents.count <= 3)
-    }
+        // Drop stash
+        try await repository.stashDrop(index: 0)
 
-    // MARK: - Stash Changes Tests
-
-    @Test func testGetStashChanges() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        let stashes = try await repository.getStashes()
-
-        guard let firstStash = stashes.first else {
-            return
-        }
-
-        // Should be able to get changes
-        let changes = try await repository.getChangedFiles(firstStash.id)
-
-        // Stash should have at least some changes
-        #expect(changes.count > 0, "Stash should contain changes")
-
-        // Verify change structure
-        for (path, file) in changes {
-            #expect(!path.isEmpty)
-        }
-    }
-
-    // MARK: - Empty Stash Tests
-
-    @Test func testEmptyStashLog() async throws {
-        // Create temp repo without stashes
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-
-        try FileManager.default.createDirectory(at: tempURL, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: tempURL.appendingPathComponent(".git/logs/refs"),
-            withIntermediateDirectories: true
-        )
-
-        defer {
-            try? FileManager.default.removeItem(at: tempURL)
-        }
-
-        let repository = GitRepository(url: tempURL)
-        let stashes = try await repository.getStashes()
-
-        #expect(stashes.isEmpty)
-    }
-
-    // MARK: - Date Parsing Tests
-
-    @Test func testStashDateParsing() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-        let stashes = try await repository.getStashes()
-
-        guard let firstStash = stashes.first else {
-            return
-        }
-
-        // Date should be reasonable (not epoch, not far future)
-        let now = Date()
-        let tenYearsAgo = now.addingTimeInterval(-1 * 365 * 24 * 60 * 60)
-
-        #expect(firstStash.date > tenYearsAgo, "Stash date too old")
-        #expect(firstStash.date < now.addingTimeInterval(60), "Stash date in future")
+        // Verify stash is gone
+        let after = try await repository.getStashes()
+        #expect(after.isEmpty, "Stash should be deleted")
     }
 }

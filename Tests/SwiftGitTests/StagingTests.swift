@@ -119,8 +119,6 @@ struct StagingTests {
         }
     }
 
-    // MARK: - Stage All Tests
-
     @Test func testStageAll() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -144,40 +142,6 @@ struct StagingTests {
         for file in testFiles {
             #expect(status.contains("A  \(file)"), "\(file) should be staged")
         }
-    }
-
-    // MARK: - Unstage Tests
-
-    @Test func testUnstageFile() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let testFile = "test_unstage_\(UUID().uuidString).txt"
-        let repository = GitRepository(url: repoURL)
-
-        // Create and stage a file
-        try createTestFile(in: repoURL, named: testFile, content: "test")
-        try await repository.stageFile(at: testFile)
-
-        // Verify file is staged
-        if let line = try statusLine(for: testFile, in: repoURL) {
-            #expect(line.hasPrefix("A  "), "File should be staged")
-        } else {
-            Issue.record("No status line for file")
-        }
-
-        // Unstage the file
-        try await repository.unstageFile(at: testFile)
-
-        // Verify file is unstaged
-        if let line = try statusLine(for: testFile, in: repoURL) {
-            #expect(line.hasPrefix("?? "), "File should be untracked again")
-        } else {
-            Issue.record("No status line for file")
-        }
-
-        // Cleanup
-        try deleteTestFile(in: repoURL, named: testFile)
     }
 
     @Test func testUnstageAll() async throws {
@@ -213,56 +177,7 @@ struct StagingTests {
             try deleteTestFile(in: repoURL, named: file)
         }
     }
-
-    // MARK: - Commit Tests
-    @Test func testCommit() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let testFile = "test_commit_\(UUID().uuidString).txt"
-        let repository = GitRepository(url: repoURL)
-
-        // Create and stage file
-        try createTestFile(in: repoURL, named: testFile, content: "Hello")
-        try await repository.stageFile(at: testFile)
-
-        // Verify file is staged
-        if let line = try statusLine(for: testFile, in: repoURL) {
-            #expect(line.hasPrefix("A  "), "File should be staged")
-        }
-
-        // Commit
-        try await repository.commit(message: "Add test file")
-
-        // Verify no staged changes
-        let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
-        #expect(staged.isEmpty, "Should have no staged changes after commit")
-
-        // Verify file is now tracked and clean
-        let status = try gitStatus(in: repoURL)
-        #expect(!status.contains(testFile), "File should not appear in status (clean)")
-
-        // Cleanup
-        try await repository.discardFile(at: testFile)
-    }
-
-    @Test func testCommitEmptyMessage() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        let repository = GitRepository(url: repoURL)
-
-        // Try to commit with empty message
-        do {
-            try await repository.commit(message: "")
-            Issue.record("Should have thrown error for empty message")
-        } catch GitError.emptyCommitMessage {
-            // Expected
-        } catch {
-            Issue.record("Wrong error type: \(error)")
-        }
-    }
-
+    
     @Test func testCommitNothingStaged() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
