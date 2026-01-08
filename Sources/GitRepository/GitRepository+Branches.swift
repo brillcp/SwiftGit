@@ -10,7 +10,7 @@ extension GitRepository: BranchReadable {
             remote: allRefs.filter { $0.type == .remoteBranch },
             current: try await refReader.getHEADBranch()
         )
-    }    
+    }
 }
 
 // MARK: - BranchManageable

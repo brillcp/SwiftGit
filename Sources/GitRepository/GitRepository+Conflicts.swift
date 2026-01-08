@@ -35,7 +35,7 @@ extension GitRepository: ConflictManageable {
     }
 
     /// Abort current operation (merge/cherry-pick/revert)
-    public func abortOperation() async throws {        
+    public func abortOperation() async throws {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             try await commandRunner.run(.mergeAbort, stdin: nil, in: url)
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {

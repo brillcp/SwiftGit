@@ -306,7 +306,7 @@ struct StagingTests {
 }
 
 // MARK: - Test Helpers
-private extension StagingTests {    
+private extension StagingTests {
     func modifyTestFile(in repoURL: URL, named: String) throws {
         let fileURL = repoURL.appendingPathComponent(named)
         let content = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
