@@ -22,50 +22,34 @@ extension GitRepository: DiffReadable {
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard workingFile.unstaged != nil else { return [] }
 
-        let snapshot = try await getRepoSnapshot()
-
-        let resolver = WorkingTreeDiffResolver(
-            repoURL: url,
-            blobLoader: self
+        let result = try await commandRunner.run(
+            .diff(path: workingFile.path, staged: false),
+            stdin: nil
         )
 
-        let diffPair = try await resolver.resolveDiff(
-            for: workingFile,
-            headTree: snapshot.headTree,
-            indexMap: snapshot.indexMap
-        )
+        guard result.exitCode == 0 else {
+            throw GitError.diffFailed
+        }
 
-        return try await diffGenerator.generateHunks(
-            oldContent: diffPair.old?.text ?? "",
-            newContent: diffPair.new?.text ?? ""
-        )
+        let hunks = await diffParser.parse(result.stdout)
+        return await diffParser.enhanceWithWordDiff(hunks)
     }
 
     /// Get diff for staged changes (index vs HEAD)
     public func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
-        let snapshot = try await getRepoSnapshot()
+        guard workingFile.staged != nil else { return [] }
 
-        // Get HEAD version
-        let headContent: String
-        if let headBlobHash = snapshot.headTree[workingFile.path] {
-            headContent = try await getBlob(headBlobHash)?.text ?? ""
-        } else {
-            headContent = ""
-        }
-
-        // Get index version
-        let indexContent: String
-        if let indexEntry = snapshot.indexMap[workingFile.path] {
-            indexContent = try await getBlob(indexEntry)?.text ?? ""
-        } else {
-            indexContent = ""
-        }
-
-        // Diff: HEAD → index (what's staged)
-        return try await diffGenerator.generateHunks(
-            oldContent: headContent,
-            newContent: indexContent
+        let result = try await commandRunner.run(
+            .diff(path: workingFile.path, staged: true),
+            stdin: nil
         )
+
+        guard result.exitCode == 0 else {
+            throw GitError.diffFailed
+        }
+
+        let hunks = await diffParser.parse(result.stdout)
+        return await diffParser.enhanceWithWordDiff(hunks)
     }
 }
 

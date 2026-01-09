@@ -4,6 +4,127 @@ import Foundation
 
 @Suite("Hunk Staging Tests")
 struct HunkStagingTests {
+    @Test func testHunkHeadersMatchGit() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.swift"
+
+        // Create initial content
+        let initial = """
+        struct Foo {
+            let text = "Hello, Swift!"
+        }
+
+        // Testing and stuff
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and 💫…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+
+        struct Bar {
+            let name: String
+            let value: Double
+        }
+
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+
+        struct Fiz {
+            let date: Date
+        }
+        """
+
+        try createTestFile(in: repoURL, named: testFile, content: initial)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Modify to match your screenshot
+        let modified = """
+        struct Foo {
+            let text = "Hello, Swift"
+        }
+
+        // Testing and stuff
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and 💫…
+        // Testing and stuff…
+        // Testing & stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+        // Testing and stuff…
+
+        struct Bar {
+            let name: String
+            let value: Double
+        }
+
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+        // More comments…
+
+        struct Fiz {
+            let date: Date
+        }
+        """
+
+        try createTestFile(in: repoURL, named: testFile, content: modified)
+
+        // Get YOUR hunks
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let yourHunks = try await repository.getFileDiff(for: file)
+
+        // Get GIT's hunks
+        let gitDiff = try gitDiffOutput(in: repoURL, file: testFile)
+
+        print("\n=== YOUR HUNKS ===")
+        for (i, hunk) in yourHunks.enumerated() {
+            print("\nHunk \(i + 1):")
+            print(hunk.header)
+            print("Lines: \(hunk.lines.count)")
+        }
+
+        print("\n=== GIT'S HUNKS ===")
+        print(gitDiff)
+    }
+
     @Test func testHunkHeaderCounting() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -259,4 +380,16 @@ struct HunkStagingTests {
         #expect(filePartial?.staged != nil, "Should still have staged changes")
         #expect(filePartial?.unstaged != nil, "Should have unstaged changes")
     }
+}
+
+func gitDiffOutput(in repoURL: URL, file: String) throws -> String {
+    let process = Process ()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = ["-C", repoURL.path, "diff", file]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.launch()
+    process.waitUntilExit()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8) ?? ""
 }

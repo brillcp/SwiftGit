@@ -48,6 +48,7 @@ public enum GitError: LocalizedError {
 
     // MARK: - Conflict Detection
     case conflictDetected
+    case diffFailed
 
     public var errorDescription: String? {
         switch self {
@@ -130,6 +131,8 @@ public enum GitError: LocalizedError {
         // MARK: - Conflict Detection
         case .conflictDetected:
             return "Merge conflicts detected. Resolve them before continuing."
+        case .diffFailed:
+            return "Failed to get file diff. Please try again."
         }
     }
 }

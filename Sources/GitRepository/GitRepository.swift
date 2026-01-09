@@ -17,6 +17,7 @@ public actor GitRepository: GitRepositoryProtocol {
     let refReader: RefReaderProtocol
     let cache: ObjectCacheProtocol
     let fileManager: FileManager
+    let diffParser: GitDiffParser
 
     var gitURL: URL {
         url.appendingPathComponent(GitPath.git.rawValue)
@@ -37,6 +38,7 @@ public actor GitRepository: GitRepositoryProtocol {
         self.packReader = PackFileReader()
         self.diffCalculator = DiffCalculator()
         self.diffGenerator = DiffGenerator()
+        self.diffParser = GitDiffParser()
         self.refReader = RefReader(
             repoURL: url,
             cache: cache
