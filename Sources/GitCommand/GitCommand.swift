@@ -22,6 +22,7 @@ public enum GitCommand: Sendable {
     case mergeAbort
     case cherryPickAbort
     case revertAbort
+    case diff(path: String, staged: Bool)
 }
 
 extension GitCommand {
@@ -108,6 +109,12 @@ extension GitCommand {
             return ["cherry-pick", "--abort"]
         case .revertAbort:
             return ["revert", "--abort"]
+        case .diff(let path, let staged):
+            if staged {
+                return ["diff", "--cached", path]
+            } else {
+                return ["diff", path]
+            }
         }
     }
 }
