@@ -42,20 +42,15 @@ extension GitRepository: StagingManageable {
     }
 
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
-        // Check if file is in index
-        let snapshot = try await workingTree.indexSnapshot()
-        let entries = snapshot.entries
-        let fileInIndex = entries.contains { $0.path == file.path }
-
-        if !fileInIndex {
-            throw GitError.fileNotInIndex(path: file.path)
-        }
+        try await checkIndex(for: file)
 
         if file.unstaged == .untracked {
             throw GitError.cannotStageHunkFromUntrackedFile
         }
 
         // Save old blob SHA BEFORE staging
+        let snapshot = try await workingTree.indexSnapshot()
+        let entries = snapshot.entries
         let oldBlobSha = entries.first(where: { $0.path == file.path })?.sha1
 
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
@@ -77,14 +72,7 @@ extension GitRepository: StagingManageable {
     }
 
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
-        // Validation
-        let snapshot = try await workingTree.indexSnapshot()
-        let entries = snapshot.entries
-        let fileInIndex = entries.contains { $0.path == file.path }
-
-        if !fileInIndex {
-            throw GitError.fileNotInIndex(path: file.path)
-        }
+        try await checkIndex(for: file)
 
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
 
@@ -105,6 +93,16 @@ extension GitRepository: StagingManageable {
 
 // MARK: - Private helper
 private extension GitRepository {
+    func checkIndex(for file: WorkingTreeFile) async throws {
+        let snapshot = try await workingTree.indexSnapshot()
+        let entries = snapshot.entries
+        let fileInIndex = entries.contains { $0.path == file.path }
+
+        if !fileInIndex {
+            throw GitError.fileNotInIndex(path: file.path)
+        }
+    }
+
     func cleanupTrailingNewlineChange(for path: String) async throws {
         let snapshot = try await getRepoSnapshot()
 
