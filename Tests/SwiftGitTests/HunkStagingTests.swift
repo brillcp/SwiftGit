@@ -281,6 +281,45 @@ struct HunkStagingTests {
         try await repository.discardFile(at: testFile)
     }
 
+    @Test func testDiscardHunkWithTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITHOUT trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Add trailing newline
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        // Get hunks
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let hunks = try await repository.getFileDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunk for trailing newline")
+
+        // Discard the hunk
+        try await repository.discardHunk(hunks[0], in: file)
+
+        // Verify newline is gone
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(!content.hasSuffix("\n"), "Trailing newline should be removed")
+
+        // Verify no more changes
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        #expect(statusAfter.files[testFile] == nil, "File should be clean")
+    }
+
     @Test func testUnstageMultipleHunks() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

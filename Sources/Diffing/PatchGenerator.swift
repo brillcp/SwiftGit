@@ -95,31 +95,40 @@ extension PatchGenerator {
         patch += makeHeader(for: file)
         patch += reverseHunkHeader(hunk.header) + String.newLine
 
-        for (index, line) in hunk.lines.enumerated() {
-            let lineText = line.segments.map { $0.text }.joined()
-            let isLastLine = (index == hunk.lines.count - 1)
+        let reversedHasNoNewline = hunk.hasNoNewlineAtEnd
 
-            switch line.type {
-            case .added:  // Swap: becomes removed
-                patch += "-\(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
-            case .removed:  // Swap: becomes added
-                patch += "+\(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
-            case .unchanged:
-                patch += " \(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
+        // Find last result line
+        var lastResultLineIndex = -1
+        for (index, line) in hunk.lines.enumerated() {
+            if line.type == .unchanged || line.type == .removed {
+                lastResultLineIndex = index
             }
         }
 
-        if hunk.hasNoNewlineAtEnd {
-            patch += String.noNewLineAtEnd
+        // Process in order: unchanged, then added→removed, then removed→added
+        for line in hunk.lines where line.type == .unchanged {
+            let lineText = line.segments.map { $0.text }.joined()
+            patch += " \(lineText)\(String.newLine)"
+        }
+
+        for line in hunk.lines where line.type == .added {
+            let lineText = line.segments.map { $0.text }.joined()
+            patch += "-\(lineText)\(String.newLine)"
+        }
+
+        for (index, line) in hunk.lines.enumerated() where line.type == .removed {
+            let lineText = line.segments.map { $0.text }.joined()
+            let isLastResultLine = (index == lastResultLineIndex)
+
+            patch += "+\(lineText)"
+
+            if !isLastResultLine || !reversedHasNoNewline {
+                patch += String.newLine
+            }
+
+            if isLastResultLine && reversedHasNoNewline {
+                patch += String.noNewLineAtEnd
+            }
         }
 
         return patch
