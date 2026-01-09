@@ -3,7 +3,7 @@ import Foundation
 public struct GitIndexSnapshot: Sendable {
     public let entries: [IndexEntry]
     public let entriesByPath: [String: IndexEntry]
-    public let conflictedPaths: [String]
+    public let conflictedPaths: Set<String>
     public let version: Int
     public let entryCount: Int
 
@@ -29,10 +29,6 @@ public struct GitIndexSnapshot: Sendable {
         }
 
         self.entriesByPath = tempDict
-        self.conflictedPaths = Array(conflicts).sorted()
-    }
-
-    public subscript(path: String) -> IndexEntry? {
-        entriesByPath[path]
+        self.conflictedPaths = conflicts
     }
 }

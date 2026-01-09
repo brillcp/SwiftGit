@@ -7,9 +7,6 @@ public protocol WorkingTreeReaderProtocol: Actor {
     /// Compute the current working tree status
     func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus
 
-    /// Get untracked files
-    func untrackedFiles() async throws -> [String]
-
     /// Invalidate index cache
     func invalidateIndexCache() async
 }
@@ -50,28 +47,12 @@ extension WorkingTreeReader: WorkingTreeReaderProtocol {
 
         workingComplete.merge(untracked) { _, new in new }
 
-        var status = compareStates(
+        return compareStates(
             headTree: snapshot.headTree,
             index: snapshot.indexMap,
-            workingTree: workingComplete
+            workingTree: workingComplete,
+            conflictedPaths: snapshot.conflictedPaths
         )
-
-        // Mark conflicted files (now available from snapshot)
-        for path in snapshot.conflictedPaths {
-            status.files[path] = WorkingTreeFile(
-                path: path,
-                staged: .conflicted,
-                unstaged: .conflicted
-            )
-        }
-
-        return status
-    }
-
-    public func untrackedFiles() async throws -> [String] {
-        let indexEntries = try await indexSnapshot()
-        let untracked = try await scanForUntrackedFiles(indexEntries: indexEntries.entries)
-        return Array(untracked.keys)
     }
 
     public func invalidateIndexCache() async {
@@ -257,7 +238,8 @@ private extension WorkingTreeReader {
     func compareStates(
         headTree: [String: String],
         index: [String: String],
-        workingTree: [String: String]
+        workingTree: [String: String],
+        conflictedPaths: Set<String>
     ) -> WorkingTreeStatus {
         var files: [String: WorkingTreeFile] = [:]
         let allPaths = Set(headTree.keys).union(index.keys).union(workingTree.keys)
@@ -305,6 +287,15 @@ private extension WorkingTreeReader {
                     unstaged: unstaged
                 )
             }
+        }
+
+        // Mark conflicted files
+        for path in conflictedPaths {
+            files[path] = WorkingTreeFile(
+                path: path,
+                staged: .conflicted,
+                unstaged: .conflicted
+            )
         }
 
         return WorkingTreeStatus(files: files)

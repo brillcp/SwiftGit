@@ -5,7 +5,7 @@ public protocol ConflictManageable: Actor {
     func hasConflicts() async throws -> Bool
 
     /// Get list of conflicted file paths
-    func getConflictedFiles() async throws -> [String]
+    func getConflictedFiles() async throws -> Set<String>
 
     /// Get the type of operation causing conflicts (merge, cherry-pick, revert)
     func conflictOperation() async -> ConflictOperation?

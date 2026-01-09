@@ -16,7 +16,7 @@ extension GitRepository: ConflictManageable {
     }
 
     /// Get list of conflicted file paths
-    public func getConflictedFiles() async throws -> [String] {
+    public func getConflictedFiles() async throws -> Set<String> {
         try await getRepoSnapshot().conflictedPaths
     }
 

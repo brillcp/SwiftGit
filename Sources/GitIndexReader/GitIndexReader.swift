@@ -3,9 +3,6 @@ import Foundation
 public protocol GitIndexReaderProtocol: Actor {
     /// Read the Git index file
     func readIndex(at url: URL) async throws -> GitIndexSnapshot
-
-    /// Get a specific index entry by path (O(1) lookup)
-    func getEntry(for path: String, at url: URL) async throws -> IndexEntry?
 }
 
 // MARK: -
@@ -50,11 +47,6 @@ extension GitIndexReader: GitIndexReaderProtocol {
         await cache.set(.indexSnapshot(url: url), value: (snapshot: snapshot, modDate: modDate))
 
         return snapshot
-    }
-
-    public func getEntry(for path: String, at url: URL) async throws -> IndexEntry? {
-        let snapshot = try await readIndex(at: url)
-        return snapshot[path]
     }
 }
 

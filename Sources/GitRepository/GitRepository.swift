@@ -95,7 +95,7 @@ public struct RepoSnapshot: Sendable {
         indexSnapshot.entriesByPath.mapValues(\.sha1)
     }
 
-    var conflictedPaths: [String] {
+    var conflictedPaths: Set<String> {
         indexSnapshot.conflictedPaths
     }
 }
