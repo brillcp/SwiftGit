@@ -13,4 +13,6 @@ extension String {
     }
 
     public static let newLine: String = "\n"
+    public static let noNewLine: String = "\\ No newline at end of file"
+    public static let noNewLineAtEnd: String = "\(newLine)\(noNewLine)\(newLine)"
 }

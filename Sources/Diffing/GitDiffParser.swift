@@ -14,7 +14,7 @@ extension GitDiffParser {
         var lineId = 0
         var hunkId = 0
 
-        let lines = diffOutput.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = diffOutput.split(separator: String.newLine, omittingEmptySubsequences: false)
 
         for line in lines {
             let lineStr = String(line)
@@ -54,7 +54,7 @@ extension GitDiffParser {
             }
 
             // No newline marker
-            if lineStr.hasPrefix("\\ No newline at end of file") {
+            if lineStr.hasPrefix(String.noNewLine) {
                 if currentHunk != nil {
                     currentHunk = DiffHunk(
                         id: currentHunk!.id,
@@ -67,7 +67,7 @@ extension GitDiffParser {
             }
 
             // Parse diff line
-            guard currentHunk != nil else { continue }
+            guard !lineStr.isEmpty, currentHunk != nil else { continue }
 
             let type: DiffLine.LineType
             let content: String
@@ -82,9 +82,10 @@ extension GitDiffParser {
                 type = .unchanged
                 content = String(lineStr.dropFirst())
             } else {
-                // Empty line or continuation
-                type = .unchanged
-                content = lineStr
+                continue
+//                // Empty line or continuation
+//                type = .unchanged
+//                content = lineStr
             }
 
             // Create DiffLine with single segment (no word-diff yet)
@@ -112,10 +113,13 @@ extension GitDiffParser {
             ))
         }
 
-        return hunks
+        return enhanceWithWordDiff(hunks)
     }
+}
 
-    public func enhanceWithWordDiff(_ hunks: [DiffHunk]) -> [DiffHunk] {
+// MARK: - Private functions
+private extension GitDiffParser {
+    func enhanceWithWordDiff(_ hunks: [DiffHunk]) -> [DiffHunk] {
         var enhanced: [DiffHunk] = []
 
         for hunk in hunks {
@@ -138,24 +142,29 @@ extension GitDiffParser {
                     let oldText = removedLine.segments.map { $0.text }.joined()
                     let newText = addedLine.segments.map { $0.text }.joined()
 
-                    let enhancedRemoved = applyWordDiff(
-                        oldText: oldText,
-                        newText: newText,
-                        forOld: true,
-                        lineId: removedLine.id,
-                        type: .removed
+                    let oldSegments = wordDiff(
+                        old: Substring(oldText),
+                        new: Substring(newText),
+                        forOld: true
                     )
 
-                    let enhancedAdded = applyWordDiff(
-                        oldText: oldText,
-                        newText: newText,
-                        forOld: false,
-                        lineId: addedLine.id,
-                        type: .added
+                    let newSegments = wordDiff(
+                        old: Substring(oldText),
+                        new: Substring(newText),
+                        forOld: false
                     )
 
-                    enhancedLines.append(enhancedRemoved)
-                    enhancedLines.append(enhancedAdded)
+                    enhancedLines.append(DiffLine(
+                        id: removedLine.id,
+                        type: .removed,
+                        segments: oldSegments
+                    ))
+
+                    enhancedLines.append(DiffLine(
+                        id: addedLine.id,
+                        type: .added,
+                        segments: newSegments
+                    ))
                     i += 2
                 } else {
                     // Keep unchanged or solo added/removed lines as-is
@@ -174,27 +183,21 @@ extension GitDiffParser {
 
         return enhanced
     }
-}
 
-// MARK: - Private functions
-private extension GitDiffParser {
-    func applyWordDiff(
-        oldText: String,
-        newText: String,
-        forOld: Bool,
-        lineId: Int,
-        type: DiffLine.LineType
-    ) -> DiffLine {
-        // Extract leading whitespace
-        let leading = oldText.prefix(while: { $0.isWhitespace })
-        let oldContent = oldText.drop(while: { $0.isWhitespace })
-        let newContent = newText.drop(while: { $0.isWhitespace })
+    func wordDiff(old: Substring, new: Substring, forOld: Bool) -> [Segment] {
+        // Extract and preserve leading whitespace
+        let oldLeading = old.prefix(while: { $0.isWhitespace })
+        let newLeading = new.prefix(while: { $0.isWhitespace })
 
-        // Split into words
+        // Get content after leading whitespace
+        let oldContent = old.drop(while: { $0.isWhitespace })
+        let newContent = new.drop(while: { $0.isWhitespace })
+
+        // Split content into words (now safe to split on whitespace)
         let oldWords = oldContent.split(whereSeparator: { $0.isWhitespace })
         let newWords = newContent.split(whereSeparator: { $0.isWhitespace })
 
-        // Use Swift's difference
+        // Use Myers' algorithm for word diff
         let difference = Array(newWords).difference(from: Array(oldWords))
 
         var segments: [Segment] = []
@@ -213,17 +216,18 @@ private extension GitDiffParser {
             }
         }
 
-        // Add leading whitespace
-        if !leading.isEmpty {
+        // Add leading whitespace as first segment (not highlighted)
+        let leadingSpace = forOld ? String(oldLeading) : String(newLeading)
+        if !leadingSpace.isEmpty {
             segments.append(Segment(
                 id: segmentId,
-                text: String(leading),
+                text: leadingSpace,
                 isHighlighted: false
             ))
             segmentId += 1
         }
 
-        // Generate segments
+        // Generate segments based on which version we're building
         if forOld {
             for (index, word) in oldWords.enumerated() {
                 let isHighlighted = removals.contains(index)
@@ -246,9 +250,10 @@ private extension GitDiffParser {
             }
         }
 
-        // Add spaces between words
-        let spacedSegments = segments.enumerated().map { index, segment in
-            if index > 0 && index < segments.count {
+        // Add spaces between words (skip first if it's the leading whitespace)
+        let startIndex = leadingSpace.isEmpty ? 0 : 1
+        return segments.enumerated().map { index, segment in
+            if index >= startIndex && index < segments.count - 1 {
                 return Segment(
                     id: segment.id,
                     text: segment.text + " ",
@@ -257,11 +262,5 @@ private extension GitDiffParser {
             }
             return segment
         }
-
-        return DiffLine(
-            id: lineId,
-            type: type,
-            segments: spacedSegments
-        )
     }
 }

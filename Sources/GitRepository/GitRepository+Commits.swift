@@ -28,21 +28,13 @@ extension GitRepository: CommitReadable {
     public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
         guard let commit = try await getCommit(commitId) else { return [:] }
 
-        let currentTree = try await getTreePaths(commit.tree)
-
-        var parentTree: [String: String]? = nil
-        if let parentId = commit.parents.first,
-           let parentCommit = try await getCommit(parentId) {
-            parentTree = try await getTreePaths(parentCommit.tree)
-        }
-
-        return try await diffCalculator.calculateDiff(
-            currentTree: currentTree,
-            parentTree: parentTree,
-            blobLoader: { [weak self] blobHash in
-                try await self?.getBlob(blobHash)
-            }
+        // Use git diff-tree to get changed files
+        let result = try await commandRunner.run(
+            .diffTree(commitId: commitId),
+            stdin: nil
         )
+
+        return try await parseChangedFiles(result.stdout, commit: commit)
     }
 
     public func getHEAD() async throws -> String? {
@@ -82,6 +74,75 @@ extension GitRepository: CommitWritable {
 
 // MARK: - Private helpers
 private extension GitRepository {
+    func parseChangedFiles(_ output: String, commit: Commit) async throws -> [String: CommitedFile] {
+        var files: [String: CommitedFile] = [:]
+
+        let lines = output.split(separator: "\n")
+
+        for line in lines {
+            // Format: :100644 100644 hash1 hash2 M\tpath
+            // or for renames: :100644 100644 hash1 hash2 R100\told\tnew
+            let parts = line.split(separator: "\t")
+            guard parts.count >= 2 else { continue }
+
+            let statusPart = parts[0].split(separator: " ").last ?? ""
+            let status = String(statusPart)
+
+            if status.hasPrefix("R") {
+                // Rename: old path and new path
+                guard parts.count >= 3 else { continue }
+                let oldPath = String(parts[1])
+                let newPath = String(parts[2])
+
+                // Get new blob
+                let newBlob = try await getBlob(at: newPath, treeHash: commit.tree)
+                if let blob = newBlob {
+                    files[newPath] = CommitedFile(
+                        path: newPath,
+                        blob: blob,
+                        changeType: .renamed(from: oldPath)
+                    )
+                }
+            } else {
+                let path = String(parts[1])
+                let changeType: GitChangeType
+
+                switch status {
+                case "A": changeType = .added
+                case "M": changeType = .modified
+                case "D": changeType = .deleted
+                default: continue
+                }
+
+                // Load blob (nil for deleted files)
+                let blob: Blob?
+                if changeType == .deleted {
+                    // Load from parent tree
+                    if let parentId = commit.parents.first,
+                       let parentCommit = try await getCommit(parentId) {
+                        blob = try await getBlob(at: path, treeHash: parentCommit.tree)
+                    } else {
+                        blob = nil
+                    }
+                } else {
+                    blob = try await getBlob(at: path, treeHash: commit.tree)
+                }
+
+                if let blob = blob {
+                    files[path] = CommitedFile(path: path, blob: blob, changeType: changeType)
+                }
+            }
+        }
+
+        return files
+    }
+
+    func getBlob(at path: String, treeHash: String) async throws -> Blob? {
+        let paths = try await getTreePaths(treeHash)
+        guard let blobHash = paths[path] else { return nil }
+        return try await getBlob(blobHash)
+    }
+
     func streamAllCommits(limit: Int) -> AsyncThrowingStream<Commit, Error> {
         AsyncThrowingStream { continuation in
             Task {

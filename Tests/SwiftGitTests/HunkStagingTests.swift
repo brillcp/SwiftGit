@@ -168,10 +168,25 @@ struct HunkStagingTests {
 
         let hunk = hunks[0]
 
-        // Count lines by type
-        let unchangedCount = hunk.lines.filter { $0.type == .unchanged }.count
-        let addedCount = hunk.lines.filter { $0.type == .added }.count
-        let removedCount = hunk.lines.filter { $0.type == .removed }.count
+        print("\n=== HUNK DEBUG ===")
+        print("Header: \(hunks[0].header)")
+        print("Total lines: \(hunks[0].lines.count)")
+        print("\nLine breakdown:")
+        for (i, line) in hunks[0].lines.enumerated() {
+            let text = line.segments.map { $0.text }.joined()
+            print("\(i). [\(line.type)] \(text)")
+        }
+
+        let unchangedCount = hunks[0].lines.filter { $0.type == .unchanged }.count
+        let removedCount = hunks[0].lines.filter { $0.type == .removed }.count
+        let addedCount = hunks[0].lines.filter { $0.type == .added }.count
+
+        print("\nCounts:")
+        print("Unchanged: \(unchangedCount)")
+        print("Removed: \(removedCount)")
+        print("Added: \(addedCount)")
+        print("Old total (unchanged + removed): \(unchangedCount + removedCount)")
+        print("New total (unchanged + added): \(unchangedCount + addedCount)")
 
         // Parse header
         let pattern = #"@@ -(\d+),(\d+) \+(\d+),(\d+) @@"#

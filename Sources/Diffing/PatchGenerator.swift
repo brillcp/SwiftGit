@@ -37,7 +37,7 @@ extension PatchGenerator {
         }
 
         if hunk.hasNoNewlineAtEnd {
-            patch += "\n\\ No newline at end of file\n"
+            patch += String.noNewLineAtEnd
         }
 
         return patch
@@ -75,7 +75,7 @@ extension PatchGenerator {
             }
 
             if hunk.hasNoNewlineAtEnd {
-                patch += "\n\\ No newline at end of file\n"
+                patch += String.noNewLineAtEnd
             }
         }
 
@@ -119,7 +119,7 @@ extension PatchGenerator {
         }
 
         if hunk.hasNoNewlineAtEnd {
-            patch += "\n\\ No newline at end of file\n"
+            patch += String.noNewLineAtEnd
         }
 
         return patch

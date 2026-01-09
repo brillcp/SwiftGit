@@ -177,7 +177,7 @@ struct StagingTests {
             try deleteTestFile(in: repoURL, named: file)
         }
     }
-    
+
     @Test func testCommitNothingStaged() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

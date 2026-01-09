@@ -9,9 +9,8 @@ public actor GitRepository: GitRepositoryProtocol {
 
     // MARK: - Internal properties
     let protectedBranches = ["main", "master", "develop", "production", "staging"]
-    let diffCalculator: DiffCalculatorProtocol
+//    let diffCalculator: DiffCalculatorProtocol
     let workingTree: WorkingTreeReaderProtocol
-    let diffGenerator: DiffGeneratorProtocol
     let patchGenerator: PatchGenerator
     let commandRunner: GitCommandable
     let refReader: RefReaderProtocol
@@ -36,8 +35,7 @@ public actor GitRepository: GitRepositoryProtocol {
         )
         self.looseParser = LooseObjectParser()
         self.packReader = PackFileReader()
-        self.diffCalculator = DiffCalculator()
-        self.diffGenerator = DiffGenerator()
+//        self.diffCalculator = DiffCalculator()
         self.diffParser = GitDiffParser()
         self.refReader = RefReader(
             repoURL: url,

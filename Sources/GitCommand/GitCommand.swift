@@ -23,6 +23,9 @@ public enum GitCommand: Sendable {
     case cherryPickAbort
     case revertAbort
     case diff(path: String, staged: Bool)
+    case showFile(commitId: String, path: String)
+    case diffCommits(from: String, to: String, path: String)
+    case diffTree(commitId: String)
 }
 
 extension GitCommand {
@@ -115,6 +118,12 @@ extension GitCommand {
             } else {
                 return ["diff", path]
             }
+        case .showFile(let commitId, let path):
+            return ["show", "\(commitId):\(path)"]
+        case .diffCommits(let from, let to, let path):
+            return ["diff", from, to, "--", path]
+        case .diffTree(let commitId):
+            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", commitId]
         }
     }
 }

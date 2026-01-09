@@ -4,19 +4,25 @@ extension GitRepository: DiffReadable {
     public func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk] {
         guard let commit = try await getCommit(commitId) else { return [] }
 
-        let newBlob = try await getBlob(at: path, treeHash: commit.tree)
+        // Need a parent to diff against
+        guard let parentId = commit.parents.first else {
+            // No parent - this is the initial commit
+            // Show the file as entirely added
+            let result = try await commandRunner.run(
+                .showFile(commitId: commitId, path: path),
+                stdin: nil
+            )
 
-        var oldBlob: Blob? = nil
-        if let parentId = commit.parents.first, let parentCommit = try await getCommit(parentId) {
-            oldBlob = try await getBlob(at: path, treeHash: parentCommit.tree)
+            return await diffParser.parse(result.stdout)
         }
 
-        let diffPair = DiffPair(old: oldBlob, new: newBlob)
-
-        return try await diffGenerator.generateHunks(
-            oldContent: diffPair.old?.text ?? "",
-            newContent: diffPair.new?.text ?? ""
+        // Diff this commit against its parent
+        let result = try await commandRunner.run(
+            .diffCommits(from: parentId, to: commitId, path: path),
+            stdin: nil
         )
+
+        return await diffParser.parse(result.stdout)
     }
 
     public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
@@ -32,7 +38,7 @@ extension GitRepository: DiffReadable {
         }
 
         let hunks = await diffParser.parse(result.stdout)
-        return await diffParser.enhanceWithWordDiff(hunks)
+        return hunks
     }
 
     /// Get diff for staged changes (index vs HEAD)
@@ -49,15 +55,6 @@ extension GitRepository: DiffReadable {
         }
 
         let hunks = await diffParser.parse(result.stdout)
-        return await diffParser.enhanceWithWordDiff(hunks)
-    }
-}
-
-// MARK: - Private helpers
-private extension GitRepository {
-    func getBlob(at path: String, treeHash: String) async throws -> Blob? {
-        let paths = try await getTreePaths(treeHash)
-        guard let blobHash = paths[path] else { return nil }
-        return try await getBlob(blobHash)
+        return hunks
     }
 }

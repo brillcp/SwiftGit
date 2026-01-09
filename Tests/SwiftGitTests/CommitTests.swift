@@ -4,6 +4,51 @@ import Foundation
 
 @Suite("Commit Tests")
 struct CommitTests {
+    @Test func testGetCommitFileDiff() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create initial commit
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Modify file and commit
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nModified Line 2\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Modify line 2")
+
+        // Get the commit hash
+        guard let commitHash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+
+        // Get diff for this file in this commit
+        let hunks = try await repository.getFileDiff(for: commitHash, at: testFile)
+
+        // Verify we got hunks
+        #expect(!hunks.isEmpty, "Should have at least one hunk")
+
+        // Verify the diff shows the modification
+        let hunk = hunks[0]
+        let removedLines = hunk.lines.filter { $0.type == .removed }
+        let addedLines = hunk.lines.filter { $0.type == .added }
+
+        #expect(removedLines.count == 1, "Should have one removed line")
+        #expect(addedLines.count == 1, "Should have one added line")
+
+        // Verify content
+        let removedText = removedLines[0].segments.map { $0.text }.joined()
+        let addedText = addedLines[0].segments.map { $0.text }.joined()
+
+        #expect(removedText.contains("Line 2"), "Removed line should contain 'Line 2'")
+        #expect(addedText.contains("Modified"), "Added line should contain 'Modified'")
+    }
+
     @Test func testMultipleLoadAfterCommit() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
