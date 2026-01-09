@@ -66,7 +66,6 @@ struct CommitTests {
         // Load staged multiple times (simulating what your UI does)
         for i in 1...3 {
             let staged = try await repository.getWorkingTreeStatus().files.values.filter(\.isStaged)
-            print("Load \(i): \(staged.count) staged files")
             #expect(staged.isEmpty, "Load \(i) should show no staged files")
         }
 

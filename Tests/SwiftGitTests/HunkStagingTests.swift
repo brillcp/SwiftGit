@@ -56,7 +56,7 @@ struct HunkStagingTests {
         try await repository.stageFile(at: testFile)
         try await repository.commit(message: "Initial")
 
-        // Modify to match your screenshot
+        // Modify content
         let modified = """
         struct Foo {
             let text = "Hello, Swift"
@@ -102,7 +102,7 @@ struct HunkStagingTests {
 
         try createTestFile(in: repoURL, named: testFile, content: modified)
 
-        // Get YOUR hunks
+        // Get hunks
         let status = try await repository.getWorkingTreeStatus()
         guard let file = status.files[testFile] else {
             Issue.record("No file")
@@ -111,18 +111,7 @@ struct HunkStagingTests {
 
         let yourHunks = try await repository.getFileDiff(for: file)
 
-        // Get GIT's hunks
-        let gitDiff = try gitDiffOutput(in: repoURL, file: testFile)
-
-        print("\n=== YOUR HUNKS ===")
-        for (i, hunk) in yourHunks.enumerated() {
-            print("\nHunk \(i + 1):")
-            print(hunk.header)
-            print("Lines: \(hunk.lines.count)")
-        }
-
-        print("\n=== GIT'S HUNKS ===")
-        print(gitDiff)
+        #expect(yourHunks.count == 3, "Should have 3 hunks")
     }
 
     @Test func testHunkHeaderCounting() async throws {
@@ -167,26 +156,9 @@ struct HunkStagingTests {
         #expect(!hunks.isEmpty, "Should have at least one hunk")
 
         let hunk = hunks[0]
-
-        print("\n=== HUNK DEBUG ===")
-        print("Header: \(hunks[0].header)")
-        print("Total lines: \(hunks[0].lines.count)")
-        print("\nLine breakdown:")
-        for (i, line) in hunks[0].lines.enumerated() {
-            let text = line.segments.map { $0.text }.joined()
-            print("\(i). [\(line.type)] \(text)")
-        }
-
         let unchangedCount = hunks[0].lines.filter { $0.type == .unchanged }.count
         let removedCount = hunks[0].lines.filter { $0.type == .removed }.count
         let addedCount = hunks[0].lines.filter { $0.type == .added }.count
-
-        print("\nCounts:")
-        print("Unchanged: \(unchangedCount)")
-        print("Removed: \(removedCount)")
-        print("Added: \(addedCount)")
-        print("Old total (unchanged + removed): \(unchangedCount + removedCount)")
-        print("New total (unchanged + added): \(unchangedCount + addedCount)")
 
         // Parse header
         let pattern = #"@@ -(\d+),(\d+) \+(\d+),(\d+) @@"#
