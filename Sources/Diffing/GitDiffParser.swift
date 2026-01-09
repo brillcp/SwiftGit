@@ -20,16 +20,16 @@ extension GitDiffParser {
             let lineStr = String(line)
 
             // Skip header lines
-            if lineStr.hasPrefix("diff --git") ||
-                lineStr.hasPrefix("index ") ||
-                lineStr.hasPrefix("--- ") ||
-                lineStr.hasPrefix("+++ ") ||
-                lineStr.hasPrefix("Binary files") {
+            if lineStr.hasPrefix(DiffPrefix.diffGit.rawValue) ||
+                lineStr.hasPrefix(DiffPrefix.index.rawValue) ||
+                lineStr.hasPrefix(DiffPrefix.remove.rawValue) ||
+                lineStr.hasPrefix(DiffPrefix.add.rawValue) ||
+                lineStr.hasPrefix(DiffPrefix.binaryFiles.rawValue) {
                 continue
             }
 
             // Hunk header
-            if lineStr.hasPrefix("@@ ") {
+            if lineStr.hasPrefix(DiffPrefix.at.rawValue) {
                 // Save previous hunk if exists
                 if let hunk = currentHunk {
                     hunks.append(DiffHunk(
@@ -41,10 +41,12 @@ extension GitDiffParser {
                     hunkId += 1
                 }
 
+                let cleanHeader = stripContextHint(lineStr)
+
                 // Start new hunk
                 currentHunk = DiffHunk(
                     id: hunkId,
-                    header: lineStr,
+                    header: cleanHeader,
                     lines: [],
                     hasNoNewlineAtEnd: false
                 )
@@ -72,13 +74,13 @@ extension GitDiffParser {
             let type: DiffLine.LineType
             let content: String
 
-            if lineStr.hasPrefix("+") {
+            if lineStr.hasPrefix(DiffPrefix.plus.rawValue) {
                 type = .added
                 content = String(lineStr.dropFirst())
-            } else if lineStr.hasPrefix("-") {
+            } else if lineStr.hasPrefix(DiffPrefix.minus.rawValue) {
                 type = .removed
                 content = String(lineStr.dropFirst())
-            } else if lineStr.hasPrefix(" ") {
+            } else if lineStr.hasPrefix(DiffPrefix.space.rawValue) {
                 type = .unchanged
                 content = String(lineStr.dropFirst())
             } else {
@@ -116,6 +118,27 @@ extension GitDiffParser {
 
 // MARK: - Private functions
 private extension GitDiffParser {
+    enum DiffPrefix: String {
+        case diffGit = "diff --git"
+        case index = "index "
+        case remove = "--- "
+        case add = "+++ "
+        case binaryFiles = "Binary files"
+        case at = "@@ "
+        case plus = "+"
+        case minus = "-"
+        case space = " "
+    }
+
+    func stripContextHint(_ header: String) -> String {
+        // Find the second @@ and cut everything after it
+        guard let range = header.range(of: #"@@.*?@@"#, options: .regularExpression) else {
+            return header
+        }
+
+        return String(header[range]) + " "
+    }
+
     func enhanceWithWordDiff(_ hunks: [DiffHunk]) -> [DiffHunk] {
         var enhanced: [DiffHunk] = []
 
