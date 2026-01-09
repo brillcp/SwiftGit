@@ -83,9 +83,6 @@ extension GitDiffParser {
                 content = String(lineStr.dropFirst())
             } else {
                 continue
-//                // Empty line or continuation
-//                type = .unchanged
-//                content = lineStr
             }
 
             // Create DiffLine with single segment (no word-diff yet)
