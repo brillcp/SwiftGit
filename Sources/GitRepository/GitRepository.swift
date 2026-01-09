@@ -46,7 +46,7 @@ public actor GitRepository: GitRepositoryProtocol {
             indexReader: GitIndexReader(cache: cache),
             cache: cache
         )
-        self.commandRunner = CommandRunner()
+        self.commandRunner = CommandRunner(repoURL: url)
         self.patchGenerator = PatchGenerator()
         self.fileManager = .default
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()

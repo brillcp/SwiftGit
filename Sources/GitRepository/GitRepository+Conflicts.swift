@@ -37,11 +37,11 @@ extension GitRepository: ConflictManageable {
     /// Abort current operation (merge/cherry-pick/revert)
     public func abortOperation() async throws {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
-            try await commandRunner.run(.mergeAbort, stdin: nil, in: url)
+            try await commandRunner.run(.mergeAbort, stdin: nil)
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
-            try await commandRunner.run(.cherryPickAbort, stdin: nil, in: url)
+            try await commandRunner.run(.cherryPickAbort, stdin: nil)
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
-            try await commandRunner.run(.revertAbort, stdin: nil, in: url)
+            try await commandRunner.run(.revertAbort, stdin: nil)
         }
 
         await invalidateAllCaches()

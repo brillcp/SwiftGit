@@ -5,8 +5,7 @@ extension GitRepository: RevertManageable {
     public func revertCommit(_ commitHash: String) async throws {
         let result = try await commandRunner.run(
             .revert(commitHash: commitHash, noCommit: false),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         // Check for conflicts

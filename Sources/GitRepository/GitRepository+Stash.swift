@@ -12,8 +12,7 @@ extension GitRepository: StashManageable {
     public func stashPush(message: String? = nil) async throws {
         let result = try await commandRunner.run(
             .stashPush(message: message),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {
@@ -33,8 +32,7 @@ extension GitRepository: StashManageable {
     public func stashPop(index: Int? = nil) async throws {
         let result = try await commandRunner.run(
             .stashPop(index: index),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {
@@ -50,8 +48,7 @@ extension GitRepository: StashManageable {
     public func stashApply(index: Int? = nil) async throws {
         let result = try await commandRunner.run(
             .stashApply(index: index),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {
@@ -67,8 +64,7 @@ extension GitRepository: StashManageable {
     public func stashDrop(index: Int) async throws {
         let result = try await commandRunner.run(
             .stashDrop(index: index),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {

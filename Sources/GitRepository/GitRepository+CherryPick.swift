@@ -5,8 +5,7 @@ extension GitRepository: CherryPickManageable {
     public func cherryPick(_ commitHash: String) async throws {
         let result = try await commandRunner.run(
             .cherryPick(commitHash: commitHash),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         // Check for conflicts

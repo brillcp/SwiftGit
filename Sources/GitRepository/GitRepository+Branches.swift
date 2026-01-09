@@ -25,8 +25,7 @@ extension GitRepository: BranchManageable {
 
         let result = try await commandRunner.run(
             .checkout(branch: branch, create: createNew),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {
@@ -48,8 +47,7 @@ extension GitRepository: BranchManageable {
 
         let result = try await commandRunner.run(
             .deleteBranch(name: name, force: force),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {

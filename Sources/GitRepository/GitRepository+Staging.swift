@@ -2,7 +2,7 @@ import Foundation
 
 extension GitRepository: StagingManageable {
     public func stageFile(at path: String) async throws {
-        let result = try await commandRunner.run(.add(path: path), stdin: nil, in: url)
+        let result = try await commandRunner.run(.add(path: path), stdin: nil)
 
         guard result.exitCode == 0 else {
             throw GitError.stageFailed(path: path)
@@ -12,7 +12,7 @@ extension GitRepository: StagingManageable {
     }
 
     public func stageAllFiles() async throws {
-        let result = try await commandRunner.run(.addAll, stdin: nil, in: url)
+        let result = try await commandRunner.run(.addAll, stdin: nil)
 
         guard result.exitCode == 0 else {
             throw GitError.stageAllFailed
@@ -22,7 +22,7 @@ extension GitRepository: StagingManageable {
     }
 
     public func unstageFile(at path: String) async throws {
-        let result = try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+        let result = try await commandRunner.run(.reset(path: path), stdin: nil)
 
         guard result.exitCode == 0 else {
             throw GitError.unstageFailed(path: path)
@@ -32,7 +32,7 @@ extension GitRepository: StagingManageable {
     }
 
     public func unstageAllFiles() async throws {
-        let result = try await commandRunner.run(.resetAll, stdin: nil, in: url)
+        let result = try await commandRunner.run(.resetAll, stdin: nil)
 
         guard result.exitCode == 0 else {
             throw GitError.unstageAllFailed
@@ -62,8 +62,7 @@ extension GitRepository: StagingManageable {
 
         let result = try await commandRunner.run(
             .applyPatch(cached: true),
-            stdin: patch,
-            in: url
+            stdin: patch
         )
 
         guard result.exitCode == 0 else {
@@ -91,8 +90,7 @@ extension GitRepository: StagingManageable {
 
         let result = try await commandRunner.run(
             .applyPatch(cached: true),
-            stdin: patch,
-            in: url
+            stdin: patch
         )
 
         guard result.exitCode == 0 else {
@@ -129,7 +127,7 @@ private extension GitRepository {
 
         if headTrimmed == indexTrimmed && headContent != indexContent {
             // Only difference is trailing newlines - unstage it
-            try await commandRunner.run(.reset(path: path), stdin: nil, in: url)
+            try await commandRunner.run(.reset(path: path), stdin: nil)
         }
     }
 }

@@ -10,7 +10,7 @@ extension GitRepository: DiscardManageable {
 
         if isTracked {
             // Tracked file - restore from index/HEAD
-            let result = try await commandRunner.run(.restore(path: path), stdin: nil, in: url)
+            let result = try await commandRunner.run(.restore(path: path), stdin: nil)
 
             guard result.exitCode == 0 else {
                 throw GitError.discardFileFailed(path: path)
@@ -30,8 +30,7 @@ extension GitRepository: DiscardManageable {
 
         let result = try await commandRunner.run(
             .applyPatch(cached: false),
-            stdin: patch,
-            in: url
+            stdin: patch
         )
 
         guard result.exitCode == 0 else {
@@ -41,14 +40,14 @@ extension GitRepository: DiscardManageable {
 
     public func discardAllFiles() async throws {
         // Reset tracked files and staged changes to HEAD
-        let result = try await commandRunner.run(.resetHardHEAD, stdin: nil, in: url)
+        let result = try await commandRunner.run(.resetHardHEAD, stdin: nil)
 
         guard result.exitCode == 0 else {
             throw GitError.discardAllFailed
         }
 
         // Remove untracked files and directories
-        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil, in: url)
+        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
 
         // Invalidate caches after mutations
         await workingTree.invalidateIndexCache()
@@ -57,10 +56,10 @@ extension GitRepository: DiscardManageable {
     /// Discard all unstaged changes and remove all untracked files/directories, preserving staged changes
     public func discardUnstagedAndUntracked() async throws {
         // Revert unstaged changes in tracked files
-        try await commandRunner.run(.restoreAll, stdin: nil, in: url)
+        try await commandRunner.run(.restoreAll, stdin: nil)
 
         // Remove untracked files and directories
-        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil, in: url)
+        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
 
         // Invalidate caches after mutations
         await workingTree.invalidateIndexCache()

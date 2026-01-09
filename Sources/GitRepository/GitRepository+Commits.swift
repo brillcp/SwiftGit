@@ -63,8 +63,7 @@ extension GitRepository: CommitWritable {
 
         let result = try await commandRunner.run(
             .commit(message: message, author: nil),
-            stdin: nil,
-            in: url
+            stdin: nil
         )
 
         guard result.exitCode == 0 else {
