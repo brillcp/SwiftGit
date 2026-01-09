@@ -41,7 +41,7 @@ extension GitRepository: StashManageable {
 
         // Invalidate caches
         await workingTree.invalidateIndexCache()
-        await cache.remove(.refs) // Stash list changed
+        await cache.remove(.refs)
     }
 
     /// Apply stash without removing it
@@ -57,7 +57,6 @@ extension GitRepository: StashManageable {
 
         // Invalidate caches
         await workingTree.invalidateIndexCache()
-        // Note: refs don't change (stash still exists)
     }
 
     /// Delete a stash
