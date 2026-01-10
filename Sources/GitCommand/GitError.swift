@@ -109,6 +109,8 @@ public enum GitError: LocalizedError {
             return "Failed to revert changes."
         case .cleanFailed:
             return "Failed to clean the repository."
+        case .restoreFailed:
+            return "Failed to restore the working directory."
 
         // MARK: - Stash Operations
         case .nothingToStash:
