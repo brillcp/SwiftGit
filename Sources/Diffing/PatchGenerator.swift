@@ -95,8 +95,6 @@ extension PatchGenerator {
         patch += makeHeader(for: file)
         patch += reverseHunkHeader(hunk.header) + String.newLine
 
-        let reversedHasNoNewline = hunk.hasNoNewlineAtEnd
-
         // Find last result line
         var lastResultLineIndex = -1
         for (index, line) in hunk.lines.enumerated() {
@@ -105,29 +103,35 @@ extension PatchGenerator {
             }
         }
 
-        // Process in order: unchanged, then added→removed, then removed→added
-        for line in hunk.lines where line.type == .unchanged {
-            let lineText = line.segments.map { $0.text }.joined()
-            patch += " \(lineText)\(String.newLine)"
-        }
-
-        for line in hunk.lines where line.type == .added {
-            let lineText = line.segments.map { $0.text }.joined()
-            patch += "-\(lineText)\(String.newLine)"
-        }
-
-        for (index, line) in hunk.lines.enumerated() where line.type == .removed {
+        // Process lines IN ORIGINAL ORDER
+        for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
             let isLastResultLine = (index == lastResultLineIndex)
 
-            patch += "+\(lineText)"
+            switch line.type {
+            case .added:  // Becomes removed in reverse
+                patch += "-\(lineText)\(String.newLine)"
 
-            if !isLastResultLine || !reversedHasNoNewline {
-                patch += String.newLine
-            }
+            case .removed:  // Becomes added in reverse
+                patch += "+\(lineText)"
 
-            if isLastResultLine && reversedHasNoNewline {
-                patch += String.noNewLineAtEnd
+                // Handle newline and marker for last result line
+                if isLastResultLine && hunk.hasNoNewlineAtEnd {
+                    // Don't add newline, add marker instead
+                    patch += String.newLine + String.noNewLineAtEnd
+                } else {
+                    patch += String.newLine
+                }
+
+            case .unchanged:
+                patch += " \(lineText)"
+
+                // Handle newline and marker for last result line
+                if isLastResultLine && hunk.hasNoNewlineAtEnd {
+                    patch += String.newLine + String.noNewLineAtEnd
+                } else {
+                    patch += String.newLine
+                }
             }
         }
 
