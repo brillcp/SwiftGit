@@ -53,13 +53,20 @@ extension GitRepository: DiscardManageable {
         await workingTree.invalidateIndexCache()
     }
 
-    /// Discard all unstaged changes and remove all untracked files/directories, preserving staged changes
-    public func discardUnstagedAndUntracked() async throws {
+    public func discardUnstagedChanges() async throws {
         // Revert unstaged changes in tracked files
-        try await commandRunner.run(.restoreAll, stdin: nil)
+        let restore = try await commandRunner.run(.restoreAll, stdin: nil)
+
+        guard restore.exitCode == 0 else {
+            throw GitError.restoreFailed
+        }
 
         // Remove untracked files and directories
-        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
+        let clean = try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
+        
+        guard clean.exitCode == 0 else {
+            throw GitError.cleanFailed
+        }
 
         // Invalidate caches after mutations
         await workingTree.invalidateIndexCache()

@@ -10,4 +10,7 @@ public protocol DiscardManageable: Actor {
 
     /// Discard a specific hunk
     func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
+
+    /// Discard all unstaged changes and remove all untracked files/directories, preserving staged changes
+    func discardUnstagedChanges() async throws
 }
