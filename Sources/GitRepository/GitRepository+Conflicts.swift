@@ -3,12 +3,10 @@ import Foundation
 extension GitRepository: ConflictManageable {
     /// Check if repository is in a conflicted state
     public func hasConflicts() async throws -> Bool {
-        let gitURL = url.appendingPathComponent(".git")
-
         // Check for merge/cherry-pick/revert in progress
-        let mergeHead = gitURL.appendingPathComponent("MERGE_HEAD")
-        let cherryPickHead = gitURL.appendingPathComponent("CHERRY_PICK_HEAD")
-        let revertHead = gitURL.appendingPathComponent("REVERT_HEAD")
+        let mergeHead = gitURL.appendingPathComponent(GitPath.mergeHead.rawValue)
+        let cherryPickHead = gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue)
+        let revertHead = gitURL.appendingPathComponent(GitPath.revertHead.rawValue)
 
         return fileManager.fileExists(atPath: mergeHead.path) ||
                fileManager.fileExists(atPath: cherryPickHead.path) ||

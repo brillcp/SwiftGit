@@ -19,4 +19,16 @@ public enum ConflictOperation: Sendable {
     case merge
     case cherryPick
     case revert
+
+    /// The Git ref file that contains the commit hash for "theirs" side
+    public var refFile: String {
+        switch self {
+        case .merge:
+            "\(GitPath.git.rawValue)/\(GitPath.mergeHead.rawValue)"
+        case .cherryPick:
+            "\(GitPath.git.rawValue)/\(GitPath.cherryPickHead.rawValue)"
+        case .revert:
+            "\(GitPath.git.rawValue)/\(GitPath.revertHead.rawValue)"
+        }
+    }
 }
