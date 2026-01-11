@@ -105,8 +105,6 @@ public enum GitError: LocalizedError {
             return "Failed to discard selected changes in '\(path)'."
         case .discardAllFailed:
             return "Failed to discard changes."
-        case .revertFailed:
-            return "Failed to revert changes."
         case .cleanFailed:
             return "Failed to clean the repository."
         case .restoreFailed:

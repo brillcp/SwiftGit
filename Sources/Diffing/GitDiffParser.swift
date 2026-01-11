@@ -136,7 +136,7 @@ private extension GitDiffParser {
             return header
         }
 
-        return String(header[range]) + " "
+        return String(header[range]) + String.space
     }
 
     func enhanceWithWordDiff(_ hunks: [DiffHunk]) -> [DiffHunk] {
@@ -276,7 +276,7 @@ private extension GitDiffParser {
             if index >= startIndex && index < segments.count - 1 {
                 return Segment(
                     id: segment.id,
-                    text: segment.text + " ",
+                    text: segment.text + String.space,
                     isHighlighted: segment.isHighlighted
                 )
             }

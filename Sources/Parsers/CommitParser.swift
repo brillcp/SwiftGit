@@ -66,6 +66,7 @@ extension CommitParser: CommitParserProtocol {
             title: title,
             body: body,
             author: author,
+            committer: committer,
             parents: parents,
             tree: tree
         )
@@ -83,7 +84,7 @@ private extension String {
 
         let name = raw[..<emailStart].trimmingCharacters(in: .whitespaces)
         let email = raw[raw.index(after: emailStart)..<emailEnd]
-        let remainder = raw[emailEnd...].dropFirst().split(separator: " ")
+        let remainder = raw[emailEnd...].dropFirst().split(separator: String.space)
 
         guard remainder.count >= 2 else { return nil }
 

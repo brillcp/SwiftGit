@@ -2,7 +2,7 @@ import Foundation
 
 extension String {
     public var shortHash: String {
-        String(prefix(6))
+        String(prefix(7))
     }
 
     public var isValidSHA: Bool {
@@ -13,6 +13,8 @@ extension String {
     }
 
     public static let newLine: String = "\n"
+    public static let tab: String = "\t"
+    public static let space: String = " "
     public static let noNewLine: String = "\\ No newline at end of file"
     public static let noNewLineAtEnd: String = "\(newLine)\(noNewLine)\(newLine)"
 }

@@ -77,15 +77,15 @@ private extension GitRepository {
     func parseChangedFiles(_ output: String, commit: Commit) async throws -> [String: CommitedFile] {
         var files: [String: CommitedFile] = [:]
 
-        let lines = output.split(separator: "\n")
+        let lines = output.split(separator: String.newLine)
 
         for line in lines {
             // Format: :100644 100644 hash1 hash2 M\tpath
             // or for renames: :100644 100644 hash1 hash2 R100\told\tnew
-            let parts = line.split(separator: "\t")
+            let parts = line.split(separator: String.tab)
             guard parts.count >= 2 else { continue }
 
-            let statusPart = parts[0].split(separator: " ").last ?? ""
+            let statusPart = parts[0].split(separator: String.space).last ?? ""
             let status = String(statusPart)
 
             if status.hasPrefix("R") {

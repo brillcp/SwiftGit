@@ -147,10 +147,10 @@ extension RefReader: RefReaderProtocol {
         var stashes: [Stash] = []
 
         for (index, line) in lines.enumerated().reversed() {
-            let parts = line.split(separator: "\t", maxSplits: 1)
+            let parts = line.split(separator: String.tab, maxSplits: 1)
             guard parts.count == 2 else { continue }
 
-            let metadata = parts[0].split(separator: " ")
+            let metadata = parts[0].split(separator: String.space)
             guard metadata.count >= 5 else { continue }
 
             let stashHash = String(metadata[1])
@@ -291,7 +291,7 @@ private extension RefReader {
                 continue
             }
 
-            let parts = s.split(separator: " ", maxSplits: 1)
+            let parts = s.split(separator: String.space, maxSplits: 1)
             guard parts.count == 2 else { continue }
 
             let sha = String(parts[0])
@@ -378,7 +378,7 @@ private extension RefReader {
                 continue
             }
 
-            let parts = trimmed.split(separator: " ", maxSplits: 1)
+            let parts = trimmed.split(separator: String.space, maxSplits: 1)
             guard parts.count == 2 else { continue }
 
             let sha = String(parts[0])
