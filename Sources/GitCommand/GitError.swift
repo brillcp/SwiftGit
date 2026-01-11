@@ -51,6 +51,8 @@ public enum GitError: LocalizedError {
     // MARK: - Conflict Detection
     case conflictDetected
     case diffFailed
+    case fileNotFound(path: String, ref: String)
+    case getFileContentFailed(path: String, ref: String)
 
     public var errorDescription: String? {
         switch self {
@@ -139,6 +141,10 @@ public enum GitError: LocalizedError {
             return "Merge conflicts detected. Resolve them before continuing."
         case .diffFailed:
             return "Failed to get file diff. Please try again."
+        case .fileNotFound(let path, let ref):
+            return "File '\(path)' not found at \(ref)"
+        case .getFileContentFailed(let path, let ref):
+            return "Failed to get '\(path)' at \(ref)"
         }
     }
 }

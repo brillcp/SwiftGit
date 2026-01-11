@@ -57,4 +57,20 @@ extension GitRepository: DiffReadable {
         let hunks = await diffParser.parse(result.stdout)
         return hunks
     }
+
+    public func getFileContent(at path: String, ref: String) async throws -> String {
+        let result = try await commandRunner.run(
+            .showFile(commitId: ref, path: path),
+            stdin: nil
+        )
+
+        guard result.exitCode == 0 else {
+            if result.stderr.contains("does not exist") || result.stderr.contains("unknown revision") {
+                throw GitError.fileNotFound(path: path, ref: ref)
+            }
+            throw GitError.getFileContentFailed(path: path, ref: ref)
+        }
+
+        return result.stdout
+    }
 }
