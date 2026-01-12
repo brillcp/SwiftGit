@@ -9,6 +9,7 @@ extension GitRepository: StagingManageable {
         }
 
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.fileStaged(path: path))
     }
 
     public func stageAllFiles() async throws {
@@ -29,6 +30,7 @@ extension GitRepository: StagingManageable {
         }
 
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.fileUnstaged(path: path))
     }
 
     public func unstageAllFiles() async throws {
@@ -49,9 +51,10 @@ extension GitRepository: StagingManageable {
         }
 
         // Save old blob SHA BEFORE staging
+        let path = file.path
         let snapshot = try await workingTree.indexSnapshot()
         let entries = snapshot.entries
-        let oldBlobSha = entries.first(where: { $0.path == file.path })?.sha1
+        let oldBlobSha = entries.first(where: { $0.path == path })?.sha1
 
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
 
@@ -61,7 +64,7 @@ extension GitRepository: StagingManageable {
         )
 
         guard result.exitCode == 0 else {
-            throw GitError.stageHunkFailed(path: file.path)
+            throw GitError.stageHunkFailed(path: path)
         }
 
         await workingTree.invalidateIndexCache()
@@ -69,6 +72,7 @@ extension GitRepository: StagingManageable {
         if let oldBlobSha {
             await cache.remove(.blob(hash: oldBlobSha))
         }
+        eventSubject.send(.hunkStaged(hunk: hunk, path: path))
     }
 
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
@@ -81,13 +85,16 @@ extension GitRepository: StagingManageable {
             stdin: patch
         )
 
+        let path = file.path
+
         guard result.exitCode == 0 else {
-            throw GitError.unstageHunkFailed(path: file.path)
+            throw GitError.unstageHunkFailed(path: path)
         }
 
         await workingTree.invalidateIndexCache()
 
-        try await cleanupTrailingNewlineChange(for: file.path)
+        try await cleanupTrailingNewlineChange(for: path)
+        eventSubject.send(.hunkUnstaged(hunk: hunk, path: path))
     }
 }
 

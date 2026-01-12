@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 public protocol GitRepositoryProtocol:
     CommitReadable,
@@ -20,6 +21,8 @@ public protocol GitRepositoryProtocol:
 {
     /// The URL of the repository
     var url: URL { get }
+
+    var events: AnyPublisher<GitEvent, Never> { get }
 
     /// Initialize a repository at the given URL
     init(url: URL, cache: ObjectCacheProtocol)

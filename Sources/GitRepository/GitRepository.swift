@@ -1,5 +1,5 @@
 import Foundation
-
+import Combine
 public actor GitRepository: GitRepositoryProtocol {
     // MARK: Private properties
     private var securityScopeStarted: Bool = false
@@ -9,6 +9,7 @@ public actor GitRepository: GitRepositoryProtocol {
 
     // MARK: - Internal properties
     let protectedBranches = ["main", "master", "develop", "production", "staging"]
+    let eventSubject = PassthroughSubject<GitEvent, Never>()
     let workingTree: WorkingTreeReaderProtocol
     let patchGenerator: PatchGenerator
     let commandRunner: GitCommandable
@@ -23,6 +24,9 @@ public actor GitRepository: GitRepositoryProtocol {
 
     // MARK: - Public properties
     public let url: URL
+    public var events: AnyPublisher<GitEvent, Never> {
+        eventSubject.eraseToAnyPublisher()
+    }
 
     // MARK: - Init
     public init(url: URL, cache: ObjectCacheProtocol = ObjectCache()) {
@@ -56,6 +60,21 @@ public actor GitRepository: GitRepositoryProtocol {
             url.stopAccessingSecurityScopedResource()
         }
     }
+}
+
+// MARK: - GitEvent
+public enum GitEvent {
+    case fileStaged(path: String)
+    case fileUnstaged(path: String)
+    case fileDiscarded(path: String)
+
+    case hunkStaged(hunk: DiffHunk, path: String)
+    case hunkUnstaged(hunk: DiffHunk, path: String)
+    case hunkDiscarded(hunk: DiffHunk, path: String)
+
+    case committed(hash: String)
+    case branchChanged(name: String)
+    case conflictResolved(path: String)
 }
 
 // MARK: - Repository error

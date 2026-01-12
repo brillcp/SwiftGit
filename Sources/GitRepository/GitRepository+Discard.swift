@@ -23,6 +23,7 @@ extension GitRepository: DiscardManageable {
             try fileManager.removeItem(at: fileURL)
         }
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.fileDiscarded(path: path))
     }
 
     public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
@@ -33,9 +34,11 @@ extension GitRepository: DiscardManageable {
             stdin: patch
         )
 
+        let path = file.path
         guard result.exitCode == 0 else {
-            throw GitError.discardHunkFailed(path: file.path)
+            throw GitError.discardHunkFailed(path: path)
         }
+        eventSubject.send(.hunkDiscarded(hunk: hunk, path: path))
     }
 
     public func discardAllFiles() async throws {
@@ -63,7 +66,7 @@ extension GitRepository: DiscardManageable {
 
         // Remove untracked files and directories
         let clean = try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
-        
+
         guard clean.exitCode == 0 else {
             throw GitError.cleanFailed
         }
