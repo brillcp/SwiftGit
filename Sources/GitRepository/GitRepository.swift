@@ -74,7 +74,14 @@ public enum GitEvent {
 
     case committed(hash: String)
     case branchChanged(name: String)
+    case branchDeleted(name: String)
     case conflictResolved(path: String)
+    case revertedCommit(hash: String)
+
+    case stashed(message: String?)
+    case stashPopped
+    case stashApplied(index: Int)
+    case stashDropped(index: Int)
 }
 
 // MARK: - Repository error

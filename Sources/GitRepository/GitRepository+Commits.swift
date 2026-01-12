@@ -69,6 +69,9 @@ extension GitRepository: CommitWritable {
         }
 
         await invalidateAllCaches()
+
+        let hash = try await getHEAD() ?? ""
+        eventSubject.send(.committed(hash: hash))
     }
 }
 

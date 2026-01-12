@@ -15,7 +15,7 @@ extension GitRepository: BranchReadable {
 
 // MARK: - BranchManageable
 extension GitRepository: BranchManageable {
-    public func checkout(branch: String, createNew: Bool) async throws {
+    public func checkoutBranch(_ name: String, createNew: Bool) async throws {
         if !createNew {
             let status = try await getWorkingTreeStatus()
             guard status.files.isEmpty else {
@@ -24,15 +24,16 @@ extension GitRepository: BranchManageable {
         }
 
         let result = try await commandRunner.run(
-            .checkout(branch: branch, create: createNew),
+            .checkout(branch: name, create: createNew),
             stdin: nil
         )
 
         guard result.exitCode == 0 else {
-            throw GitError.checkoutFailed(branch: branch)
+            throw GitError.checkoutFailed(branch: name)
         }
 
         await invalidateAllCaches()
+        eventSubject.send(.branchChanged(name: name))
     }
 
     public func deleteBranch(_ name: String, force: Bool) async throws {
@@ -55,5 +56,6 @@ extension GitRepository: BranchManageable {
         }
 
         await cache.remove(.refs)
+        eventSubject.send(.branchDeleted(name: name))
     }
 }
