@@ -81,9 +81,9 @@ public enum GitEvent {
     case revertedCommit(hash: String)
 
     case stashed
-    case stashPopped
-    case stashApplied
-    case stashDropped
+    case stashPopped(index: Int)
+    case stashApplied(index: Int)
+    case stashDropped(index: Int)
 }
 
 // MARK: - Repository error
