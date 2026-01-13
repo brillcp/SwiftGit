@@ -58,6 +58,19 @@ extension GitRepository: DiffReadable {
         return hunks
     }
 
+    public func getRawStagedDiff() async throws -> String {
+        let result = try await commandRunner.run(
+            .diff(path: ".", staged: true),
+            stdin: nil
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.diffFailed
+        }
+
+        return result.stdout
+    }
+
     public func getFileContent(at path: String, ref: String) async throws -> String {
         let result = try await commandRunner.run(
             .showFile(commitId: ref, path: path),
