@@ -17,4 +17,8 @@ extension String {
     public static let space: String = " "
     public static let noNewLine: String = "\\ No newline at end of file"
     public static let noNewLineAtEnd: String = "\(newLine)\(noNewLine)\(newLine)"
+
+    public static func stashId(for index: Int = 0) -> String {
+        "stash@{\(index)}"
+    }
 }

@@ -22,8 +22,8 @@ public enum GitCommand: Sendable {
 
     // MARK: - Stash
     case stashPush(message: String?)
-    case stashPop(index: Int?)
-    case stashApply(index: Int?)
+    case stashPop(index: Int)
+    case stashApply(index: Int)
     case stashDrop(index: Int)
 
     // MARK: - History Manipulation
@@ -99,19 +99,11 @@ extension GitCommand {
             }
             return args
         case .stashPop(let index):
-            var args = ["stash", "pop"]
-            if let index = index {
-                args.append("stash@{\(index)}")
-            }
-            return args
+            return ["stash", "pop", String.stashId(for: index)]
         case .stashApply(let index):
-            var args = ["stash", "apply"]
-            if let index = index {
-                args.append("stash@{\(index)}")
-            }
-            return args
+            return ["stash", "apply", String.stashId(for: index)]
         case .stashDrop(let index):
-            return ["stash", "drop", "stash@{\(index)}"]
+            return ["stash", "drop", String.stashId(for: index)]
 
         // MARK: - History Manipulation
         case .cherryPick(let commitHash):
