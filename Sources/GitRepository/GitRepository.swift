@@ -80,10 +80,10 @@ public enum GitEvent {
     case conflictResolved(path: String)
     case revertedCommit(hash: String)
 
-    case stashed
-    case stashPopped(index: Int)
-    case stashApplied(index: Int)
-    case stashDropped(index: Int)
+    case stashed(id: String)
+    case stashApplied
+    case stashPopped(id: String)
+    case stashDropped(id: String)
 }
 
 // MARK: - Repository error

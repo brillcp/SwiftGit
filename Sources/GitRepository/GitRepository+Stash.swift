@@ -26,11 +26,16 @@ extension GitRepository: StashManageable {
 
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs)
-        eventSubject.send(.stashed)
+
+        if let id = try await getStashes().first?.id {
+            eventSubject.send(.stashed(id: id))
+        }
     }
 
     /// Apply and remove most recent stash
     public func stashPop(index: Int) async throws {
+        let stashId = try await getStashes()[index].id
+
         let result = try await commandRunner.run(
             .stashPop(index: index),
             stdin: nil
@@ -40,10 +45,9 @@ extension GitRepository: StashManageable {
             throw GitError.stashPopFailed
         }
 
-        // Invalidate caches
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs)
-        eventSubject.send(.stashPopped(index: index))
+        eventSubject.send(.stashPopped(id: stashId))
     }
 
     /// Apply stash without removing it
@@ -57,13 +61,14 @@ extension GitRepository: StashManageable {
             throw GitError.stashApplyFailed
         }
 
-        // Invalidate caches
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashApplied(index: index))
+        eventSubject.send(.stashApplied)
     }
 
     /// Delete a stash
     public func stashDrop(index: Int) async throws {
+        let stashId = try await getStashes()[index].id
+
         let result = try await commandRunner.run(
             .stashDrop(index: index),
             stdin: nil
@@ -73,8 +78,7 @@ extension GitRepository: StashManageable {
             throw GitError.stashDropFailed
         }
 
-        // Invalidate refs cache (stash list changed)
         await cache.remove(.refs)
-        eventSubject.send(.stashDropped(index: index))
+        eventSubject.send(.stashDropped(id: stashId))
     }
 }
