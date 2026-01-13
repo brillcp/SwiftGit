@@ -11,6 +11,9 @@ public protocol DiffReadable: Actor {
     /// Get diff for staged changes (HEAD → Index)
     func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk]
 
+    /// Get raw file diff for staged changes
+    func getRawStagedDiff() async throws -> String
+
     /// Get file content at a specific ref (commit, branch, or stage number)
     func getFileContent(at path: String, ref: String) async throws -> String
 }
