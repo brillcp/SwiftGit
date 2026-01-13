@@ -15,12 +15,12 @@ extension GitRepository: StashManageable {
             stdin: nil
         )
 
+        let output = result.stderr + result.stdout
+        if output.contains("No local changes") {
+            throw GitError.nothingToStash
+        }
+
         guard result.exitCode == 0 else {
-            // Check if "No local changes to save"
-            let output = result.stderr + result.stdout
-            if output.contains("No local changes") {
-                throw GitError.nothingToStash
-            }
             throw GitError.stashFailed
         }
 
