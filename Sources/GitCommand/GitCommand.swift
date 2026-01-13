@@ -1,6 +1,9 @@
 import Foundation
 
 public enum GitCommand: Sendable {
+    // MARK: - Pushing
+    case push(remote: String?, branch: String?, setUpstream: Bool, force: Bool)
+
     // MARK: - Staging
     case add(path: String)
     case addAll
@@ -46,6 +49,27 @@ public enum GitCommand: Sendable {
 extension GitCommand {
     var arguments: [String] {
         switch self {
+            // MARK: - Pushing
+        case .push(let remote, let branch, let setUpstream, let force):
+            var args = ["push"]
+
+            if force {
+                args.append("--force")
+            }
+
+            if setUpstream {
+                args.append("--set-upstream")
+            }
+
+            if let remote {
+                args.append(remote)
+            }
+
+            if let branch {
+                args.append(branch)
+            }
+
+            return args
         // MARK: - Staging
         case .add(let path):
             return ["add", "--", path]

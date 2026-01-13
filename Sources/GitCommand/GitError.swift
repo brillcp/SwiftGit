@@ -5,6 +5,12 @@ public enum GitError: LocalizedError {
     case gitNotFound
     case notARepository
 
+    // MARK: - Push
+    case pushRejected(reason: String)
+    case noUpstream
+    case authenticationFailed
+    case pushFailed
+
     // MARK: - Commit Operations
     case emptyCommitMessage
     case nothingToCommit
@@ -62,7 +68,17 @@ public enum GitError: LocalizedError {
         case .notARepository:
             return "This folder is not a Git repository."
 
-        // MARK: - Commit Operations
+        // MARK: - Push
+        case .pushRejected(let reason):
+            return "Push rejected: \(reason)"
+        case .noUpstream:
+            return "No upstream branch configured"
+        case .authenticationFailed:
+            return "Authentication failed"
+        case .pushFailed:
+            return "Push failed"
+
+            // MARK: - Commit Operations
         case .emptyCommitMessage:
             return "Commit message cannot be empty."
         case .nothingToCommit:

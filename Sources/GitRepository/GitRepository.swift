@@ -64,6 +64,8 @@ public actor GitRepository: GitRepositoryProtocol {
 
 // MARK: - GitEvent
 public enum GitEvent {
+    case pushed(remote: String, branch: String?)
+
     case fileStaged(path: String)
     case fileUnstaged(path: String)
     case fileDiscarded(path: String)

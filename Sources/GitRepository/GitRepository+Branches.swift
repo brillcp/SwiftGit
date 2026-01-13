@@ -15,6 +15,37 @@ extension GitRepository: BranchReadable {
 
 // MARK: - BranchManageable
 extension GitRepository: BranchManageable {
+    public func push(
+        remote: String? = nil,
+        branch: String? = nil,
+        setUpstream: Bool = false,
+        force: Bool = false
+    ) async throws {
+        let result = try await commandRunner.run(
+            .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force),
+            stdin: nil
+        )
+
+        guard result.exitCode == 0 else {
+            let output = result.stderr + result.stdout
+
+            // Check for common errors
+            if output.contains("failed to push") || output.contains("rejected") {
+                throw GitError.pushRejected(reason: result.stderr)
+            }
+            if output.contains("no upstream") || output.contains("set-upstream") {
+                throw GitError.noUpstream
+            }
+            if output.contains("authentication") || output.contains("denied") {
+                throw GitError.authenticationFailed
+            }
+
+            throw GitError.pushFailed
+        }
+
+        eventSubject.send(.pushed(remote: remote ?? "origin", branch: branch))
+    }
+
     public func checkoutBranch(_ name: String, createNew: Bool) async throws {
         if !createNew {
             let status = try await getWorkingTreeStatus()
