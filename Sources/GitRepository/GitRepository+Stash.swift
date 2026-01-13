@@ -26,7 +26,7 @@ extension GitRepository: StashManageable {
 
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs)
-        eventSubject.send(.stashed(stashId: String.stashId()))
+        eventSubject.send(.stashed)
     }
 
     /// Apply and remove most recent stash
@@ -43,7 +43,7 @@ extension GitRepository: StashManageable {
         // Invalidate caches
         await workingTree.invalidateIndexCache()
         await cache.remove(.refs)
-        eventSubject.send(.stashPopped(stashId: String.stashId(for: index)))
+        eventSubject.send(.stashPopped)
     }
 
     /// Apply stash without removing it
@@ -59,7 +59,7 @@ extension GitRepository: StashManageable {
 
         // Invalidate caches
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashApplied(stashId: String.stashId(for: index)))
+        eventSubject.send(.stashApplied)
     }
 
     /// Delete a stash
@@ -75,6 +75,6 @@ extension GitRepository: StashManageable {
 
         // Invalidate refs cache (stash list changed)
         await cache.remove(.refs)
-        eventSubject.send(.stashDropped(stashId: String.stashId(for: index)))
+        eventSubject.send(.stashDropped)
     }
 }
