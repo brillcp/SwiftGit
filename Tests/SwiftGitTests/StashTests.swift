@@ -118,4 +118,47 @@ struct StashTests {
         let after = try await repository.getStashes()
         #expect(after.isEmpty, "Stash should be deleted")
     }
+
+    @Test func testGetChangedFilesForStash() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Create initial commit
+        try createTestFile(in: repoURL, named: "file1.txt", content: "Content 1")
+        try createTestFile(in: repoURL, named: "file2.txt", content: "Content 2")
+        try await repository.stageAllFiles()
+        try await repository.commit(message: "Initial")
+
+        // Make changes (don't commit)
+        try createTestFile(in: repoURL, named: "file1.txt", content: "Modified")
+        try createTestFile(in: repoURL, named: "file3.txt", content: "New file")
+
+        // Stash the changes
+        try await repository.stashPush(message: "Test stash")
+
+        // Get stashes
+        let stashes = try await repository.getStashes()
+
+        guard let firstStash = stashes.first,
+              let stashCommit = try await repository.getCommit(firstStash.id) else {
+            Issue.record("No stash found")
+            return
+        }
+
+        print("📦 Stash commit: \(stashCommit.id)")
+        print("📦 Parents: \(stashCommit.parents)")
+        print("📦 Message: \(stashCommit.body)")
+
+        // Get changed files from stash
+        let changes = try await repository.getChangedFiles(stashCommit.id)
+
+        print("📦 Changed files: \(changes.keys.sorted())")
+        print("📦 Change count: \(changes.count)")
+
+        #expect(changes.count >= 2, "Stash should show at least 2 changed files")
+        #expect(changes["file1.txt"] != nil, "file1.txt should be in stash")
+        #expect(changes["file3.txt"] != nil, "file3.txt should be in stash")
+    }
 }
