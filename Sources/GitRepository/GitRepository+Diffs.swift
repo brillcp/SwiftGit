@@ -4,10 +4,7 @@ extension GitRepository: DiffReadable {
     public func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk] {
         guard let commit = try await getCommit(commitId) else { return [] }
 
-        // Need a parent to diff against
         guard let parentId = commit.parents.first else {
-            // No parent - this is the initial commit
-            // Show the file as entirely added
             let result = try await commandRunner.run(
                 .showFile(commitId: commitId, path: path),
                 stdin: nil
@@ -16,7 +13,6 @@ extension GitRepository: DiffReadable {
             return await diffParser.parse(result.stdout)
         }
 
-        // Diff this commit against its parent
         let result = try await commandRunner.run(
             .diffCommits(from: parentId, to: commitId, path: path),
             stdin: nil

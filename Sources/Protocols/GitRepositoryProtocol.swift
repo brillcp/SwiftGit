@@ -5,19 +5,20 @@ public protocol GitRepositoryProtocol:
     CommitReadable,
     CommitWritable,
     BranchReadable,
-    BranchManageable,
+    BranchWritable,
     RefReadable,
     DiffReadable,
     WorkingTreeReadable,
-    StagingManageable,
-    DiscardManageable,
+    StagingWritable,
+    DiscardWritable,
     StashReadable,
-    StashManageable,
+    StashWritable,
     ObjectReadable,
-    CacheManageable,
-    CherryPickManageable,
-    RevertManageable,
-    ConflictManageable
+    CacheWritable,
+    CherryPickWritable,
+    RevertWritable,
+    ConflictReadable,
+    ConflictWritable
 {
     /// The URL of the repository
     var url: URL { get }

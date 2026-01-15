@@ -1,9 +1,7 @@
 import Foundation
 
-extension GitRepository: ConflictManageable {
-    /// Check if repository is in a conflicted state
+extension GitRepository: ConflictReadable {
     public func hasConflicts() async throws -> Bool {
-        // Check for merge/cherry-pick/revert in progress
         let mergeHead = gitURL.appendingPathComponent(GitPath.mergeHead.rawValue)
         let cherryPickHead = gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue)
         let revertHead = gitURL.appendingPathComponent(GitPath.revertHead.rawValue)
@@ -13,12 +11,10 @@ extension GitRepository: ConflictManageable {
                fileManager.fileExists(atPath: revertHead.path)
     }
 
-    /// Get list of conflicted file paths
     public func getConflictedFiles() async throws -> Set<String> {
         try await getRepoSnapshot().conflictedPaths
     }
 
-    /// Get the type of operation causing conflicts
     public func conflictOperation() async -> ConflictOperation? {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             return .merge
@@ -31,8 +27,10 @@ extension GitRepository: ConflictManageable {
         }
         return nil
     }
+}
 
-    /// Abort current operation (merge/cherry-pick/revert)
+// MARK: - ConflictWritable
+extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             try await commandRunner.run(.mergeAbort, stdin: nil)

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for staging and unstaging files
-public protocol StagingManageable: Actor {
+public protocol StagingWritable: Actor {
     /// Stage a single file
     func stageFile(at path: String) async throws
 

@@ -1,14 +1,12 @@
 import Foundation
 
-extension GitRepository: CherryPickManageable {
-    /// Apply changes from a commit to the current branch
+extension GitRepository: CherryPickWritable {
     public func cherryPick(_ commitHash: String) async throws {
         let result = try await commandRunner.run(
             .cherryPick(commitHash: commitHash),
             stdin: nil
         )
 
-        // Check for conflicts
         if result.exitCode != 0 {
             let conflict = "conflict"
             if result.stderr.contains(conflict) || result.stderr.contains(conflict.uppercased()) {
@@ -17,7 +15,6 @@ extension GitRepository: CherryPickManageable {
             throw GitError.cherryPickFailed(commit: commitHash)
         }
 
-        // Invalidate caches after successful cherry-pick
         await invalidateAllCaches()
     }
 }

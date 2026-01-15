@@ -7,8 +7,7 @@ extension GitRepository: StashReadable {
 }
 
 // MARK: - StashManageable
-extension GitRepository: StashManageable {
-    /// Save current changes to stash
+extension GitRepository: StashWritable {
     public func stashPush(message: String? = nil) async throws {
         let result = try await commandRunner.run(
             .stashPush(message: message),
@@ -32,7 +31,6 @@ extension GitRepository: StashManageable {
         }
     }
 
-    /// Apply and remove most recent stash
     public func stashPop(index: Int) async throws {
         let stashId = try await getStashes()[index].id
 
@@ -50,7 +48,6 @@ extension GitRepository: StashManageable {
         eventSubject.send(.stashPopped(id: stashId))
     }
 
-    /// Apply stash without removing it
     public func stashApply(index: Int) async throws {
         let result = try await commandRunner.run(
             .stashApply(index: index),
@@ -65,7 +62,6 @@ extension GitRepository: StashManageable {
         eventSubject.send(.stashApplied)
     }
 
-    /// Delete a stash
     public func stashDrop(index: Int) async throws {
         let stashId = try await getStashes()[index].id
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for discarding changes
-public protocol DiscardManageable: Actor {
+public protocol DiscardWritable: Actor {
     /// Discard changes in a single file
     func discardFile(at path: String) async throws
 

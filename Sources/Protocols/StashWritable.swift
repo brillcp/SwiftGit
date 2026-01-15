@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for managing stashes (save, apply, drop)
-public protocol StashManageable: Actor {
+public protocol StashWritable: Actor {
     /// Save current changes to a new stash
     func stashPush(message: String?) async throws
 

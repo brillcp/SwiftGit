@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol ConflictManageable: Actor {
+public protocol ConflictReadable: Actor {
     /// Check if repository is in a conflicted state
     func hasConflicts() async throws -> Bool
 
@@ -9,9 +9,6 @@ public protocol ConflictManageable: Actor {
 
     /// Get the type of operation causing conflicts (merge, cherry-pick, revert)
     func conflictOperation() async -> ConflictOperation?
-
-    /// Abort current merge/cherry-pick/revert operation
-    func abortOperation() async throws
 }
 
 /// Type of Git operation that can result in conflicts

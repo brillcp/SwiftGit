@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for managing branches (checkout, create, delete)
-public protocol BranchManageable: Actor {
+public protocol BranchWritable: Actor {
     /// Push commits to remote
     func push(
         remote: String?,

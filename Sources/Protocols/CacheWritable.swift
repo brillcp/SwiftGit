@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for cache management
-public protocol CacheManageable: Actor {
+public protocol CacheWritable: Actor {
     /// Invalidate all caches
     func invalidateAllCaches() async
 }

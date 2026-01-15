@@ -14,7 +14,7 @@ extension GitRepository: BranchReadable {
 }
 
 // MARK: - BranchManageable
-extension GitRepository: BranchManageable {
+extension GitRepository: BranchWritable {
     public func push(
         remote: String? = nil,
         branch: String? = nil,
@@ -29,7 +29,6 @@ extension GitRepository: BranchManageable {
         guard result.exitCode == 0 else {
             let output = result.stderr + result.stdout
 
-            // Check for common errors
             if output.contains("failed to push") || output.contains("rejected") {
                 throw GitError.pushRejected(reason: result.stderr)
             }
@@ -72,7 +71,6 @@ extension GitRepository: BranchManageable {
             throw GitError.cannotDeleteCurrentBranch
         }
 
-        // Can't delete protected branches
         if protectedBranches.contains(name) {
             throw GitError.cannotDeleteProtectedBranch(name)
         }

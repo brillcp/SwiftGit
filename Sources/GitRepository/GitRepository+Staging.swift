@@ -1,6 +1,6 @@
 import Foundation
 
-extension GitRepository: StagingManageable {
+extension GitRepository: StagingWritable {
     public func stageFile(at path: String) async throws {
         let result = try await commandRunner.run(.add(path: path), stdin: nil)
 
@@ -52,7 +52,6 @@ extension GitRepository: StagingManageable {
             throw GitError.cannotStageHunkFromUntrackedFile
         }
 
-        // Save old blob SHA BEFORE staging
         let path = file.path
         let snapshot = try await workingTree.indexSnapshot()
         let entries = snapshot.entries

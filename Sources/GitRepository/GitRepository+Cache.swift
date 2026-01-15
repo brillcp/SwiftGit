@@ -1,6 +1,6 @@
 import Foundation
 
-extension GitRepository: CacheManageable {
+extension GitRepository: CacheWritable {
     public func invalidateAllCaches() async {
         await workingTree.invalidateIndexCache()
         await cache.remove(.head)

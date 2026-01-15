@@ -2,29 +2,23 @@ import Foundation
 
 extension GitRepository: ObjectReadable {
     public func getTree(_ hash: String) async throws -> Tree? {
-        // Check cache
         if let cached: Tree = await cache.get(.tree(hash: hash)) { return cached }
 
-        // Load from storage
         guard let parsedObject = try await loadObject(hash: hash),
               case .tree(let tree) = parsedObject
         else { return nil }
 
-        // Cache it
         await cache.set(.tree(hash: hash), value: tree)
         return tree
     }
 
     public func getBlob(_ hash: String) async throws -> Blob? {
-        // Check cache (only cache small blobs)
         if let cached: Blob = await cache.get(.blob(hash: hash)) { return cached }
 
-        // Load from storage
         guard let parsedObject = try await loadObject(hash: hash),
               case .blob(let blob) = parsedObject
         else { return nil }
 
-        // Cache only if < 100KB
         if blob.data.count < 100_000 {
             await cache.set(.blob(hash: hash), value: blob)
         }

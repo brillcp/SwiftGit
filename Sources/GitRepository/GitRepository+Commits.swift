@@ -2,15 +2,12 @@ import Foundation
 
 extension GitRepository: CommitReadable {
     public func getCommit(_ hash: String) async throws -> Commit? {
-        // Check cache first
         if let cached: Commit = await cache.get(.commit(hash: hash)) { return cached }
 
-        // Load from storage
         guard let parsedObject = try await loadObject(hash: hash),
               case .commit(let commit) = parsedObject
         else { return nil }
 
-        // Cache it
         await cache.set(.commit(hash: hash), value: commit)
         return commit
     }
@@ -28,7 +25,6 @@ extension GitRepository: CommitReadable {
     public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
         guard let commit = try await getCommit(commitId) else { return [:] }
 
-        // Use git diff-tree to get changed files
         let result = try await commandRunner.run(
             .diffTree(commitId: commitId),
             stdin: nil
@@ -59,7 +55,6 @@ extension GitRepository: CommitWritable {
         )
 
         guard result.exitCode == 0 else {
-            // Check if it's "nothing to commit"
             let output = result.stderr + result.stdout
             if output.contains("nothing to commit") ||
                output.contains("no changes added to commit") {
