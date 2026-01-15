@@ -10,7 +10,8 @@ extension GitRepository: CherryPickManageable {
 
         // Check for conflicts
         if result.exitCode != 0 {
-            if result.stderr.contains("conflict") || result.stderr.contains("CONFLICT") {
+            let conflict = "conflict"
+            if result.stderr.contains(conflict) || result.stderr.contains(conflict.uppercased()) {
                 throw GitError.cherryPickConflict(commit: commitHash)
             }
             throw GitError.cherryPickFailed(commit: commitHash)
