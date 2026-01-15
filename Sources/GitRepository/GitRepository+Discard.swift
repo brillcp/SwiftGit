@@ -54,6 +54,7 @@ extension GitRepository: DiscardManageable {
 
         // Invalidate caches after mutations
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesDiscarded)
     }
 
     public func discardUnstagedChanges() async throws {
@@ -73,5 +74,6 @@ extension GitRepository: DiscardManageable {
 
         // Invalidate caches after mutations
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesDiscarded)
     }
 }

@@ -20,6 +20,7 @@ extension GitRepository: StagingManageable {
         }
 
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesStaged)
     }
 
     public func unstageFile(at path: String) async throws {
@@ -41,6 +42,7 @@ extension GitRepository: StagingManageable {
         }
 
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesUnstaged)
     }
 
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {

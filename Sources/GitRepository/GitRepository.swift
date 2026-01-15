@@ -69,6 +69,9 @@ public enum GitEvent {
     case fileStaged(path: String)
     case fileUnstaged(path: String)
     case fileDiscarded(path: String)
+    case allFilesStaged
+    case allFilesUnstaged
+    case allFilesDiscarded
 
     case hunkStaged(hunk: DiffHunk, path: String)
     case hunkUnstaged(hunk: DiffHunk, path: String)
