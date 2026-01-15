@@ -142,7 +142,7 @@ struct CommitTests {
         }
 
         // Get changed files
-        let changes = try await repository.getChangedFiles(hash)
+        let changes = try await repository.getCommittedFiles(hash)
 
         #expect(changes.count == 2, "Should have 2 changed files")
         #expect(changes["file1.txt"]?.changeType == .modified)

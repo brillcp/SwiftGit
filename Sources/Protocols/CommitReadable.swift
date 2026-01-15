@@ -15,5 +15,8 @@ public protocol CommitReadable: Actor {
     func getHEADBranch() async throws -> String?
 
     /// Get changed files for a commit
-    func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile]
+    func getCommittedFiles(_ commitId: String) async throws -> [String: CommitedFile]
+
+    /// Get changed files for a stash commit
+    func getStashedFiles(_ stashId: String) async throws -> [String: CommitedFile]
 }

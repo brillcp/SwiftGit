@@ -152,7 +152,7 @@ struct StashTests {
         print("📦 Message: \(stashCommit.body)")
 
         // Get changed files from stash
-        let changes = try await repository.getChangedFiles(stashCommit.id)
+        let changes = try await repository.getStashedFiles(stashCommit.id)
 
         print("📦 Changed files: \(changes.keys.sorted())")
         print("📦 Change count: \(changes.count)")

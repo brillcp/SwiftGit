@@ -22,13 +22,28 @@ extension GitRepository: CommitReadable {
         return streamedCommits.sorted { $0.author.timestamp < $1.author.timestamp }
     }
 
-    public func getChangedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
+    public func getCommittedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
         guard let commit = try await getCommit(commitId) else { return [:] }
 
         let result = try await commandRunner.run(
             .diffTree(commitId: commitId),
             stdin: nil
         )
+
+        return try await parseChangedFiles(result.stdout, commit: commit)
+    }
+
+    public func getStashedFiles(_ stashId: String) async throws -> [String: CommitedFile] {
+        let result = try await commandRunner.run(
+            .stashShow(ref: stashId),
+            stdin: nil
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.diffFailed
+        }
+
+        guard let commit = try await getCommit(stashId) else { return [:] }
 
         return try await parseChangedFiles(result.stdout, commit: commit)
     }

@@ -21,7 +21,7 @@ extension GitRepository: DiffReadable {
         return await diffParser.parse(result.stdout)
     }
 
-    public func getFileDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
+    public func getUnstagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard workingFile.unstaged != nil else { return [] }
 
         let result = try await commandRunner.run(
@@ -37,7 +37,6 @@ extension GitRepository: DiffReadable {
         return hunks
     }
 
-    /// Get diff for staged changes (index vs HEAD)
     public func getStagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard workingFile.staged != nil else { return [] }
 

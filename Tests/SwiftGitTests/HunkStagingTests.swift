@@ -109,7 +109,7 @@ struct HunkStagingTests {
             return
         }
 
-        let yourHunks = try await repository.getFileDiff(for: file)
+        let yourHunks = try await repository.getUnstagedDiff(for: file)
 
         #expect(yourHunks.count == 3, "Should have 3 hunks")
     }
@@ -151,7 +151,7 @@ struct HunkStagingTests {
             return
         }
 
-        let hunks = try await repository.getFileDiff(for: file)
+        let hunks = try await repository.getUnstagedDiff(for: file)
 
         #expect(!hunks.isEmpty, "Should have at least one hunk")
 
@@ -205,7 +205,7 @@ struct HunkStagingTests {
             return
         }
 
-        let hunks = try await repository.getFileDiff(for: file)
+        let hunks = try await repository.getUnstagedDiff(for: file)
 
         #expect(!hunks.isEmpty, "Should have hunks")
 
@@ -248,7 +248,7 @@ struct HunkStagingTests {
         }
 
         // Get hunks
-        let hunks = try await repository.getFileDiff(for: file)
+        let hunks = try await repository.getUnstagedDiff(for: file)
         #expect(!hunks.isEmpty, "Should have hunks")
 
         // Stage the hunk
@@ -305,7 +305,7 @@ struct HunkStagingTests {
             return
         }
 
-        let hunks = try await repository.getFileDiff(for: file)
+        let hunks = try await repository.getUnstagedDiff(for: file)
         #expect(!hunks.isEmpty, "Should have hunk for trailing newline")
 
         // Discard the hunk
@@ -375,7 +375,7 @@ struct HunkStagingTests {
             return
         }
 
-        let hunks = try await repository.getFileDiff(for: file)
+        let hunks = try await repository.getUnstagedDiff(for: file)
         #expect(hunks.count >= 2, "Should have at least 2 hunks")
 
         // Stage all hunks

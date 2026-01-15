@@ -43,33 +43,22 @@ public enum GitCommand: Sendable {
     case diffTree(commitId: String)
     case diffCommits(from: String, to: String, path: String)
     case showFile(commitId: String, path: String)
+    case stashShow(ref: String)
     case applyPatch(cached: Bool)
 }
 
 extension GitCommand {
     var arguments: [String] {
         switch self {
-            // MARK: - Pushing
+        // MARK: - Pushing
         case .push(let remote, let branch, let setUpstream, let force):
             var args = ["push"]
-
-            if force {
-                args.append("--force")
-            }
-
-            if setUpstream {
-                args.append("--set-upstream")
-            }
-
-            if let remote {
-                args.append(remote)
-            }
-
-            if let branch {
-                args.append(branch)
-            }
-
+            if force { args.append("--force") }
+            if setUpstream { args.append("--set-upstream") }
+            if let remote { args.append(remote) }
+            if let branch { args.append(branch) }
             return args
+
         // MARK: - Staging
         case .add(let path):
             return ["add", "--", path]
@@ -117,8 +106,8 @@ extension GitCommand {
 
         // MARK: - Stash
         case .stashPush(let message):
-            var args = ["stash", "push"]
-            if let message = message {
+            var args = ["stash", "push", "--include-untracked"]
+            if let message {
                 args += ["-m", message]
             }
             return args
@@ -156,11 +145,13 @@ extension GitCommand {
                 return ["diff", path]
             }
         case .diffTree(let commitId):
-            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", "--first-parent", commitId]
+            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", commitId]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .showFile(let commitId, let path):
             return ["show", "\(commitId):\(path)"]
+        case .stashShow(let ref):
+            return ["stash", "show", "--name-status", ref]
         case .applyPatch(let cached):
             var args = ["apply"]
             if cached {
