@@ -175,7 +175,7 @@ extension RefReader: RefReaderProtocol {
 
             stashes.append(
                 Stash(
-                    id: stashHash,
+                    hash: stashHash,
                     index: lines.count - index - 1,
                     message: message,
                     date: date

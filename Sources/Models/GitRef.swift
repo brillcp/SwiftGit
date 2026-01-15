@@ -4,7 +4,8 @@ public enum RefType: Sendable {
     case localBranch, remoteBranch, stash, tag
 }
 
-public struct GitRef: Hashable, Sendable {
+public struct GitRef: Identifiable, Hashable, Sendable {
+    public var id: String { hash }
     public let name: String
     public let hash: String
     public let type: RefType
@@ -13,11 +14,5 @@ public struct GitRef: Hashable, Sendable {
         self.name = name
         self.hash = hash
         self.type = type
-    }
-}
-
-extension GitRef: Identifiable {
-    public var id: String {
-        hash
     }
 }
