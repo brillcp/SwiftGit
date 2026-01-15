@@ -156,7 +156,7 @@ extension GitCommand {
                 return ["diff", path]
             }
         case .diffTree(let commitId):
-            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", commitId]
+            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", "--first-parent", commitId]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .showFile(let commitId, let path):
