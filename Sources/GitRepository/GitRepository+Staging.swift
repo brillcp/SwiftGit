@@ -32,7 +32,15 @@ extension GitRepository: StagingWritable {
     }
 
     public func unstageFile(at path: String) async throws {
-        let result = try await commandRunner.run(.reset(path: path), stdin: nil)
+        let status = try await getWorkingTreeStatus()
+
+        var result: CommandResult
+        if let file = status.files[path], case .renamed(let oldPath) = file.staged {
+            result = try await commandRunner.run(.reset(path: path), stdin: nil)
+            result = try await commandRunner.run(.reset(path: oldPath), stdin: nil)
+        } else {
+            result = try await commandRunner.run(.reset(path: path), stdin: nil)
+        }
 
         guard result.exitCode == 0 else {
             throw GitError.unstageFailed(path: path)
