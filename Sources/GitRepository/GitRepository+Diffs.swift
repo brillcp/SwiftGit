@@ -24,12 +24,14 @@ extension GitRepository: DiffReadable {
     public func getUnstagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {
         guard workingFile.unstaged != nil else { return [] }
 
+        let isUntracked = workingFile.unstaged == .untracked
+
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: false),
+            .diff(path: workingFile.path, staged: false, untracked: isUntracked),
             stdin: nil
         )
 
-        guard result.exitCode == 0 else {
+        guard result.exitCode == 0 || (isUntracked && result.exitCode == 1) else {
             throw GitError.diffFailed
         }
 
@@ -41,7 +43,7 @@ extension GitRepository: DiffReadable {
         guard workingFile.staged != nil else { return [] }
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: true),
+            .diff(path: workingFile.path, staged: true, untracked: false),
             stdin: nil
         )
 

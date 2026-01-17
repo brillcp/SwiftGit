@@ -34,6 +34,8 @@ extension GitRepository: CommitReadable {
     }
 
     public func getStashedFiles(_ stashId: String) async throws -> [String: CommitedFile] {
+        guard let stashCommit = try await getCommit(stashId) else { return [:] }
+
         let result = try await commandRunner.run(
             .stashShow(ref: stashId),
             stdin: nil
@@ -43,9 +45,7 @@ extension GitRepository: CommitReadable {
             throw GitError.diffFailed
         }
 
-        guard let commit = try await getCommit(stashId) else { return [:] }
-
-        return try await parseChangedFiles(result.stdout, commit: commit)
+        return try await parseChangedFiles(result.stdout, commit: stashCommit)
     }
 
     public func getHEAD() async throws -> String? {
@@ -141,7 +141,7 @@ private extension GitRepository {
                     blob = try await getBlob(at: path, treeHash: commit.tree)
                 }
 
-                if let blob = blob {
+                if let blob {
                     files[path] = CommitedFile(path: path, blob: blob, changeType: changeType)
                 }
             }

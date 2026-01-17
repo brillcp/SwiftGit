@@ -39,7 +39,7 @@ public enum GitCommand: Sendable {
     case revertAbort
 
     // MARK: - Diff & Patches
-    case diff(path: String, staged: Bool)
+    case diff(path: String, staged: Bool, untracked: Bool)
     case diffTree(commitId: String)
     case diffCommits(from: String, to: String, path: String)
     case showFile(commitId: String, path: String)
@@ -138,12 +138,17 @@ extension GitCommand {
             return ["revert", "--abort"]
 
         // MARK: - Diff & Patches
-        case .diff(let path, let staged):
+        case .diff(let path, let staged, let untracked):
+            var args = ["diff"]
             if staged {
-                return ["diff", "--cached", path]
-            } else {
-                return ["diff", path]
+                args.append("--cached")
             }
+            if untracked {
+                args.append("--no-index")
+                args.append("/dev/null")
+            }
+            args.append(path)
+            return args
         case .diffTree(let commitId):
             return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", commitId]
         case .diffCommits(let from, let to, let path):
