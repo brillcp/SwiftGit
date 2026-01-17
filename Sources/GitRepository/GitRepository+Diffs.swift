@@ -44,7 +44,7 @@ extension GitRepository: DiffReadable {
         guard workingFile.staged != nil else { return [] }
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: true, untracked: false, deleted: false),
+            .diff(path: workingFile.path, staged: true, untracked: false, deleted: workingFile.unstaged == .deleted),
             stdin: nil
         )
 
