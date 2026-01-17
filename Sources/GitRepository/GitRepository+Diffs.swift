@@ -25,9 +25,10 @@ extension GitRepository: DiffReadable {
         guard workingFile.unstaged != nil else { return [] }
 
         let isUntracked = workingFile.unstaged == .untracked
+        let isDeleted = workingFile.unstaged == .deleted
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: false, untracked: isUntracked),
+            .diff(path: workingFile.path, staged: false, untracked: isUntracked, deleted: isDeleted),
             stdin: nil
         )
 
@@ -43,7 +44,7 @@ extension GitRepository: DiffReadable {
         guard workingFile.staged != nil else { return [] }
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: true, untracked: false),
+            .diff(path: workingFile.path, staged: true, untracked: false, deleted: false),
             stdin: nil
         )
 
@@ -57,7 +58,7 @@ extension GitRepository: DiffReadable {
 
     public func getRawStagedDiff() async throws -> String {
         let result = try await commandRunner.run(
-            .diff(path: ".", staged: true, untracked: false),
+            .diff(path: ".", staged: true, untracked: false, deleted: false),
             stdin: nil
         )
 
