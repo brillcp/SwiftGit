@@ -134,7 +134,11 @@ public struct RepoSnapshot: Sendable {
 extension GitRepository {
     func getRepoSnapshot() async throws -> RepoSnapshot {
         guard let head = try await getHEAD(), let commit = try await getCommit(head) else {
-            throw GitError.notARepository
+            return RepoSnapshot(
+                head: "",
+                headTree: [:],
+                indexSnapshot: try await workingTree.indexSnapshot()
+            )
         }
 
         return RepoSnapshot(

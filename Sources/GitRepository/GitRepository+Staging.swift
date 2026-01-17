@@ -2,7 +2,15 @@ import Foundation
 
 extension GitRepository: StagingWritable {
     public func stageFile(at path: String) async throws {
-        let result = try await commandRunner.run(.add(path: path), stdin: nil)
+        let status = try await getWorkingTreeStatus()
+
+        var result: CommandResult
+        if let file = status.files[path], case .renamed(let oldPath) = file.unstaged {
+            result = try await commandRunner.run(.add(path: path), stdin: nil)
+            result = try await commandRunner.run(.add(path: oldPath), stdin: nil)
+        } else {
+            result = try await commandRunner.run(.add(path: path), stdin: nil)
+        }
 
         guard result.exitCode == 0 else {
             throw GitError.stageFailed(path: path)
