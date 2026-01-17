@@ -2,21 +2,39 @@ import Foundation
 
 extension GitRepository: DiscardWritable {
     public func discardFile(at path: String) async throws {
-        let fileURL = url.appendingPathComponent(path)
-        let indexSnapshot = try await workingTree.indexSnapshot()
+        let status = try await getWorkingTreeStatus()
 
-        let isTracked = indexSnapshot.entriesByPath[path] != nil
+        // Check if this is a renamed file
+        if let file = status.files[path],
+           case .renamed(let oldPath) = file.unstaged {
+            // Discard rename: remove new file, restore old file
+            let newFileURL = url.appendingPathComponent(path)
+            if fileManager.fileExists(atPath: newFileURL.path) {
+                try fileManager.removeItem(at: newFileURL)
+            }
 
-        if isTracked {
-            let result = try await commandRunner.run(.restore(path: path), stdin: nil)
-
+            // Restore old file from index
+            let result = try await commandRunner.run(.restore(path: oldPath), stdin: nil)
             guard result.exitCode == 0 else {
-                throw GitError.discardFileFailed(path: path)
+                throw GitError.discardFileFailed(path: oldPath)
             }
         } else {
-            guard fileManager.fileExists(atPath: fileURL.path) else { return }
-            try fileManager.removeItem(at: fileURL)
+            // Normal discard logic
+            let fileURL = url.appendingPathComponent(path)
+            let indexSnapshot = try await workingTree.indexSnapshot()
+            let isTracked = indexSnapshot.entriesByPath[path] != nil
+
+            if isTracked {
+                let result = try await commandRunner.run(.restore(path: path), stdin: nil)
+                guard result.exitCode == 0 else {
+                    throw GitError.discardFileFailed(path: path)
+                }
+            } else {
+                guard fileManager.fileExists(atPath: fileURL.path) else { return }
+                try fileManager.removeItem(at: fileURL)
+            }
         }
+
         await workingTree.invalidateIndexCache()
         eventSubject.send(.fileDiscarded(path: path))
     }
