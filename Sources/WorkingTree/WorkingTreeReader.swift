@@ -12,6 +12,7 @@ public protocol WorkingTreeReaderProtocol: Actor {
 }
 
 // MARK: -
+/*
 public actor WorkingTreeReader {
     private let repoURL: URL
     private let fileManager: FileManager
@@ -299,5 +300,130 @@ private extension WorkingTreeReader {
         }
 
         return WorkingTreeStatus(files: files)
+    }
+}
+*/
+
+public actor WorkingTreeReader {
+    private let repoURL: URL
+    private let commandRunner: GitCommandable
+    private let indexReader: GitIndexReaderProtocol
+    private let cache: ObjectCacheProtocol
+
+    public init(
+        repoURL: URL,
+        commandRunner: GitCommandable,
+        indexReader: GitIndexReaderProtocol,
+        cache: ObjectCacheProtocol
+    ) {
+        self.repoURL = repoURL
+        self.commandRunner = commandRunner
+        self.indexReader = indexReader
+        self.cache = cache
+    }
+}
+
+// MARK: - WorkingTreeReaderProtocol
+extension WorkingTreeReader: WorkingTreeReaderProtocol {
+    public func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus {
+        let result = try await commandRunner.run(
+            .status,
+            stdin: nil
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.statusFailed
+        }
+
+        return parseStatus(result.stdout)
+    }
+
+    public func indexSnapshot() async throws -> GitIndexSnapshot {
+        do {
+            return try await indexReader.readIndex(at: indexURL)
+        } catch GitIndexError.fileNotFound {
+            return GitIndexSnapshot(entries: [], version: 2)
+        }
+    }
+
+    public func invalidateIndexCache() async {
+        let url = indexURL
+        await cache.remove(.indexSnapshot(url: url))
+    }
+}
+
+// MARK: - Private functions
+private extension WorkingTreeReader {
+    var gitURL: URL {
+        repoURL.appendingPathComponent(GitPath.git.rawValue)
+    }
+
+    var indexURL: URL {
+        gitURL.appendingPathComponent(GitPath.index.rawValue)
+    }
+
+    func parseStatus(_ output: String) -> WorkingTreeStatus {
+        var files: [String: WorkingTreeFile] = [:]
+
+        // Split by null terminator
+        let entries = output.split(separator: "\0", omittingEmptySubsequences: true)
+
+        var i = 0
+        while i < entries.count {
+            let entry = String(entries[i])
+            guard entry.count >= 3 else {
+                i += 1
+                continue
+            }
+
+            // First 2 chars are status codes
+            let stagedChar = entry[entry.startIndex]
+            let unstagedChar = entry[entry.index(after: entry.startIndex)]
+
+            // Rest is the path (after space)
+            let path = String(entry.dropFirst(3))
+
+            // Check if this is a rename (next entry is old path)
+            var oldPath: String? = nil
+            if stagedChar == "R" || unstagedChar == "R" {
+                i += 1
+                if i < entries.count {
+                    oldPath = String(entries[i])
+                }
+            }
+
+            let staged = parseChangeType(stagedChar, oldPath: oldPath)
+            let unstaged = parseChangeType(unstagedChar, oldPath: oldPath)
+
+            if staged != nil || unstaged != nil {
+                files[path] = WorkingTreeFile(
+                    path: path,
+                    staged: staged,
+                    unstaged: unstaged
+                )
+            }
+
+            i += 1
+        }
+
+        return WorkingTreeStatus(files: files)
+    }
+
+    func parseChangeType(_ char: Character, oldPath: String?) -> GitChangeType? {
+        switch char {
+        case "M": return .modified
+        case "A": return .added
+        case "D": return .deleted
+        case "R":
+            if let oldPath {
+                return .renamed(from: oldPath)
+            }
+            return .modified // Fallback
+        case "C": return .added // Copied treated as added
+        case "?": return .untracked
+        case "U": return .conflicted
+        case " ", ".": return nil // No change
+        default: return nil
+        }
     }
 }

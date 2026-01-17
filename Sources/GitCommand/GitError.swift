@@ -60,6 +60,8 @@ public enum GitError: LocalizedError {
     case fileNotFound(path: String, ref: String)
     case getFileContentFailed(path: String, ref: String)
 
+    case statusFailed
+
     public var errorDescription: String? {
         switch self {
         // MARK: - Setup & Environment
@@ -161,6 +163,8 @@ public enum GitError: LocalizedError {
             return "File '\(path)' not found at \(ref)"
         case .getFileContentFailed(let path, let ref):
             return "Failed to get '\(path)' at \(ref)"
+        case .statusFailed:
+            return "Failed to get repository status."
         }
     }
 }

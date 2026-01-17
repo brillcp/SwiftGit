@@ -43,12 +43,13 @@ public actor GitRepository: GitRepositoryProtocol {
             repoURL: url,
             cache: cache
         )
+        self.commandRunner = CommandRunner(repoURL: url)
         self.workingTree = WorkingTreeReader(
             repoURL: url,
+            commandRunner: commandRunner,
             indexReader: GitIndexReader(cache: cache),
             cache: cache
         )
-        self.commandRunner = CommandRunner(repoURL: url)
         self.patchGenerator = PatchGenerator()
         self.fileManager = .default
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
@@ -113,7 +114,6 @@ public enum RepositoryError: LocalizedError {
 // MARK: - Repository snapshot
 public struct RepoSnapshot: Sendable {
     let head: String
-    let commit: Commit
     let headTree: [String: String]
     let indexSnapshot: GitIndexSnapshot
 
@@ -140,7 +140,6 @@ extension GitRepository {
 
         return RepoSnapshot(
             head: head,
-            commit: commit,
             headTree: try await getTreePaths(commit.tree),
             indexSnapshot: try await workingTree.indexSnapshot()
         )
