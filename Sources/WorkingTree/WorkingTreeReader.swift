@@ -358,7 +358,7 @@ private extension WorkingTreeReader {
         }
 
         // Real deletions
-        for (path, _) in hashToDeleted {
+        for (_, path) in hashToDeleted {
             if isStaged {
                 files[path] = WorkingTreeFile(
                     path: path,
