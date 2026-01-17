@@ -57,7 +57,7 @@ extension GitRepository: DiffReadable {
 
     public func getRawStagedDiff() async throws -> String {
         let result = try await commandRunner.run(
-            .diff(path: ".", staged: true),
+            .diff(path: ".", staged: true, untracked: false),
             stdin: nil
         )
 
