@@ -12,7 +12,6 @@ public protocol WorkingTreeReaderProtocol: Actor {
 }
 
 // MARK: -
-/*
 public actor WorkingTreeReader {
     private let repoURL: URL
     private let fileManager: FileManager
@@ -92,7 +91,6 @@ private extension WorkingTreeReader {
             return nil // File deleted
         }
 
-        // Get file stats - fast syscall
         let attrs = try fileManager.attributesOfItem(atPath: fileURL.path)
         guard let modDate = attrs[.modificationDate] as? Date,
               let sizeNum = attrs[.size] as? UInt64 else { return nil }
@@ -100,13 +98,10 @@ private extension WorkingTreeReader {
         let sizeMatches = sizeNum == UInt64(entry.size)
         let mtimeMatches = abs(modDate.timeIntervalSince(entry.mtime)) < 0.001
 
-        // Git's optimization: if mtime + size match, reuse hash
         if mtimeMatches && sizeMatches {
-            // File unchanged - reuse hash from index (NO HASHING!)
             return entry.sha1
         }
 
-        // Check cache by file identity (inode + dev + size + mtime)
         let devAttr = attrs[.systemNumber] as? NSNumber
         let inoAttr = attrs[.systemFileNumber] as? NSNumber
         let dev = UInt64(devAttr?.uint64Value ?? 0)
@@ -118,10 +113,7 @@ private extension WorkingTreeReader {
             return cached
         }
 
-        // Compute hash
         let computed = try computeFileHash(at: fileURL)
-
-        // Cache with eviction
         await cache.set(.fileHash(identity: identity), value: computed)
 
         return computed
@@ -134,18 +126,15 @@ private extension WorkingTreeReader {
         let fileSize = try fileHandle.seekToEnd()
         try fileHandle.seek(toOffset: 0)
 
-        // Git blob format: "blob <size>\0<content>"
         let header = "blob \(fileSize)\0"
 
         var context = CC_SHA1_CTX()
         CC_SHA1_Init(&context)
 
-        // Hash header
         header.utf8.withContiguousStorageIfAvailable { ptr in
             _ = CC_SHA1_Update(&context, ptr.baseAddress, CC_LONG(ptr.count))
         }
 
-        // Stream file content in 64KB chunks
         while true {
             let chunk = fileHandle.readData(ofLength: 65536)
             if chunk.isEmpty { break }
@@ -162,14 +151,12 @@ private extension WorkingTreeReader {
     }
 
     func scanForUntrackedFiles(indexEntries: [IndexEntry]) async throws -> [String: String] {
-        // Build indexed paths and dirs
         var indexedPaths = Set<String>(minimumCapacity: indexEntries.count)
         var indexedDirs = Set<String>(minimumCapacity: indexEntries.count)
 
         for entry in indexEntries {
             indexedPaths.insert(entry.path)
 
-            // Add all parent directories
             var path = entry.path
             while let slashIdx = path.lastIndex(of: "/") {
                 path = String(path[..<slashIdx])
@@ -210,7 +197,6 @@ private extension WorkingTreeReader {
 
             let fullPath = relativePath.isEmpty ? name : "\(relativePath)/\(name)"
 
-            // Skip if already in index
             if indexedPaths.contains(fullPath) {
                 continue
             }
@@ -218,7 +204,6 @@ private extension WorkingTreeReader {
             let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey])
 
             if resourceValues.isDirectory == true {
-                // Only recurse if directory isn't fully tracked
                 if !indexedDirs.contains(fullPath) {
                     try await scanDirectoryForUntracked(
                         at: itemURL,
@@ -229,7 +214,6 @@ private extension WorkingTreeReader {
                     )
                 }
             } else {
-                // Untracked file - compute hash
                 let hash = try computeFileHash(at: itemURL)
                 result[fullPath] = hash
             }
@@ -246,6 +230,11 @@ private extension WorkingTreeReader {
         let allPaths = Set(headTree.keys).union(index.keys).union(workingTree.keys)
         files.reserveCapacity(allPaths.count)
 
+        var stagedDeletions: [String: String] = [:]
+        var stagedAdditions: [String: String] = [:]
+        var unstagedDeletions: [String: String] = [:]
+        var unstagedAdditions: [String: String] = [:]
+
         for path in allPaths {
             let headOid = headTree[path]
             let indexOid = index[path]
@@ -261,10 +250,10 @@ private extension WorkingTreeReader {
                         staged = .modified
                     }
                 } else {
-                    staged = .added
+                    stagedAdditions[path] = indexOid
                 }
-            } else if headOid != nil {
-                staged = .deleted
+            } else if let headOid = headOid {
+                stagedDeletions[path] = headOid
             }
 
             // Unstaged changes (Index → Working Tree)
@@ -274,13 +263,12 @@ private extension WorkingTreeReader {
                         unstaged = .modified
                     }
                 } else {
-                    unstaged = .untracked
+                    unstagedAdditions[path] = workingOid
                 }
-            } else if indexOid != nil {
-                unstaged = .deleted
+            } else if let indexOid = indexOid {
+                unstagedDeletions[path] = indexOid
             }
 
-            // Only add if there are changes
             if staged != nil || unstaged != nil {
                 files[path] = WorkingTreeFile(
                     path: path,
@@ -289,6 +277,21 @@ private extension WorkingTreeReader {
                 )
             }
         }
+
+        // Detect renames
+        detectRenames(
+            deletions: stagedDeletions,
+            additions: stagedAdditions,
+            files: &files,
+            isStaged: true
+        )
+
+        detectRenames(
+            deletions: unstagedDeletions,
+            additions: unstagedAdditions,
+            files: &files,
+            isStaged: false
+        )
 
         // Mark conflicted files
         for path in conflictedPaths {
@@ -301,129 +304,74 @@ private extension WorkingTreeReader {
 
         return WorkingTreeStatus(files: files)
     }
-}
-*/
 
-public actor WorkingTreeReader {
-    private let repoURL: URL
-    private let commandRunner: GitCommandable
-    private let indexReader: GitIndexReaderProtocol
-    private let cache: ObjectCacheProtocol
-
-    public init(
-        repoURL: URL,
-        commandRunner: GitCommandable,
-        indexReader: GitIndexReaderProtocol,
-        cache: ObjectCacheProtocol
+    func detectRenames(
+        deletions: [String: String],
+        additions: [String: String],
+        files: inout [String: WorkingTreeFile],
+        isStaged: Bool
     ) {
-        self.repoURL = repoURL
-        self.commandRunner = commandRunner
-        self.indexReader = indexReader
-        self.cache = cache
-    }
-}
-
-// MARK: - WorkingTreeReaderProtocol
-extension WorkingTreeReader: WorkingTreeReaderProtocol {
-    public func computeStatus(snapshot: RepoSnapshot) async throws -> WorkingTreeStatus {
-        let result = try await commandRunner.run(
-            .status,
-            stdin: nil
-        )
-
-        guard result.exitCode == 0 else {
-            throw GitError.statusFailed
+        var hashToDeleted: [String: String] = [:]
+        for (path, hash) in deletions {
+            hashToDeleted[hash] = path
         }
 
-        return parseStatus(result.stdout)
-    }
+        for (newPath, hash) in additions {
+            if let oldPath = hashToDeleted[hash] {
+                // Found a rename!
+                let changeType = GitChangeType.renamed(from: oldPath)
 
-    public func indexSnapshot() async throws -> GitIndexSnapshot {
-        do {
-            return try await indexReader.readIndex(at: indexURL)
-        } catch GitIndexError.fileNotFound {
-            return GitIndexSnapshot(entries: [], version: 2)
-        }
-    }
+                if isStaged {
+                    files[newPath] = WorkingTreeFile(
+                        path: newPath,
+                        staged: changeType,
+                        unstaged: files[newPath]?.unstaged
+                    )
+                    files.removeValue(forKey: oldPath)
+                } else {
+                    files[newPath] = WorkingTreeFile(
+                        path: newPath,
+                        staged: files[newPath]?.staged,
+                        unstaged: changeType
+                    )
+                    files.removeValue(forKey: oldPath)
+                }
 
-    public func invalidateIndexCache() async {
-        let url = indexURL
-        await cache.remove(.indexSnapshot(url: url))
-    }
-}
-
-// MARK: - Private functions
-private extension WorkingTreeReader {
-    var gitURL: URL {
-        repoURL.appendingPathComponent(GitPath.git.rawValue)
-    }
-
-    var indexURL: URL {
-        gitURL.appendingPathComponent(GitPath.index.rawValue)
-    }
-
-    func parseStatus(_ output: String) -> WorkingTreeStatus {
-        var files: [String: WorkingTreeFile] = [:]
-
-        // Split by null terminator
-        let entries = output.split(separator: "\0", omittingEmptySubsequences: true)
-
-        var i = 0
-        while i < entries.count {
-            let entry = String(entries[i])
-            guard entry.count >= 3 else {
-                i += 1
-                continue
-            }
-
-            // First 2 chars are status codes
-            let stagedChar = entry[entry.startIndex]
-            let unstagedChar = entry[entry.index(after: entry.startIndex)]
-
-            // Rest is the path (after space)
-            let path = String(entry.dropFirst(3))
-
-            // Check if this is a rename (next entry is old path)
-            var oldPath: String? = nil
-            if stagedChar == "R" || unstagedChar == "R" {
-                i += 1
-                if i < entries.count {
-                    oldPath = String(entries[i])
+                hashToDeleted.removeValue(forKey: hash)
+            } else {
+                // Real addition
+                let changeType: GitChangeType = isStaged ? .added : .untracked
+                if isStaged {
+                    files[newPath] = WorkingTreeFile(
+                        path: newPath,
+                        staged: changeType,
+                        unstaged: files[newPath]?.unstaged
+                    )
+                } else {
+                    files[newPath] = WorkingTreeFile(
+                        path: newPath,
+                        staged: files[newPath]?.staged,
+                        unstaged: changeType
+                    )
                 }
             }
-
-            let staged = parseChangeType(stagedChar, oldPath: oldPath)
-            let unstaged = parseChangeType(unstagedChar, oldPath: oldPath)
-
-            if staged != nil || unstaged != nil {
-                files[path] = WorkingTreeFile(
-                    path: path,
-                    staged: staged,
-                    unstaged: unstaged
-                )
-            }
-
-            i += 1
         }
 
-        return WorkingTreeStatus(files: files)
-    }
-
-    func parseChangeType(_ char: Character, oldPath: String?) -> GitChangeType? {
-        switch char {
-        case "M": return .modified
-        case "A": return .added
-        case "D": return .deleted
-        case "R":
-            if let oldPath {
-                return .renamed(from: oldPath)
+        // Real deletions
+        for (path, _) in hashToDeleted {
+            if isStaged {
+                files[path] = WorkingTreeFile(
+                    path: path,
+                    staged: .deleted,
+                    unstaged: files[path]?.unstaged
+                )
+            } else {
+                files[path] = WorkingTreeFile(
+                    path: path,
+                    staged: files[path]?.staged,
+                    unstaged: .deleted
+                )
             }
-            return .modified // Fallback
-        case "C": return .added // Copied treated as added
-        case "?": return .untracked
-        case "U": return .conflicted
-        case " ", ".": return nil // No change
-        default: return nil
         }
     }
 }
