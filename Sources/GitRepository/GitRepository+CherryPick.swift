@@ -2,19 +2,37 @@ import Foundation
 
 extension GitRepository: CherryPickWritable {
     public func cherryPick(_ commitHash: String) async throws {
+        let status = try await getWorkingTreeStatus()
+        let needsStash = !status.files.isEmpty
+
+        if needsStash {
+            try await stashPush(message: "Auto stash before cherry-pick")
+        }
+
         let result = try await commandRunner.run(
             .cherryPick(commitHash: commitHash),
             stdin: nil
         )
 
         if result.exitCode != 0 {
-            let conflict = "conflict"
-            if result.stderr.contains(conflict) || result.stderr.contains(conflict.uppercased()) {
+            // On conflict, DON'T pop stash - leave it for after resolution
+            if result.stderr.localizedCaseInsensitiveContains("conflict") {
                 throw GitError.cherryPickConflict(commit: commitHash)
+            }
+
+            // On other errors, try to restore stash
+            if needsStash {
+                try? await stashPop(index: 0)
             }
             throw GitError.cherryPickFailed(commit: commitHash)
         }
 
-        await invalidateAllCaches()
+        // Success - pop stash
+        if needsStash {
+            try await stashPop(index: 0)
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.cherryPickCompleted)
     }
 }

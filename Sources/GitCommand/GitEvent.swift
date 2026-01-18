@@ -19,6 +19,7 @@ public enum GitEvent {
     case branchDeleted(name: String)
     case conflictResolved(path: String)
     case revertedCommit(hash: String)
+    case cherryPickCompleted
 
     case stashed(id: String)
     case stashApplied
