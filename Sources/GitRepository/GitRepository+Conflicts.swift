@@ -32,14 +32,53 @@ extension GitRepository: ConflictReadable {
 // MARK: - ConflictWritable
 extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
+        var abortedOperation: GitEvent?
+
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             try await commandRunner.run(.mergeAbort)
+            abortedOperation = .mergeAborted
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
             try await commandRunner.run(.cherryPickAbort)
+            abortedOperation = .cherryPickAborted
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             try await commandRunner.run(.revertAbort)
+            abortedOperation = .revertAborted
         }
 
         await invalidateAllCaches()
+
+        if let abortedOperation {
+            eventSubject.send(abortedOperation)
+        }
+    }
+
+    public func continueOperation() async throws {
+        var continuedOperation: GitEvent?
+
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
+            let result = try await commandRunner.run(.mergeContinue)
+            guard result.exitCode == 0 else {
+                throw GitError.mergeContinueFailed
+            }
+            continuedOperation = .mergeContinued
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
+            let result = try await commandRunner.run(.cherryPickContinue)
+            guard result.exitCode == 0 else {
+                throw GitError.cherryPickContinueFailed
+            }
+            continuedOperation = .cherryPickContinued
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
+            let result = try await commandRunner.run(.revertContinue)
+            guard result.exitCode == 0 else {
+                throw GitError.revertContinueFailed
+            }
+            continuedOperation = .revertContinued
+        }
+
+        await invalidateAllCaches()
+
+        if let event = continuedOperation {
+            eventSubject.send(event)
+        }
     }
 }

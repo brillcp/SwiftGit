@@ -34,22 +34,4 @@ extension GitRepository: CherryPickWritable {
         await workingTree.invalidateIndexCache()
         eventSubject.send(.cherryPickCompleted)
     }
-
-    public func cherryPickContinue() async throws {
-        let result = try await commandRunner.run(.cherryPickContinue)
-        guard result.exitCode == 0 else {
-            throw GitError.cherryPickContinueFailed
-        }
-        await invalidateAllCaches()
-        eventSubject.send(.cherryPickContinued)
-    }
-
-    public func cherryPickAbort() async throws {
-        let result = try await commandRunner.run(.cherryPickAbort)
-        guard result.exitCode == 0 else {
-            throw GitError.cherryPickAbortFailed
-        }
-        await invalidateAllCaches()
-        eventSubject.send(.cherryPickAborted)
-    }
 }
