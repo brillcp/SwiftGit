@@ -18,7 +18,7 @@ public protocol GitRepositoryProtocol:
     CherryPickWritable,
     RevertWritable,
     ConflictReadable,
-    ConflictWritable,
+    ConflictWritable
 {
     /// The URL of the repository
     var url: URL { get }
