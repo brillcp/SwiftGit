@@ -44,10 +44,19 @@ public enum GitCommand: Sendable {
     case diffCommits(from: String, to: String, path: String)
     case showFile(commitId: String, path: String)
     case stashShow(ref: String)
-    case applyPatch(cached: Bool)
+    case applyPatch(patch: String, cached: Bool)
 }
 
 extension GitCommand {
+    var stdinData: Data? {
+        switch self {
+        case .applyPatch(let patch, _):
+            return patch.data(using: .utf8)
+        default:
+            return nil
+        }
+    }
+
     var arguments: [String] {
         switch self {
         // MARK: - Pushing
@@ -163,7 +172,7 @@ extension GitCommand {
             return ["show", "\(commitId):\(path)"]
         case .stashShow(let ref):
             return ["stash", "show", "--name-status", ref]
-        case .applyPatch(let cached):
+        case .applyPatch(_, let cached):
             var args = ["apply"]
             if cached {
                 args.append("--cached")
@@ -171,6 +180,7 @@ extension GitCommand {
             args.append("--ignore-whitespace")
             args.append("--unidiff-zero")
             args.append("--whitespace=nowarn")
+            args.append("-")
             return args
         }
     }

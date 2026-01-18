@@ -26,8 +26,7 @@ extension GitRepository: CommitReadable {
         guard let commit = try await getCommit(commitId) else { return [:] }
 
         let result = try await commandRunner.run(
-            .diffTree(commitId: commitId),
-            stdin: nil
+            .diffTree(commitId: commitId)
         )
 
         return try await parseChangedFiles(result.stdout, commit: commit)
@@ -37,8 +36,7 @@ extension GitRepository: CommitReadable {
         guard let stashCommit = try await getCommit(stashId) else { return [:] }
 
         let result = try await commandRunner.run(
-            .stashShow(ref: stashId),
-            stdin: nil
+            .stashShow(ref: stashId)
         )
 
         guard result.exitCode == 0 else {
@@ -65,8 +63,7 @@ extension GitRepository: CommitWritable {
         }
 
         let result = try await commandRunner.run(
-            .commit(message: message, author: nil),
-            stdin: nil
+            .commit(message: message, author: nil)
         )
 
         guard result.exitCode == 0 else {

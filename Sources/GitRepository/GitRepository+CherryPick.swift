@@ -10,8 +10,7 @@ extension GitRepository: CherryPickWritable {
         }
 
         let result = try await commandRunner.run(
-            .cherryPick(commitHash: commitHash),
-            stdin: nil
+            .cherryPick(commitHash: commitHash)
         )
 
         if result.exitCode != 0 {

@@ -10,9 +10,7 @@ extension GitRepository: StashReadable {
 extension GitRepository: StashWritable {
     public func stashPush(message: String? = nil) async throws {
         let result = try await commandRunner.run(
-            .stashPush(message: message),
-            stdin: nil
-        )
+            .stashPush(message: message))
 
         let output = result.stderr + result.stdout
         if output.contains("No local changes") {
@@ -35,9 +33,7 @@ extension GitRepository: StashWritable {
         let stashId = try await getStashes()[index].id
 
         let result = try await commandRunner.run(
-            .stashPop(index: index),
-            stdin: nil
-        )
+            .stashPop(index: index))
 
         guard result.exitCode == 0 else {
             throw GitError.stashPopFailed
@@ -50,9 +46,7 @@ extension GitRepository: StashWritable {
 
     public func stashApply(index: Int) async throws {
         let result = try await commandRunner.run(
-            .stashApply(index: index),
-            stdin: nil
-        )
+            .stashApply(index: index))
 
         guard result.exitCode == 0 else {
             throw GitError.stashApplyFailed
@@ -66,9 +60,7 @@ extension GitRepository: StashWritable {
         let stashId = try await getStashes()[index].id
 
         let result = try await commandRunner.run(
-            .stashDrop(index: index),
-            stdin: nil
-        )
+            .stashDrop(index: index))
 
         guard result.exitCode == 0 else {
             throw GitError.stashDropFailed

@@ -6,10 +6,10 @@ extension GitRepository: StagingWritable {
 
         var result: CommandResult
         if let file = status.files[path], case .renamed(let oldPath) = file.unstaged {
-            result = try await commandRunner.run(.add(path: path), stdin: nil)
-            result = try await commandRunner.run(.add(path: oldPath), stdin: nil)
+            result = try await commandRunner.run(.add(path: path))
+            result = try await commandRunner.run(.add(path: oldPath))
         } else {
-            result = try await commandRunner.run(.add(path: path), stdin: nil)
+            result = try await commandRunner.run(.add(path: path))
         }
 
         guard result.exitCode == 0 else {
@@ -21,7 +21,7 @@ extension GitRepository: StagingWritable {
     }
 
     public func stageAllFiles() async throws {
-        let result = try await commandRunner.run(.addAll, stdin: nil)
+        let result = try await commandRunner.run(.addAll)
 
         guard result.exitCode == 0 else {
             throw GitError.stageAllFailed
@@ -36,10 +36,10 @@ extension GitRepository: StagingWritable {
 
         var result: CommandResult
         if let file = status.files[path], case .renamed(let oldPath) = file.staged {
-            result = try await commandRunner.run(.reset(path: path), stdin: nil)
-            result = try await commandRunner.run(.reset(path: oldPath), stdin: nil)
+            result = try await commandRunner.run(.reset(path: path))
+            result = try await commandRunner.run(.reset(path: oldPath))
         } else {
-            result = try await commandRunner.run(.reset(path: path), stdin: nil)
+            result = try await commandRunner.run(.reset(path: path))
         }
 
         guard result.exitCode == 0 else {
@@ -51,7 +51,7 @@ extension GitRepository: StagingWritable {
     }
 
     public func unstageAllFiles() async throws {
-        let result = try await commandRunner.run(.resetAll, stdin: nil)
+        let result = try await commandRunner.run(.resetAll)
 
         guard result.exitCode == 0 else {
             throw GitError.unstageAllFailed
@@ -76,8 +76,7 @@ extension GitRepository: StagingWritable {
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
 
         let result = try await commandRunner.run(
-            .applyPatch(cached: true),
-            stdin: patch
+            .applyPatch(patch: patch, cached: true)
         )
 
         guard result.exitCode == 0 else {
@@ -98,8 +97,7 @@ extension GitRepository: StagingWritable {
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
 
         let result = try await commandRunner.run(
-            .applyPatch(cached: true),
-            stdin: patch
+            .applyPatch(patch: patch, cached: true)
         )
 
         let path = file.path
@@ -149,7 +147,7 @@ private extension GitRepository {
 
         if headTrimmed == indexTrimmed && headContent != indexContent {
             // Only difference is trailing newlines - unstage it
-            try await commandRunner.run(.reset(path: path), stdin: nil)
+            try await commandRunner.run(.reset(path: path))
         }
     }
 }

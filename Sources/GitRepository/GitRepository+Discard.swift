@@ -14,7 +14,7 @@ extension GitRepository: DiscardWritable {
             }
 
             // Restore old file from index
-            let result = try await commandRunner.run(.restore(path: oldPath), stdin: nil)
+            let result = try await commandRunner.run(.restore(path: oldPath))
             guard result.exitCode == 0 else {
                 throw GitError.discardFileFailed(path: oldPath)
             }
@@ -25,7 +25,7 @@ extension GitRepository: DiscardWritable {
             let isTracked = indexSnapshot.entriesByPath[path] != nil
 
             if isTracked {
-                let result = try await commandRunner.run(.restore(path: path), stdin: nil)
+                let result = try await commandRunner.run(.restore(path: path))
                 guard result.exitCode == 0 else {
                     throw GitError.discardFileFailed(path: path)
                 }
@@ -43,8 +43,7 @@ extension GitRepository: DiscardWritable {
         let patch = patchGenerator.generateReversePatch(hunk: hunk, file: file)
 
         let result = try await commandRunner.run(
-            .applyPatch(cached: false),
-            stdin: patch
+            .applyPatch(patch: patch, cached: false)
         )
 
         let path = file.path
@@ -55,26 +54,26 @@ extension GitRepository: DiscardWritable {
     }
 
     public func discardAllFiles() async throws {
-        let result = try await commandRunner.run(.resetHardHEAD, stdin: nil)
+        let result = try await commandRunner.run(.resetHardHEAD)
 
         guard result.exitCode == 0 else {
             throw GitError.discardAllFailed
         }
 
-        try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
+        try await commandRunner.run(.clean(force: true, directories: true))
 
         await workingTree.invalidateIndexCache()
         eventSubject.send(.allFilesDiscarded)
     }
 
     public func discardUnstagedChanges() async throws {
-        let restore = try await commandRunner.run(.restoreAll, stdin: nil)
+        let restore = try await commandRunner.run(.restoreAll)
 
         guard restore.exitCode == 0 else {
             throw GitError.restoreFailed
         }
 
-        let clean = try await commandRunner.run(.clean(force: true, directories: true), stdin: nil)
+        let clean = try await commandRunner.run(.clean(force: true, directories: true))
 
         guard clean.exitCode == 0 else {
             throw GitError.cleanFailed

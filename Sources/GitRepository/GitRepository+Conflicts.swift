@@ -33,11 +33,11 @@ extension GitRepository: ConflictReadable {
 extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
-            try await commandRunner.run(.mergeAbort, stdin: nil)
+            try await commandRunner.run(.mergeAbort)
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
-            try await commandRunner.run(.cherryPickAbort, stdin: nil)
+            try await commandRunner.run(.cherryPickAbort)
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
-            try await commandRunner.run(.revertAbort, stdin: nil)
+            try await commandRunner.run(.revertAbort)
         }
 
         await invalidateAllCaches()

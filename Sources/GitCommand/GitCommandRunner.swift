@@ -2,10 +2,7 @@ import Foundation
 
 public protocol GitCommandable: Actor {
     @discardableResult
-    func run(
-        _ command: GitCommand,
-        stdin: String?
-    ) async throws -> CommandResult
+    func run(_ command: GitCommand) async throws -> CommandResult
 }
 
 // MARK: -
@@ -21,10 +18,7 @@ public actor CommandRunner {
 
 // MARK: - GitCommandable
 extension CommandRunner: GitCommandable {
-    public func run(
-        _ command: GitCommand,
-        stdin: String? = nil
-    ) async throws -> CommandResult {
+    public func run(_ command: GitCommand) async throws -> CommandResult {
         let process = Process()
         process.executableURL = try findGitBinary()
         process.currentDirectoryURL = repoURL
@@ -35,22 +29,17 @@ extension CommandRunner: GitCommandable {
         process.standardOutput = outputPipe
         process.standardError = errorPipe
 
-        let inputPipe: Pipe?
-        if stdin != nil {
+        let stdinData = command.stdinData
+        if stdinData != nil {
             let pipe = Pipe()
             process.standardInput = pipe
-            inputPipe = pipe
-        } else {
-            inputPipe = nil
         }
 
         try process.run()
 
-        if let stdin, let inputPipe {
-            if let data = stdin.data(using: .utf8) {
-                inputPipe.fileHandleForWriting.write(data)
-            }
-            try inputPipe.fileHandleForWriting.close()
+        if let stdinData, let pipe = process.standardInput as? Pipe {
+            pipe.fileHandleForWriting.write(stdinData)
+            try pipe.fileHandleForWriting.close()
         }
 
         process.waitUntilExit()

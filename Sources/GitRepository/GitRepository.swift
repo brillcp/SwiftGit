@@ -63,7 +63,7 @@ public actor GitRepository: GitRepositoryProtocol {
 
     public func executeWorkflow(_ workflow: GitWorkflow) async throws {
         for command in workflow.commands {
-            let result = try await commandRunner.run(command, stdin: nil)
+            let result = try await commandRunner.run(command)
 
             guard result.exitCode == 0 else {
                 throw GitError.workflowFailed(name: workflow.name ?? "workflow")

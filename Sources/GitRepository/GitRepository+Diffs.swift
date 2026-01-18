@@ -6,16 +6,14 @@ extension GitRepository: DiffReadable {
 
         guard let parentId = commit.parents.first else {
             let result = try await commandRunner.run(
-                .showFile(commitId: commitId, path: path),
-                stdin: nil
+                .showFile(commitId: commitId, path: path)
             )
 
             return await diffParser.parse(result.stdout)
         }
 
         let result = try await commandRunner.run(
-            .diffCommits(from: parentId, to: commitId, path: path),
-            stdin: nil
+            .diffCommits(from: parentId, to: commitId, path: path)
         )
 
         return await diffParser.parse(result.stdout)
@@ -28,8 +26,7 @@ extension GitRepository: DiffReadable {
         let isDeleted = workingFile.unstaged == .deleted
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: false, untracked: isUntracked, deleted: isDeleted),
-            stdin: nil
+            .diff(path: workingFile.path, staged: false, untracked: isUntracked, deleted: isDeleted)
         )
 
         guard result.exitCode == 0 || (isUntracked && result.exitCode == 1) else {
@@ -44,8 +41,7 @@ extension GitRepository: DiffReadable {
         guard workingFile.staged != nil else { return [] }
 
         let result = try await commandRunner.run(
-            .diff(path: workingFile.path, staged: true, untracked: false, deleted: workingFile.staged == .deleted),
-            stdin: nil
+            .diff(path: workingFile.path, staged: true, untracked: false, deleted: workingFile.staged == .deleted)
         )
 
         guard result.exitCode == 0 else {
@@ -58,8 +54,7 @@ extension GitRepository: DiffReadable {
 
     public func getRawStagedDiff() async throws -> String {
         let result = try await commandRunner.run(
-            .diff(path: ".", staged: true, untracked: false, deleted: false),
-            stdin: nil
+            .diff(path: ".", staged: true, untracked: false, deleted: false)
         )
 
         guard result.exitCode == 0 else {
@@ -71,8 +66,7 @@ extension GitRepository: DiffReadable {
 
     public func getFileContent(at path: String, ref: String) async throws -> String {
         let result = try await commandRunner.run(
-            .showFile(commitId: ref, path: path),
-            stdin: nil
+            .showFile(commitId: ref, path: path)
         )
 
         guard result.exitCode == 0 else {

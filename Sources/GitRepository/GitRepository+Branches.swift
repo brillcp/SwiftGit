@@ -22,8 +22,7 @@ extension GitRepository: BranchWritable {
         force: Bool = false
     ) async throws {
         let result = try await commandRunner.run(
-            .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force),
-            stdin: nil
+            .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force)
         )
 
         guard result.exitCode == 0 else {
@@ -54,8 +53,7 @@ extension GitRepository: BranchWritable {
         }
 
         let result = try await commandRunner.run(
-            .checkout(branch: name, create: createNew),
-            stdin: nil
+            .checkout(branch: name, create: createNew)
         )
 
         guard result.exitCode == 0 else {
@@ -76,8 +74,7 @@ extension GitRepository: BranchWritable {
         }
 
         let result = try await commandRunner.run(
-            .deleteBranch(name: name, force: force),
-            stdin: nil
+            .deleteBranch(name: name, force: force)
         )
 
         guard result.exitCode == 0 else {
