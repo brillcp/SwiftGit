@@ -141,11 +141,11 @@ extension GitCommand {
             args.append(commitHash)
             return args
         case .cherryPickContinue:
-            return ["cherry-pick", "--continue"]
+            return ["cherry-pick", "--continue", "--no-edit"]
         case .mergeContinue:
-            return ["merge", "--continue"]
+            return ["merge", "--continue", "--no-edit"]
         case .revertContinue:
-            return ["revert", "--continue"]
+            return ["revert", "--continue", "--no-edit"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:
