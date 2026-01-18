@@ -26,5 +26,13 @@ public enum GitEvent {
     case stashPopped(id: String)
     case stashDropped(id: String)
 
+    case cherryPickContinued
+    case mergeContinued
+    case revertContinued
+
+    case cherryPickAborted
+    case mergeAborted
+    case revertAborted
+
     case workflowCompleted(name: String)
 }

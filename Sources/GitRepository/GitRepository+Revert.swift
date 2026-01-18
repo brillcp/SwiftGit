@@ -16,4 +16,22 @@ extension GitRepository: RevertWritable {
         await invalidateAllCaches()
         eventSubject.send(.revertedCommit(hash: commitHash))
     }
+
+    public func revertContinue() async throws {
+        let result = try await commandRunner.run(.revertContinue)
+        guard result.exitCode == 0 else {
+            throw GitError.revertContinueFailed
+        }
+        await invalidateAllCaches()
+        eventSubject.send(.revertContinued)
+    }
+
+    public func revertAbort() async throws {
+        let result = try await commandRunner.run(.revertAbort)
+        guard result.exitCode == 0 else {
+            throw GitError.revertAbortFailed
+        }
+        await invalidateAllCaches()
+        eventSubject.send(.revertAborted)
+    }
 }

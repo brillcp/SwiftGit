@@ -60,6 +60,16 @@ public enum GitError: LocalizedError {
     case fileNotFound(path: String, ref: String)
     case getFileContentFailed(path: String, ref: String)
 
+    // MARK: - Continue operations
+    case cherryPickContinueFailed
+    case mergeContinueFailed
+    case revertContinueFailed
+
+    // MARK: - Abort operations
+    case cherryPickAbortFailed
+    case mergeAbortFailed
+    case revertAbortFailed
+
     case workflowFailed(name: String)
 
     public var errorDescription: String? {
@@ -163,6 +173,23 @@ public enum GitError: LocalizedError {
             return "File '\(path)' not found at \(ref)"
         case .getFileContentFailed(let path, let ref):
             return "Failed to get '\(path)' at \(ref)"
+
+        // MARK: - Continue operations
+        case .cherryPickContinueFailed:
+            return "Failed to continue cherry-pick"
+        case .mergeContinueFailed:
+            return "Failed to continue merge"
+        case .revertContinueFailed:
+            return "Failed to continue revert"
+
+        // MARK: - Abort operations
+        case .cherryPickAbortFailed:
+            return "Failed to abort cherry-pick"
+        case .mergeAbortFailed:
+            return "Failed to abort merge"
+        case .revertAbortFailed:
+            return "Failed to abort revert"
+
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."
         }

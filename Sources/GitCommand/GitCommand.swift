@@ -32,6 +32,9 @@ public enum GitCommand: Sendable {
     // MARK: - History Manipulation
     case cherryPick(commitHash: String)
     case revert(commitHash: String, noCommit: Bool)
+    case cherryPickContinue
+    case mergeContinue
+    case revertContinue
 
     // MARK: - Conflict Resolution
     case mergeAbort
@@ -137,6 +140,12 @@ extension GitCommand {
             }
             args.append(commitHash)
             return args
+        case .cherryPickContinue:
+            return ["cherry-pick", "--continue"]
+        case .mergeContinue:
+            return ["merge", "--continue"]
+        case .revertContinue:
+            return ["revert", "--continue"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:
