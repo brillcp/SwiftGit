@@ -27,4 +27,7 @@ public protocol GitRepositoryProtocol:
 
     /// Initialize a repository at the given URL
     init(url: URL, cache: ObjectCacheProtocol)
+
+    /// Run a git workflow with multiple commands in a row
+    func executeWorkflow(_ workflow: GitWorkflow) async throws
 }

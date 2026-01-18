@@ -60,33 +60,24 @@ public actor GitRepository: GitRepositoryProtocol {
             url.stopAccessingSecurityScopedResource()
         }
     }
-}
 
-// MARK: - GitEvent
-public enum GitEvent {
-    case pushed(remote: String, branch: String?)
+    public func executeWorkflow(_ workflow: GitWorkflow) async throws {
+        for command in workflow.commands {
+            let result = try await commandRunner.run(command, stdin: nil)
 
-    case fileStaged(path: String)
-    case fileUnstaged(path: String)
-    case fileDiscarded(path: String)
-    case allFilesStaged
-    case allFilesUnstaged
-    case allFilesDiscarded
+            guard result.exitCode == 0 else {
+                throw GitError.workflowFailed(name: workflow.name ?? "workflow")
+            }
+        }
 
-    case hunkStaged(hunk: DiffHunk, path: String)
-    case hunkUnstaged(hunk: DiffHunk, path: String)
-    case hunkDiscarded(hunk: DiffHunk, path: String)
+        await workingTree.invalidateIndexCache()
 
-    case committed(hash: String)
-    case branchChanged(name: String)
-    case branchDeleted(name: String)
-    case conflictResolved(path: String)
-    case revertedCommit(hash: String)
-
-    case stashed(id: String)
-    case stashApplied
-    case stashPopped(id: String)
-    case stashDropped(id: String)
+        if let event = workflow.onComplete {
+            eventSubject.send(event)
+        } else if let name = workflow.name {
+            eventSubject.send(.workflowCompleted(name: name))
+        }
+    }
 }
 
 // MARK: - Repository error
