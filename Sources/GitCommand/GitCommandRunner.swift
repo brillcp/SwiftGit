@@ -27,23 +27,16 @@ extension CommandRunner: GitCommandable {
 
         try process.run()
         
-        // Read output asynchronously to prevent pipe buffer overflow
-        let stdoutHandle = stdoutPipe.fileHandleForReading
-        let stderrHandle = stderrPipe.fileHandleForReading
-        
-        // Start reading immediately while process runs
         async let stdoutData = Task {
-            stdoutHandle.readDataToEndOfFile()
+            stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
         
         async let stderrData = Task {
-            stderrHandle.readDataToEndOfFile()
+            stderrPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
         
-        // Now wait for the process to finish
         process.waitUntilExit()
         
-        // Get the data we read concurrently
         let stdout = await stdoutData
         let stderr = await stderrData
 
@@ -134,12 +127,9 @@ private extension CommandRunner {
         process.currentDirectoryURL = repoURL
         process.arguments = arguments
         
-        // Ensure git runs in non-interactive mode
+        // Disable git pager to prevent interactive prompts
         process.environment = ProcessInfo.processInfo.environment
         process.environment?["GIT_PAGER"] = ""
-        process.environment?["GIT_EDITOR"] = ":"
-        process.environment?["PAGER"] = ""
-        process.environment?["LESS"] = ""
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
