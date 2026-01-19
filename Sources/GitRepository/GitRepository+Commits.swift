@@ -82,43 +82,6 @@ extension GitRepository: CommitWritable {
 
 // MARK: - Private helpers
 private extension GitRepository {
-    func parseLogOutput(_ output: String) throws -> [Commit] {
-        let blocks = output
-            .components(separatedBy: "---END---")
-            .filter { !$0.isEmpty }
-
-        var commits: [Commit] = []
-
-        for block in blocks {
-            let fields = block.split(separator: String.null, omittingEmptySubsequences: false)
-            guard fields.count >= 11 else { continue }
-
-            let commit = Commit(
-                id: String(fields[0]),
-                title: String(fields[9]),
-                body: String(fields[10]),
-                author: Author(
-                    name: String(fields[3]),
-                    email: String(fields[4]),
-                    timestamp: Date(timeIntervalSince1970: Double(fields[5]) ?? 0),
-                    timezone: ""
-                ),
-                committer: Author(
-                    name: String(fields[6]),
-                    email: String(fields[7]),
-                    timestamp: Date(timeIntervalSince1970: Double(fields[8]) ?? 0),
-                    timezone: ""
-                ),
-                parents: fields[1].split(separator: String.space).map(String.init),
-                tree: String(fields[2])
-            )
-
-            commits.append(commit)
-        }
-
-        return commits
-    }
-
     func parseChangedFiles(_ output: String, commit: Commit) async throws -> [String: CommitedFile] {
         var files: [String: CommitedFile] = [:]
 
