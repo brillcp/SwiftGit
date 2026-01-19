@@ -24,38 +24,41 @@ extension CommandRunner: GitCommandable {
         process.currentDirectoryURL = repoURL
         process.arguments = command.arguments
 
-        // Ensure git never invokes a pager or prompts for credentials in this non-interactive context
         var env = ProcessInfo.processInfo.environment
         env["GIT_PAGER"] = "cat"
         env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_ASKPASS"] = ""
+        env["GIT_EDITOR"] = ":"
+        env["EDITOR"] = ":"
+        env["VISUAL"] = ":"
+        env["NO_COLOR"] = "1"
+        env["CLICOLOR"] = "0"
+        env["CLICOLOR_FORCE"] = "0"
         process.environment = env
 
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
 
-        let stdinData = command.stdinData
-        if stdinData != nil {
-            let pipe = Pipe()
-            process.standardInput = pipe
-        }
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        process.standardInput = stdinPipe
 
         try process.run()
 
-        if let stdinData, let pipe = process.standardInput as? Pipe {
-            pipe.fileHandleForWriting.write(stdinData)
-            try pipe.fileHandleForWriting.close()
+        if let data = command.stdinData {
+            stdinPipe.fileHandleForWriting.write(data)
         }
+        try stdinPipe.fileHandleForWriting.close()
 
         process.waitUntilExit()
 
-        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
 
         return CommandResult(
-            stdout: String(data: outputData, encoding: .utf8) ?? "",
-            stderr: String(data: errorData, encoding: .utf8) ?? "",
+            stdout: String(decoding: stdoutData, as: UTF8.self),
+            stderr: String(decoding: stderrData, as: UTF8.self),
             exitCode: Int(process.terminationStatus)
         )
     }

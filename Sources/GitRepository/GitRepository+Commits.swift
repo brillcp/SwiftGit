@@ -91,12 +91,15 @@ extension GitRepository: CommitWritable {
 // MARK: - Private helpers
 private extension GitRepository {
     func parseLogOutput(_ output: String) throws -> [Commit] {
-        let commitBlocks = output.components(separatedBy: "---END---")
+        let commitBlocks = output
+            .components(separatedBy: "---END---")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
         var commits: [Commit] = []
 
         for block in commitBlocks {
             let lines = block.split(separator: String.newLine, omittingEmptySubsequences: false)
-            guard lines.count >= 11 else { continue }
+            guard lines.count >= 10 else { continue }
 
             let hash = String(lines[0])
             let parents = String(lines[1]).split(separator: String.space).map(String.init)
@@ -110,16 +113,17 @@ private extension GitRepository {
             let title = String(lines[9])
             let body = lines[10...].joined(separator: String.newLine)
 
-            let commit = Commit(
-                id: hash,
-                title: title,
-                body: body,
-                author: Author(name: authorName, email: authorEmail, timestamp: authorTimestamp, timezone: ""),
-                committer: Author(name: committerName, email: committerEmail, timestamp: committerTimestamp, timezone: ""),
-                parents: parents,
-                tree: tree
+            commits.append(
+                Commit(
+                    id: hash,
+                    title: title,
+                    body: body,
+                    author: Author(name: authorName, email: authorEmail, timestamp: authorTimestamp, timezone: ""),
+                    committer: Author(name: committerName, email: committerEmail, timestamp: committerTimestamp, timezone: ""),
+                    parents: parents,
+                    tree: tree
+                )
             )
-            commits.append(commit)
         }
 
         return commits
