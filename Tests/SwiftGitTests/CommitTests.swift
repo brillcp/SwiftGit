@@ -165,33 +165,65 @@ struct CommitTests {
 
         // Get our commits
         let ourCommits = try await repository.getAllCommits(limit: 100).map(\.id)
+        let gitCommits = try getGitLog(at: repoURL)
 
-        // Get git commits
-        let task = Process()
-        task.launchPath = "/usr/bin/git"
-        task.arguments = ["-C", repoURL.path, "log", "--all", "--pretty=format:%H", "-n", "100"]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launch()
-        task.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else {
-            Issue.record("Failed to read git output")
-            return
-        }
-
-        let gitCommits = output.split(separator: "\n").map(String.init)
-
-        // Assertions!
         #expect(ourCommits.count == gitCommits.count, "Should have same number of commits")
-        #expect(Set(ourCommits) == Set(gitCommits), "Should have exact same commits")
+        #expect(ourCommits == gitCommits, "Should have same commits IN SAME ORDER")
     }
+
+    @Test func testTopologicalOrderWithBranches() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Create main commits
+        try createTestFile(in: repoURL, named: "file1.txt", content: "1")
+        try await repository.stageFile(at: "file1.txt")
+        try await repository.commit(message: "Main 1")
+
+        // Branch off
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "feature.txt", content: "feature")
+        try await repository.stageFile(at: "feature.txt")
+        try await repository.commit(message: "Feature")
+
+        // Back to main
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "file2.txt", content: "2")
+        try await repository.stageFile(at: "file2.txt")
+        try await repository.commit(message: "Main 2")
+
+        // Compare order
+        let ourCommits = try await repository.getAllCommits(limit: 100).map(\.id)
+        let gitCommits = try getGitLog(at: repoURL)
+
+        #expect(ourCommits == gitCommits, "Topological order should match with branches")
+    }
+
 }
 
 // MARK: - Test Helpers
 private extension CommitTests {
+    func getGitLog(at repoURL: URL) throws -> [String] {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        task.arguments = ["-C", repoURL.path, "log", "--all", "--topo-order", "--pretty=format:%H", "-n", "100"]
+
+        let pipe = Pipe()
+        task.standardOutput = pipe
+
+        try task.run()
+        task.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else {
+            return []
+        }
+
+        return output.split(separator: "\n").map(String.init)
+    }
+
     func gitReset(in repoURL: URL, hard: Bool = false) throws {
         let task = Process()
         task.launchPath = "/usr/bin/git"

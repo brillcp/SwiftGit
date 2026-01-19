@@ -11,6 +11,7 @@ public enum GitCommand: Sendable {
     case resetAll
 
     // MARK: - Commits
+    case log(limit: Int)
     case commit(message: String, author: String?)
 
     // MARK: - Branches
@@ -83,6 +84,14 @@ extension GitCommand {
             return ["reset", "HEAD", "--", "."]
 
         // MARK: - Commits
+        case .log(let limit):
+            return [
+                "log",
+                "--all",
+                "--topo-order",
+                "--format=%H%n%P%n%T%n%an%n%ae%n%at%n%cn%n%ce%n%ct%n%s%n%b%n---END---",
+                "-n", "\(limit)"
+            ]
         case .commit(let message, let author):
             var args = ["commit", "-m", message]
             if let author {
