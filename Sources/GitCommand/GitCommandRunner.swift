@@ -46,45 +46,45 @@ extension CommandRunner: GitCommandable {
                     return
                 }
 
-                let command = GitCommand.log(limit: limit)
-                let (process, stdoutPipe, _) = try await self.makeGitProcess(arguments: command.arguments, stdinData: command.stdinData)
-
-                try process.run()
-                if let pipe = process.standardInput as? Pipe {
-                    try pipe.fileHandleForWriting.close()
-                }
-
-                let handle = stdoutPipe.fileHandleForReading
-                var buffer = Data()
-
-                while true {
-                    if Task.isCancelled {
-                        process.terminate()
-                        continuation.finish()
-                        return
+                do {
+                    let result = try await self.run(.log(limit: limit))
+                    let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let commitLines = output.components(separatedBy: .newlines)
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                    
+                    for line in commitLines {
+                        let fields = line.split(separator: String.null, omittingEmptySubsequences: false)
+                        
+                        guard fields.count >= 11 else { continue }
+                        
+                        let commit = Commit(
+                            id: String(fields[0]),
+                            title: String(fields[9]),
+                            body: String(fields[10]),
+                            author: Author(
+                                name: String(fields[3]),
+                                email: String(fields[4]),
+                                timestamp: Date(timeIntervalSince1970: Double(fields[5]) ?? 0),
+                                timezone: ""
+                            ),
+                            committer: Author(
+                                name: String(fields[6]),
+                                email: String(fields[7]),
+                                timestamp: Date(timeIntervalSince1970: Double(fields[8]) ?? 0),
+                                timezone: ""
+                            ),
+                            parents: fields[1].isEmpty ? [] : fields[1].split(separator: " ").map(String.init),
+                            tree: String(fields[2])
+                        )
+                        
+                        continuation.yield(commit)
                     }
-
-                    let chunk = try handle.read(upToCount: 4096)
-                    if let chunk = chunk, !chunk.isEmpty {
-                        buffer.append(chunk)
-
-                        while let range = buffer.range(of: Data("---END---".utf8)) {
-                            let commitData = buffer.prefix(upTo: range.lowerBound)
-                            buffer.removeSubrange(range.lowerBound..<range.upperBound)
-
-                            let commit = try await parseCommitBlock(commitData)
-                            continuation.yield(commit)
-                        }
-                    } else {
-                        break
-                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                    return
                 }
-
-                if !buffer.isEmpty, let commit = try? await parseCommitBlock(buffer) {
-                    continuation.yield(commit)
-                }
-
-                process.waitUntilExit()
+                
                 continuation.finish()
             }
         }
@@ -125,32 +125,6 @@ private extension CommandRunner {
         }
 
         throw GitError.gitNotFound
-    }
-
-    func parseCommitBlock(_ data: Data) throws -> Commit {
-        let str = String(decoding: data, as: UTF8.self)
-        let fields = str.split(separator: String.null, omittingEmptySubsequences: false)
-        guard fields.count >= 11 else { throw GitError.nothingToCommit }
-
-        return Commit(
-            id: String(fields[0]),
-            title: String(fields[9]),
-            body: String(fields[10]),
-            author: Author(
-                name: String(fields[3]),
-                email: String(fields[4]),
-                timestamp: Date(timeIntervalSince1970: Double(fields[5]) ?? 0),
-                timezone: ""
-            ),
-            committer: Author(
-                name: String(fields[6]),
-                email: String(fields[7]),
-                timestamp: Date(timeIntervalSince1970: Double(fields[8]) ?? 0),
-                timezone: ""
-            ),
-            parents: fields[1].split(separator: " ").map(String.init),
-            tree: String(fields[2])
-        )
     }
 
     func makeGitProcess(
