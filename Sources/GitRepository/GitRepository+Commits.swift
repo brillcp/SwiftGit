@@ -17,6 +17,10 @@ extension GitRepository: CommitReadable {
             .log(limit: limit)
         )
 
+        guard result.exitCode == 0 else {
+            throw GitError.logFailed
+        }
+
         return try parseLogOutput(result.stdout)
     }
 
@@ -26,6 +30,10 @@ extension GitRepository: CommitReadable {
         let result = try await commandRunner.run(
             .diffTree(commitId: commitId)
         )
+
+        guard result.exitCode == 0 else {
+            throw GitError.getCommittedFilesFailed
+        }
 
         return try await parseChangedFiles(result.stdout, commit: commit)
     }
