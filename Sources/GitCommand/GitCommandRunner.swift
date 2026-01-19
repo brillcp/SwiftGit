@@ -54,31 +54,13 @@ extension CommandRunner: GitCommandable {
                         .filter { !$0.isEmpty }
                     
                     for line in commitLines {
-                        let fields = line.split(separator: String.null, omittingEmptySubsequences: false)
-                        
-                        guard fields.count >= 11 else { continue }
-                        
-                        let commit = Commit(
-                            id: String(fields[0]),
-                            title: String(fields[9]),
-                            body: String(fields[10]),
-                            author: Author(
-                                name: String(fields[3]),
-                                email: String(fields[4]),
-                                timestamp: Date(timeIntervalSince1970: Double(fields[5]) ?? 0),
-                                timezone: ""
-                            ),
-                            committer: Author(
-                                name: String(fields[6]),
-                                email: String(fields[7]),
-                                timestamp: Date(timeIntervalSince1970: Double(fields[8]) ?? 0),
-                                timezone: ""
-                            ),
-                            parents: fields[1].isEmpty ? [] : fields[1].split(separator: " ").map(String.init),
-                            tree: String(fields[2])
-                        )
-                        
-                        continuation.yield(commit)
+                        do {
+                            let commit = try Commit.parse(from: line)
+                            continuation.yield(commit)
+                        } catch {
+                            // Skip malformed commits but continue processing
+                            continue
+                        }
                     }
                 } catch {
                     continuation.finish(throwing: error)

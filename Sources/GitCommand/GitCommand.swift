@@ -90,8 +90,7 @@ extension GitCommand {
                 "--all",
                 "--topo-order",
                 "-n", "\(limit)",
-                "--pretty=format:%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b",
-                "--end-of-options"
+                "--format=%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b"
             ]
         case .commit(let message, let author):
             var args = ["commit", "-m", message]
