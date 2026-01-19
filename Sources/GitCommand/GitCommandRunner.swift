@@ -117,6 +117,13 @@ private extension CommandRunner {
         process.executableURL = try findGitBinary()
         process.currentDirectoryURL = repoURL
         process.arguments = arguments
+        
+        // Ensure git runs in non-interactive mode
+        process.environment = ProcessInfo.processInfo.environment
+        process.environment?["GIT_PAGER"] = ""
+        process.environment?["GIT_EDITOR"] = ":"
+        process.environment?["PAGER"] = ""
+        process.environment?["LESS"] = ""
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
