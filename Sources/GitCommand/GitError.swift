@@ -50,6 +50,7 @@ public enum GitError: LocalizedError {
 
     // MARK: - Advanced Operations
     case cherryPickFailed(commit: String)
+    case cherryPickSkipFailed
     case cherryPickConflict(commit: String)
     case revertFailed(commit: String)
     case revertConflict(commit: String)
@@ -157,6 +158,8 @@ public enum GitError: LocalizedError {
         // MARK: - Advanced Operations
         case .cherryPickFailed(let commit):
             return "Failed to cherry-pick commit \(commit.prefix(7))."
+        case .cherryPickSkipFailed:
+            return "Cherrypick skip failed."
         case .cherryPickConflict(let commit):
             return "Cherry-picking \(commit.prefix(7)) caused conflicts. Resolve them and commit."
         case .revertFailed(let commit):

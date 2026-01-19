@@ -31,6 +31,7 @@ public enum GitCommand: Sendable {
 
     // MARK: - History Manipulation
     case cherryPick(commitHash: String)
+    case cherryPickSkip
     case revert(commitHash: String, noCommit: Bool)
     case cherryPickContinue
     case mergeContinue
@@ -133,6 +134,8 @@ extension GitCommand {
         // MARK: - History Manipulation
         case .cherryPick(let commitHash):
             return ["cherry-pick", commitHash]
+        case .cherryPickSkip:
+            return ["cherry-pick", "--skip"]
         case .revert(let commitHash, let noCommit):
             var args = ["revert"]
             if noCommit {

@@ -63,10 +63,19 @@ extension GitRepository: ConflictWritable {
             continuedOperation = .mergeContinued
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
             let result = try await commandRunner.run(.cherryPickContinue)
-            guard result.exitCode == 0 else {
+            // Check for empty cherry-pick
+            if result.exitCode != 0 && result.stderr.contains("now empty") {
+                // Auto-skip empty cherry-picks
+                let skipResult = try await commandRunner.run(.cherryPickSkip)
+                guard skipResult.exitCode == 0 else {
+                    throw GitError.cherryPickSkipFailed
+                }
+                continuedOperation = .cherryPickContinued
+            } else if result.exitCode != 0 {
                 throw GitError.cherryPickContinueFailed
+            } else {
+                continuedOperation = .cherryPickContinued
             }
-            continuedOperation = .cherryPickContinued
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             let result = try await commandRunner.run(.revertContinue)
             guard result.exitCode == 0 else {
