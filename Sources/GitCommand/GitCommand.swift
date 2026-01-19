@@ -89,7 +89,7 @@ extension GitCommand {
                 "log",
                 "--all",
                 "--topo-order",
-                "--format=%H%n%P%n%T%n%an%n%ae%n%at%n%cn%n%ce%n%ct%n%s%n%b%n---END---",
+                "--format=%x00---END---%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b",
                 "-n", "\(limit)"
             ]
         case .commit(let message, let author):

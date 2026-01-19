@@ -91,39 +91,37 @@ extension GitRepository: CommitWritable {
 // MARK: - Private helpers
 private extension GitRepository {
     func parseLogOutput(_ output: String) throws -> [Commit] {
-        let commitBlocks = output
+        let blocks = output
             .components(separatedBy: "---END---")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+
         var commits: [Commit] = []
 
-        for block in commitBlocks {
-            let lines = block.split(separator: String.newLine, omittingEmptySubsequences: false)
-            guard lines.count >= 10 else { continue }
+        for block in blocks {
+            let fields = block.split(separator: String.null, omittingEmptySubsequences: false)
+            guard fields.count >= 11 else { continue }
 
-            let hash = String(lines[0])
-            let parents = String(lines[1]).split(separator: String.space).map(String.init)
-            let tree = String(lines[2])
-            let authorName = String(lines[3])
-            let authorEmail = String(lines[4])
-            let authorTimestamp = Date(timeIntervalSince1970: Double(lines[5]) ?? 0)
-            let committerName = String(lines[6])
-            let committerEmail = String(lines[7])
-            let committerTimestamp = Date(timeIntervalSince1970: Double(lines[8]) ?? 0)
-            let title = String(lines[9])
-            let body = lines[10...].joined(separator: String.newLine)
-
-            commits.append(
-                Commit(
-                    id: hash,
-                    title: title,
-                    body: body,
-                    author: Author(name: authorName, email: authorEmail, timestamp: authorTimestamp, timezone: ""),
-                    committer: Author(name: committerName, email: committerEmail, timestamp: committerTimestamp, timezone: ""),
-                    parents: parents,
-                    tree: tree
-                )
+            let commit = Commit(
+                id: String(fields[0]),
+                title: String(fields[9]),
+                body: String(fields[10]),
+                author: Author(
+                    name: String(fields[3]),
+                    email: String(fields[4]),
+                    timestamp: Date(timeIntervalSince1970: Double(fields[5]) ?? 0),
+                    timezone: ""
+                ),
+                committer: Author(
+                    name: String(fields[6]),
+                    email: String(fields[7]),
+                    timestamp: Date(timeIntervalSince1970: Double(fields[8]) ?? 0),
+                    timezone: ""
+                ),
+                parents: fields[1].split(separator: String.space).map(String.init),
+                tree: String(fields[2])
             )
+
+            commits.append(commit)
         }
 
         return commits

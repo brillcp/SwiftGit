@@ -15,6 +15,7 @@ extension String {
     public static let newLine: String = "\n"
     public static let tab: String = "\t"
     public static let space: String = " "
+    public static let null: String = "\0"
     public static let noNewLine: String = "\\ No newline at end of file"
     public static let noNewLineAtEnd: String = "\(newLine)\(noNewLine)\(newLine)"
 
