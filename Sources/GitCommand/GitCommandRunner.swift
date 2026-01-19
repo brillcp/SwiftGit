@@ -24,6 +24,12 @@ extension CommandRunner: GitCommandable {
         process.currentDirectoryURL = repoURL
         process.arguments = command.arguments
 
+        // Ensure git never invokes a pager or prompts for credentials in this non-interactive context
+        var env = ProcessInfo.processInfo.environment
+        env["GIT_PAGER"] = "cat"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        process.environment = env
+
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
