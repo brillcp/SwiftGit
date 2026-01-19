@@ -104,14 +104,18 @@ private extension GitRepository {
             let authorName = String(lines[3])
             let authorEmail = String(lines[4])
             let authorTimestamp = Date(timeIntervalSince1970: Double(lines[5]) ?? 0)
-            // ... parse rest
+            let committerName = String(lines[6])
+            let committerEmail = String(lines[7])
+            let committerTimestamp = Date(timeIntervalSince1970: Double(lines[8]) ?? 0)
+            let title = String(lines[9])
+            let body = lines[10...].joined(separator: String.newLine)
 
             let commit = Commit(
                 id: hash,
-                title: String(lines[9]),
-                body: lines[10...].joined(separator: String.newLine),
+                title: title,
+                body: body,
                 author: Author(name: authorName, email: authorEmail, timestamp: authorTimestamp, timezone: ""),
-                committer: Author(name: authorName, email: authorEmail, timestamp: authorTimestamp, timezone: ""),
+                committer: Author(name: committerName, email: committerEmail, timestamp: committerTimestamp, timezone: ""),
                 parents: parents,
                 tree: tree
             )
