@@ -26,10 +26,26 @@ extension CommandRunner: GitCommandable {
         )
 
         try process.run()
+        
+        // Read output asynchronously to prevent pipe buffer overflow
+        let stdoutHandle = stdoutPipe.fileHandleForReading
+        let stderrHandle = stderrPipe.fileHandleForReading
+        
+        // Start reading immediately while process runs
+        async let stdoutData = Task {
+            stdoutHandle.readDataToEndOfFile()
+        }.value
+        
+        async let stderrData = Task {
+            stderrHandle.readDataToEndOfFile()
+        }.value
+        
+        // Now wait for the process to finish
         process.waitUntilExit()
-
-        let stdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        
+        // Get the data we read concurrently
+        let stdout = await stdoutData
+        let stderr = await stderrData
 
         return CommandResult(
             stdout: String(decoding: stdout, as: UTF8.self),
