@@ -13,15 +13,7 @@ extension GitRepository: CommitReadable {
     }
 
     public func getAllCommits(limit: Int) async throws -> [Commit] {
-        let result = try await commandRunner.run(
-            .log(limit: limit)
-        )
-
-        guard result.exitCode == 0 else {
-            throw GitError.logFailed
-        }
-
-        return try parseLogOutput(result.stdout)
+        try await commandRunner.streamCommits(limit: limit).reduce(into: [Commit]()) { $0.append($1) }
     }
 
     public func getCommittedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
