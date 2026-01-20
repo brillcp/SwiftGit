@@ -36,7 +36,6 @@ public actor RefReader {
 // MARK: - RefReaderProtocol
 extension RefReader: RefReaderProtocol {
     public func getRefs() async throws -> [String: [GitRef]] {
-        // Check cache
         if let cached: [String: [GitRef]] = await cache.get(.refs) {
             return cached
         }
@@ -62,17 +61,14 @@ extension RefReader: RefReaderProtocol {
             }
         }
 
-        // Group by commit hash
         let refs = Dictionary(grouping: refsByName.values, by: { $0.hash })
 
-        // Cache it
         await cache.set(.refs, value: refs)
 
         return refs
     }
 
     public func getHEAD() async throws -> String? {
-        // Check cache
         if let cached: String = await cache.get(.head) {
             return cached
         }
@@ -108,7 +104,6 @@ extension RefReader: RefReaderProtocol {
             }
         }
 
-        // Cache if successful
         if let result {
             await cache.set(.head, value: result)
         }
@@ -135,6 +130,10 @@ extension RefReader: RefReaderProtocol {
     }
 
     public func getStashes() async throws -> [Stash] {
+        if let cached: [Stash] = await cache.get(.stashes) {
+            return cached
+        }
+
         let stashLogURL = gitURL.appendingPathComponent("logs/refs/stash")
 
         guard fileManager.fileExists(atPath: stashLogURL.path) else {
@@ -183,6 +182,7 @@ extension RefReader: RefReaderProtocol {
             )
         }
 
+        await cache.set(.stashes, value: stashes)
         return stashes
     }
 }

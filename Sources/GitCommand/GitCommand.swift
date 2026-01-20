@@ -50,12 +50,9 @@ public enum GitCommand: Sendable {
     case showFile(commitId: String, path: String)
     case stashShow(ref: String)
     case applyPatch(patch: String, cached: Bool)
-    
+
     // MARK: - Working Tree Status
     case status(porcelain: Bool)
-    case diffIndex(cached: Bool)
-    case diffFiles
-    case lsFiles(others: Bool, excludeStandard: Bool)
     case lsFilesStaged
 }
 
@@ -210,7 +207,7 @@ extension GitCommand {
             args.append("--whitespace=nowarn")
             args.append("-")
             return args
-            
+
         // MARK: - Working Tree Status
         case .status(let porcelain):
             var args = ["status"]
@@ -218,26 +215,6 @@ extension GitCommand {
                 args.append("--porcelain=v1")
             }
             return args
-        case .diffIndex(let cached):
-            var args = ["diff-index"]
-            if cached {
-                args.append("--cached")
-            }
-            args.append("--name-status")
-            args.append("HEAD")
-            return args
-        case .diffFiles:
-            return ["diff-files", "--name-status"]
-        case .lsFiles(let others, let excludeStandard):
-            var args = ["ls-files"]
-            if others {
-                args.append("--others")
-            }
-            if excludeStandard {
-                args.append("--exclude-standard")
-            }
-            return args
-            
         case .lsFilesStaged:
             return ["ls-files", "--stage"]
         }

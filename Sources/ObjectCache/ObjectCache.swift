@@ -4,6 +4,7 @@ public enum CacheKey: Hashable, Sendable {
     case commit(hash: String)
     case refs
     case head
+    case stashes
     case indexSnapshot(url: URL)
     case fileDiff(commitId: String, path: String)
 }

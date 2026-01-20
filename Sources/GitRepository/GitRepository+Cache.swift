@@ -5,6 +5,7 @@ extension GitRepository: CacheWritable {
         await workingTree.invalidateIndexCache()
         await cache.remove(.head)
         await cache.remove(.refs)
+        await cache.remove(.stashes)
         await cache.clearDiffCaches()
     }
 }

@@ -46,15 +46,11 @@ public actor GitRepository: GitRepositoryProtocol {
         )
         self.commandRunner = CommandRunner(repoURL: url)
         self.workingTreeParser = WorkingTreeParser()
-        let indexReader = GitIndexReader(
-            commandRunner: commandRunner,
-            workingTreeParser: workingTreeParser
-        )
         self.workingTree = WorkingTreeReader(
             repoURL: url,
             commandRunner: commandRunner,
             cache: cache,
-            indexReader: indexReader
+            indexReader: GitIndexReader(commandRunner: commandRunner)
         )
         self.patchGenerator = PatchGenerator()
         self.fileManager = .default
