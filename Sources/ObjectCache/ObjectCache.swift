@@ -185,8 +185,6 @@ private extension ObjectCache {
         switch value {
         case let commit as Commit:
             return commit.title.count + commit.body.count + 200
-        case let tree as Tree:
-            return tree.entries.count * 100
         case let dict as [String: String]:
             return dict.keys.reduce(0) { $0 + $1.count } + dict.values.reduce(0) { $0 + $1.count }
         case let array as [GitRef]:

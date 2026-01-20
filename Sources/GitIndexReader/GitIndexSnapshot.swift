@@ -4,16 +4,14 @@ public struct GitIndexSnapshot: Sendable {
     public let entries: [IndexEntry]
     public let entriesByPath: [String: IndexEntry]
     public let conflictedPaths: Set<String>
-    public let version: Int
     public let entryCount: Int
 
     public var hasConflicts: Bool {
         !conflictedPaths.isEmpty
     }
 
-    public init(entries: [IndexEntry], version: Int) {
+    public init(entries: [IndexEntry]) {
         self.entries = entries
-        self.version = version
         self.entryCount = entries.count
 
         // Detect duplicates (conflicts in index)

@@ -50,7 +50,11 @@ public actor GitRepository: GitRepositoryProtocol {
             repoURL: url,
             commandRunner: commandRunner,
             cache: cache,
-            indexReader: GitIndexReader(cache: cache)
+            indexReader: GitIndexReader(
+                cache: cache,
+                commandRunner: commandRunner,
+                workingTreeParser: workingTreeParser
+            )
         )
         self.patchGenerator = PatchGenerator()
         self.fileManager = .default
