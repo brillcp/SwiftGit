@@ -33,6 +33,9 @@ public enum GitError: LocalizedError {
     case stageHunkFailed(path: String)
     case unstageHunkFailed(path: String)
 
+    // MARK: - Working Tree Operations
+    case workingTreeStatusFailed
+
     // MARK: - Discard Operations
     case discardFileFailed(path: String)
     case discardHunkFailed(path: String)
@@ -130,6 +133,10 @@ public enum GitError: LocalizedError {
             return "Failed to stage changes in '\(path)'."
         case .unstageHunkFailed(let path):
             return "Failed to unstage changes in '\(path)'."
+            
+        // MARK: - Working Tree Operations
+        case .workingTreeStatusFailed:
+            return "Failed to get working tree status."
 
         // MARK: - Discard Operations
         case .discardFileFailed(let path):
