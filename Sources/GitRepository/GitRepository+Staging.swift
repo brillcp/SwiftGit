@@ -69,10 +69,6 @@ extension GitRepository: StagingWritable {
         }
 
         let path = file.path
-        let snapshot = try await workingTree.indexSnapshot()
-        let entries = snapshot.entries
-        let oldBlobSha = entries.first(where: { $0.path == path })?.sha1
-
         let patch = patchGenerator.generatePatch(hunk: hunk, file: file)
 
         let result = try await commandRunner.run(
@@ -85,9 +81,6 @@ extension GitRepository: StagingWritable {
 
         await workingTree.invalidateIndexCache()
 
-        if let oldBlobSha {
-            await cache.remove(.blob(hash: oldBlobSha))
-        }
         eventSubject.send(.hunkStaged(hunk: hunk, path: path))
     }
 
@@ -126,28 +119,55 @@ private extension GitRepository {
     }
 
     func cleanupTrailingNewlineChange(for path: String) async throws {
-        let snapshot = try await getRepoSnapshot()
-
-        guard let blobHash = snapshot.headTree[path],
-              let headBlob = try await getBlob(blobHash) else {
-            return
-        }
-
-        // Get INDEX content
-        guard let indexEntry = snapshot.indexMap[path],
-              let indexBlob = try await getBlob(indexEntry)
-        else { return }
-
-        let headContent = headBlob.text
-        let indexContent = indexBlob.text
-
-        // Check if only difference is trailing newline
-        let headTrimmed = headContent?.trimmingCharacters(in: .newlines)
-        let indexTrimmed = indexContent?.trimmingCharacters(in: .newlines)
-
-        if headTrimmed == indexTrimmed && headContent != indexContent {
-            // Only difference is trailing newlines - unstage it
+        // Get the staged diff for this specific file to check what's actually staged
+        let result = try await commandRunner.run(
+            .diff(path: path, staged: true, untracked: false, deleted: false)
+        )
+        
+        guard result.exitCode == 0 else { return }
+        
+        // Parse the diff to see what changes are staged
+        let hunks = await diffParser.parse(result.stdout)
+        
+        // Check if the only staged changes are trailing newline differences
+        if isOnlyTrailingNewlineChanges(hunks) {
+            // Only difference is trailing newlines - unstage the file
             try await commandRunner.run(.reset(path: path))
         }
+    }
+    
+    func isOnlyTrailingNewlineChanges(_ hunks: [DiffHunk]) -> Bool {
+        // If no hunks, no changes
+        guard !hunks.isEmpty else { return false }
+        
+        // Check each hunk to see if it only contains trailing newline changes
+        for hunk in hunks {
+            var hasTrailingNewlineChange = false
+            
+            for line in hunk.lines {
+                switch line.type {
+                case .unchanged:
+                    continue
+                case .added, .removed:
+                    let lineText = line.segments.map(\.text).joined()
+                    
+                    // Check if this line is just whitespace/newlines
+                    if lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        hasTrailingNewlineChange = true
+                    } else {
+                        // If there's any content change, this isn't just trailing newlines
+                        return false
+                    }
+                }
+            }
+            
+            // If this hunk has no trailing newline changes, it's not what we're looking for
+            if !hasTrailingNewlineChange {
+                return false
+            }
+        }
+        
+        // All hunks were just trailing newline changes
+        return true
     }
 }

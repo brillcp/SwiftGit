@@ -102,15 +102,10 @@ private extension GitRepository {
                 let oldPath = String(parts[1])
                 let newPath = String(parts[2])
 
-                // Get new blob
-                let newBlob = try await getBlob(at: newPath, treeHash: commit.tree)
-                if let blob = newBlob {
-                    files[newPath] = CommitedFile(
-                        path: newPath,
-                        blob: blob,
-                        changeType: .renamed(from: oldPath)
-                    )
-                }
+                files[newPath] = CommitedFile(
+                    path: newPath,
+                    changeType: .renamed(from: oldPath)
+                )
             } else {
                 let path = String(parts[1])
                 let changeType: GitChangeType
@@ -122,32 +117,10 @@ private extension GitRepository {
                 default: continue
                 }
 
-                // Load blob (nil for deleted files)
-                let blob: Blob?
-                if changeType == .deleted {
-                    // Load from parent tree
-                    if let parentId = commit.parents.first,
-                       let parentCommit = try await getCommit(parentId) {
-                        blob = try await getBlob(at: path, treeHash: parentCommit.tree)
-                    } else {
-                        blob = nil
-                    }
-                } else {
-                    blob = try await getBlob(at: path, treeHash: commit.tree)
-                }
-
-                if let blob {
-                    files[path] = CommitedFile(path: path, blob: blob, changeType: changeType)
-                }
+                files[path] = CommitedFile(path: path, changeType: changeType)
             }
         }
 
         return files
-    }
-
-    func getBlob(at path: String, treeHash: String) async throws -> Blob? {
-        let paths = try await getTreePaths(treeHash)
-        guard let blobHash = paths[path] else { return nil }
-        return try await getBlob(blobHash)
     }
 }

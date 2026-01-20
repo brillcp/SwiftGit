@@ -19,7 +19,6 @@ public actor PackFileReader: @unchecked Sendable {
     private let deltaResolver: DeltaResolverProtocol
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
-    private let blobParser: any BlobParserProtocol
     private var packHandles: [URL: FileHandle] = [:]
 
     public var isMapped: Bool {
@@ -30,12 +29,10 @@ public actor PackFileReader: @unchecked Sendable {
         deltaResolver: DeltaResolverProtocol = DeltaResolver(),
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
-        blobParser: any BlobParserProtocol = BlobParser()
     ) {
         self.deltaResolver = deltaResolver
         self.commitParser = commitParser
         self.treeParser = treeParser
-        self.blobParser = blobParser
     }
 }
 
@@ -65,9 +62,6 @@ extension PackFileReader: PackFileReaderProtocol {
         case "tree":
             let tree = try treeParser.parse(hash: location.hash, data: data)
             return .tree(tree)
-        case "blob":
-            let blob = try blobParser.parse(hash: location.hash, data: data)
-            return .blob(blob)
         case "tag":
             throw PackError.unsupportedObjectType("tag")
         default:
@@ -134,7 +128,7 @@ private extension PackFileReader {
         let dataOffset = offset + pos
 
         switch type {
-        case 1, 2, 3, 4:
+        case 1, 2, 4: // commit, tree, tag (skip blobs - type 3)
             // Non-delta types: decompress and return
             // Estimate compressed size (usually 50-70% of uncompressed)
             let estimatedCompressed = Int(Double(size) * 1.5) + 1024
@@ -146,7 +140,6 @@ private extension PackFileReader {
             switch type {
             case 1: typeStr = "commit"
             case 2: typeStr = "tree"
-            case 3: typeStr = "blob"
             case 4: typeStr = "tag"
             default: return nil
             }

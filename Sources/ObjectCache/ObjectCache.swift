@@ -1,14 +1,14 @@
 import Foundation
 
-public enum CacheKey: Hashable {
+public enum CacheKey: Hashable, Sendable {
     case commit(hash: String)
     case tree(hash: String)
-    case blob(hash: String)
     case treePaths(hash: String)
     case refs
     case head
     case indexSnapshot(url: URL)
     case fileHash(identity: FileIdentity)
+    case fileDiff(commitId: String, path: String)
 }
 
 public struct CacheStats {
@@ -37,6 +37,9 @@ public protocol ObjectCacheProtocol: Actor {
 
     /// Clear objects matching a predicate
     func clear(where predicate: (CacheKey) -> Bool) async
+    
+    /// Clear diff-related caches (useful after staging/committing)
+    func clearDiffCaches() async
 
     /// Get current cache statistics
     func stats() async -> CacheStats
@@ -63,11 +66,16 @@ public actor ObjectCache {
 // MARK: - ObjectCacheProtocol
 extension ObjectCache: ObjectCacheProtocol {
     public func get<T>(_ key: CacheKey) async -> T? {
-        guard var entry = storage[key] else { return nil }
+        guard var entry = storage[key] else { 
+            missCount += 1
+            return nil 
+        }
 
+        hitCount += 1
         accessOrder.remove(key)
         accessOrder.append(key)
         entry.lastAccessed = .now
+        storage[key] = entry
         return entry.value as? T
     }
 
@@ -119,7 +127,9 @@ extension ObjectCache: ObjectCacheProtocol {
     }
 
     public func clear(where predicate: (CacheKey) -> Bool) async {
-        let keysToRemove = storage.keys.filter(predicate)
+        let allKeys = Array(storage.keys)
+        let keysToRemove = allKeys.filter(predicate)
+        
         for key in keysToRemove {
             if let entry = storage[key] {
                 currentMemoryUsage -= entry.estimatedSize
@@ -137,6 +147,15 @@ extension ObjectCache: ObjectCacheProtocol {
             currentSize: storage.count,
             memoryUsage: currentMemoryUsage
         )
+    }
+    
+    public func clearDiffCaches() async {
+        await clear { key in
+            switch key {
+            case .fileDiff: return true
+            default: return false
+            }
+        }
     }
 }
 
@@ -168,8 +187,6 @@ private extension ObjectCache {
             return commit.title.count + commit.body.count + 200
         case let tree as Tree:
             return tree.entries.count * 100
-        case let blob as Blob:
-            return blob.data.count
         case let dict as [String: String]:
             return dict.keys.reduce(0) { $0 + $1.count } + dict.values.reduce(0) { $0 + $1.count }
         case let array as [GitRef]:
@@ -178,6 +195,18 @@ private extension ObjectCache {
             return string.count
         case let tuple as (snapshot: GitIndexSnapshot, modDate: Date):
             return tuple.snapshot.entries.count * 150
+        case let hunks as [DiffHunk]:
+            var totalSize = 0
+            for hunk in hunks {
+                var hunkSize = 100
+                for line in hunk.lines {
+                    for segment in line.segments {
+                        hunkSize += segment.text.count
+                    }
+                }
+                totalSize += hunkSize
+            }
+            return totalSize
         default:
             return 500
         }

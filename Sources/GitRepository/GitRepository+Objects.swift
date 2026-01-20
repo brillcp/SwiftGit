@@ -12,51 +12,7 @@ extension GitRepository: ObjectReadable {
         return tree
     }
 
-    public func getBlob(_ hash: String) async throws -> Blob? {
-        if let cached: Blob = await cache.get(.blob(hash: hash)) { return cached }
-
-        guard let parsedObject = try await loadObject(hash: hash),
-              case .blob(let blob) = parsedObject
-        else { return nil }
-
-        if blob.data.count < 100_000 {
-            await cache.set(.blob(hash: hash), value: blob)
-        }
-
-        return blob
-    }
-
-    public func streamBlob(_ hash: String) -> AsyncThrowingStream<Data, any Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    // For now, just load the whole blob and stream it in chunks
-                    // TODO: Implement true streaming for large blobs
-                    guard let blob = try await getBlob(hash) else {
-                        continuation.finish(throwing: RepositoryError.objectNotFound(hash))
-                        return
-                    }
-
-                    let chunkSize = 8192
-                    var offset = 0
-
-                    while offset < blob.data.count {
-                        let end = min(offset + chunkSize, blob.data.count)
-                        let chunk = blob.data[offset..<end]
-                        continuation.yield(Data(chunk))
-                        offset = end
-                    }
-
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-
     public func getTreePaths(_ treeHash: String) async throws -> [String : String] {
-        // Check cache
         if let cached: [String: String] = await cache.get(.treePaths(hash: treeHash)) { return cached }
 
         var paths: [String: String] = [:]
@@ -68,7 +24,6 @@ extension GitRepository: ObjectReadable {
             return true
         }
 
-        // Cache the result
         await cache.set(.treePaths(hash: treeHash), value: paths)
         return paths
     }

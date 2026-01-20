@@ -2,6 +2,11 @@ import Foundation
 
 extension GitRepository: DiffReadable {
     public func getFileDiff(for commitId: String, at path: String) async throws -> [DiffHunk] {
+        let cacheKey = CacheKey.fileDiff(commitId: commitId, path: path)
+        if let cached: [DiffHunk] = await cache.get(cacheKey) {
+            return cached
+        }
+        
         guard let commit = try await getCommit(commitId) else { return [] }
 
         guard let parentId = commit.parents.first else {
@@ -9,14 +14,18 @@ extension GitRepository: DiffReadable {
                 .showFile(commitId: commitId, path: path)
             )
 
-            return await diffParser.parse(result.stdout)
+            let hunks = await diffParser.parse(result.stdout)
+            await cache.set(cacheKey, value: hunks)
+            return hunks
         }
 
         let result = try await commandRunner.run(
             .diffCommits(from: parentId, to: commitId, path: path)
         )
 
-        return await diffParser.parse(result.stdout)
+        let hunks = await diffParser.parse(result.stdout)
+        await cache.set(cacheKey, value: hunks)
+        return hunks
     }
 
     public func getUnstagedDiff(for workingFile: WorkingTreeFile) async throws -> [DiffHunk] {

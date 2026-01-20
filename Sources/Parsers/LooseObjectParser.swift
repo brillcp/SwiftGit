@@ -3,7 +3,6 @@ import Foundation
 public enum ParsedObject: Sendable {
     case commit(Commit)
     case tree(Tree)
-    case blob(Blob)
     case tag // not implemented yet
 }
 
@@ -16,16 +15,13 @@ public protocol LooseObjectParserProtocol {
 public final class LooseObjectParser {
     private let commitParser: any CommitParserProtocol
     private let treeParser: any TreeParserProtocol
-    private let blobParser: any BlobParserProtocol
 
     public init(
         commitParser: any CommitParserProtocol = CommitParser(),
         treeParser: any TreeParserProtocol = TreeParser(),
-        blobParser: any BlobParserProtocol = BlobParser()
     ) {
         self.commitParser = commitParser
         self.treeParser = treeParser
-        self.blobParser = blobParser
     }
 }
 
@@ -42,9 +38,6 @@ extension LooseObjectParser: LooseObjectParserProtocol {
         case "tree":
             let tree = try treeParser.parse(hash: hash, data: objectData)
             return .tree(tree)
-        case "blob":
-            let blob = try blobParser.parse(hash: hash, data: objectData)
-            return .blob(blob)
         case "tag":
             // TODO: Implement tag parsing
             throw ParseError.unsupportedObjectType(type)
