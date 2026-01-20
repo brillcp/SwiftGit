@@ -6,7 +6,7 @@ extension GitRepository: DiffReadable {
         if let cached: [DiffHunk] = await cache.get(cacheKey) {
             return cached
         }
-        
+
         guard let commit = try await getCommit(commitId) else { return [] }
 
         guard let parentId = commit.parents.first else {

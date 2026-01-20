@@ -16,9 +16,7 @@ extension GitRepository: CommitReadable {
         try await commandRunner.streamCommits(limit: limit).reduce(into: [Commit]()) { $0.append($1) }
     }
 
-    public func getCommittedFiles(_ commitId: String) async throws -> [String: CommitedFile] {
-        guard let commit = try await getCommit(commitId) else { return [:] }
-
+    public func getCommittedFiles(_ commitId: String) async throws -> [String: CommittedFile] {
         let result = try await commandRunner.run(
             .diffTree(commitId: commitId)
         )
@@ -27,12 +25,10 @@ extension GitRepository: CommitReadable {
             throw GitError.getCommittedFilesFailed
         }
 
-        return try await parseChangedFiles(result.stdout, commit: commit)
+        return await workingTreeParser.parseFilesOutput(result.stdout)
     }
 
-    public func getStashedFiles(_ stashId: String) async throws -> [String: CommitedFile] {
-        guard let stashCommit = try await getCommit(stashId) else { return [:] }
-
+    public func getStashedFiles(_ stashId: String) async throws -> [String: CommittedFile] {
         let result = try await commandRunner.run(
             .stashShow(ref: stashId)
         )
@@ -41,7 +37,7 @@ extension GitRepository: CommitReadable {
             throw GitError.diffFailed
         }
 
-        return try await parseChangedFiles(result.stdout, commit: stashCommit)
+        return await workingTreeParser.parseFilesOutput(result.stdout)
     }
 
     public func getHEAD() async throws -> String? {
@@ -77,50 +73,5 @@ extension GitRepository: CommitWritable {
 
         let hash = try await getHEAD() ?? ""
         eventSubject.send(.committed(hash: hash))
-    }
-}
-
-// MARK: - Private helpers
-private extension GitRepository {
-    func parseChangedFiles(_ output: String, commit: Commit) async throws -> [String: CommitedFile] {
-        var files: [String: CommitedFile] = [:]
-
-        let lines = output.split(separator: String.newLine)
-
-        for line in lines {
-            // Format: :100644 100644 hash1 hash2 M\tpath
-            // or for renames: :100644 100644 hash1 hash2 R100\told\tnew
-            let parts = line.split(separator: String.tab)
-            guard parts.count >= 2 else { continue }
-
-            let statusPart = parts[0].split(separator: String.space).last ?? ""
-            let status = String(statusPart)
-
-            if status.hasPrefix("R") {
-                // Rename: old path and new path
-                guard parts.count >= 3 else { continue }
-                let oldPath = String(parts[1])
-                let newPath = String(parts[2])
-
-                files[newPath] = CommitedFile(
-                    path: newPath,
-                    changeType: .renamed(from: oldPath)
-                )
-            } else {
-                let path = String(parts[1])
-                let changeType: GitChangeType
-
-                switch status {
-                case "A": changeType = .added
-                case "M": changeType = .modified
-                case "D": changeType = .deleted
-                default: continue
-                }
-
-                files[path] = CommitedFile(path: path, changeType: changeType)
-            }
-        }
-
-        return files
     }
 }

@@ -10,6 +10,7 @@ public actor GitRepository: GitRepositoryProtocol {
     // MARK: - Internal properties
     let protectedBranches = ["main", "master", "develop", "production", "staging"]
     let eventSubject = PassthroughSubject<GitEvent, Never>()
+    let workingTreeParser: WorkingTreeParserProtocol
     let workingTree: WorkingTreeReaderProtocol
     let patchGenerator: PatchGenerator
     let commandRunner: GitCommandable
@@ -43,12 +44,14 @@ public actor GitRepository: GitRepositoryProtocol {
             repoURL: url,
             cache: cache
         )
+        self.commandRunner = CommandRunner(repoURL: url)
+        self.workingTreeParser = WorkingTreeParser()
         self.workingTree = WorkingTreeReader(
             repoURL: url,
-            indexReader: GitIndexReader(cache: cache),
-            cache: cache
+            commandRunner: commandRunner,
+            cache: cache,
+            indexReader: GitIndexReader(cache: cache)
         )
-        self.commandRunner = CommandRunner(repoURL: url)
         self.patchGenerator = PatchGenerator()
         self.fileManager = .default
         self.securityScopeStarted = url.startAccessingSecurityScopedResource()
