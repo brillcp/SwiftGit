@@ -8,14 +8,9 @@ public protocol GitIndexReaderProtocol: Actor {
 // MARK: -
 public actor GitIndexReader {
     private let commandRunner: GitCommandable
-    private let workingTreeParser: WorkingTreeParserProtocol
 
-    public init(
-        commandRunner: GitCommandable,
-        workingTreeParser: WorkingTreeParserProtocol
-    ) {
+    public init(commandRunner: GitCommandable) {
         self.commandRunner = commandRunner
-        self.workingTreeParser = workingTreeParser
     }
 }
 
