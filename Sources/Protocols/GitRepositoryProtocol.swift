@@ -13,7 +13,6 @@ public protocol GitRepositoryProtocol:
     DiscardWritable,
     StashReadable,
     StashWritable,
-    ObjectReadable,
     CacheWritable,
     CherryPickWritable,
     RevertWritable,

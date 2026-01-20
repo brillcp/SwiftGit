@@ -2,7 +2,6 @@ import Foundation
 
 public enum ParsedObject: Sendable {
     case commit(Commit)
-    case tree(Tree)
     case tag // not implemented yet
 }
 
@@ -14,14 +13,9 @@ public protocol LooseObjectParserProtocol {
 // MARK: -
 public final class LooseObjectParser {
     private let commitParser: any CommitParserProtocol
-    private let treeParser: any TreeParserProtocol
 
-    public init(
-        commitParser: any CommitParserProtocol = CommitParser(),
-        treeParser: any TreeParserProtocol = TreeParser(),
-    ) {
+    public init(commitParser: any CommitParserProtocol = CommitParser()) {
         self.commitParser = commitParser
-        self.treeParser = treeParser
     }
 }
 
@@ -35,12 +29,6 @@ extension LooseObjectParser: LooseObjectParserProtocol {
         case "commit":
             let commit = try commitParser.parse(hash: hash, data: objectData)
             return .commit(commit)
-        case "tree":
-            let tree = try treeParser.parse(hash: hash, data: objectData)
-            return .tree(tree)
-        case "tag":
-            // TODO: Implement tag parsing
-            throw ParseError.unsupportedObjectType(type)
         default:
             throw ParseError.unsupportedObjectType(type)
         }
@@ -89,7 +77,6 @@ public enum ParseError: LocalizedError {
     case invalidEncoding
     case unsupportedObjectType(String)
     case malformedCommit
-    case malformedTree
     case missingRequiredField(String)
 
     public var errorDescription: String? {
@@ -102,8 +89,6 @@ public enum ParseError: LocalizedError {
             return "Unsupported Git object type: \(type)"
         case .malformedCommit:
             return "Commit data is malformed"
-        case .malformedTree:
-            return "Tree data is malformed"
         case .missingRequiredField(let field):
             return "Required field missing: \(field)"
         }

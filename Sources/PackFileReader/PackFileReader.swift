@@ -18,7 +18,6 @@ public protocol PackFileReaderProtocol: Actor {
 public actor PackFileReader: @unchecked Sendable {
     private let deltaResolver: DeltaResolverProtocol
     private let commitParser: any CommitParserProtocol
-    private let treeParser: any TreeParserProtocol
     private var packHandles: [URL: FileHandle] = [:]
 
     public var isMapped: Bool {
@@ -28,11 +27,9 @@ public actor PackFileReader: @unchecked Sendable {
     public init(
         deltaResolver: DeltaResolverProtocol = DeltaResolver(),
         commitParser: any CommitParserProtocol = CommitParser(),
-        treeParser: any TreeParserProtocol = TreeParser(),
     ) {
         self.deltaResolver = deltaResolver
         self.commitParser = commitParser
-        self.treeParser = treeParser
     }
 }
 
@@ -59,9 +56,6 @@ extension PackFileReader: PackFileReaderProtocol {
         case "commit":
             let commit = try commitParser.parse(hash: location.hash, data: data)
             return .commit(commit)
-        case "tree":
-            let tree = try treeParser.parse(hash: location.hash, data: data)
-            return .tree(tree)
         case "tag":
             throw PackError.unsupportedObjectType("tag")
         default:

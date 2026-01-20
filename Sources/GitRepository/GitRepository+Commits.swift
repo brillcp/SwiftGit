@@ -75,3 +75,21 @@ extension GitRepository: CommitWritable {
         eventSubject.send(.committed(hash: hash))
     }
 }
+
+// MARK: - Private helper
+private extension GitRepository {
+    func loadObject(hash: String) async throws -> ParsedObject? {
+        guard let location = try await locator.locate(hash) else { return nil }
+
+        switch location {
+        case .loose(let fileURL):
+            let data = try Data(contentsOf: fileURL)
+            return try looseParser.parse(hash: hash, data: data)
+        case .packed(let packLocation):
+            guard let packIndex = try await locator.getPackIndex(for: packLocation.packURL) else {
+                throw RepositoryError.packIndexNotFound
+            }
+            return try await packReader.parseObject(at: packLocation, packIndex: packIndex)
+        }
+    }
+}

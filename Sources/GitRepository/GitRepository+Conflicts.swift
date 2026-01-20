@@ -12,7 +12,11 @@ extension GitRepository: ConflictReadable {
     }
 
     public func getConflictedFiles() async throws -> Set<String> {
-        try await getRepoSnapshot().conflictedPaths
+        let status = try await workingTree.workingTreeStatus()
+        let conflicted = status.files.values
+            .filter { $0.staged == .conflicted || $0.unstaged == .conflicted }
+            .map(\.path)
+        return Set(conflicted)
     }
 
     public func conflictOperation() async -> ConflictOperation? {
