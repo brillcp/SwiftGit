@@ -110,8 +110,7 @@ extension GitRepository: StagingWritable {
 private extension GitRepository {
     func checkIndex(for file: WorkingTreeFile) async throws {
         let snapshot = try await workingTree.indexSnapshot()
-        let entries = snapshot.entries
-        let fileInIndex = entries.contains { $0.path == file.path }
+        let fileInIndex = snapshot.entriesByPath[file.path] != nil
 
         if !fileInIndex {
             throw GitError.fileNotInIndex(path: file.path)

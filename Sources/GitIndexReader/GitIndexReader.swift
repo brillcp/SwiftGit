@@ -7,21 +7,15 @@ public protocol GitIndexReaderProtocol: Actor {
 
 // MARK: -
 public actor GitIndexReader {
-    private let cache: ObjectCacheProtocol
     private let commandRunner: GitCommandable
     private let workingTreeParser: WorkingTreeParserProtocol
-    private let fileManager: FileManager
 
     public init(
-        cache: ObjectCacheProtocol,
         commandRunner: GitCommandable,
-        workingTreeParser: WorkingTreeParserProtocol,
-        fileManager: FileManager = .default
+        workingTreeParser: WorkingTreeParserProtocol
     ) {
-        self.cache = cache
         self.commandRunner = commandRunner
         self.workingTreeParser = workingTreeParser
-        self.fileManager = fileManager
     }
 }
 

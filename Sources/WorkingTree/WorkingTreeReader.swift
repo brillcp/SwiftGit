@@ -14,7 +14,6 @@ public protocol WorkingTreeReaderProtocol: Actor {
 // MARK: -
 public actor WorkingTreeReader {
     private let repoURL: URL
-    private let fileManager: FileManager
     private let indexReader: GitIndexReaderProtocol
     private let cache: ObjectCacheProtocol
     private let commandRunner: GitCommandable
@@ -25,11 +24,9 @@ public actor WorkingTreeReader {
         commandRunner: GitCommandable,
         workingTreeParser: WorkingTreeParserProtocol = WorkingTreeParser(),
         cache: ObjectCacheProtocol,
-        indexReader: GitIndexReaderProtocol,
-        fileManager: FileManager = .default,
+        indexReader: GitIndexReaderProtocol
     ) {
         self.repoURL = repoURL
-        self.fileManager = fileManager
         self.indexReader = indexReader
         self.commandRunner = commandRunner
         self.workingTreeParser = workingTreeParser
@@ -40,16 +37,21 @@ public actor WorkingTreeReader {
 // MARK: - WorkingTreeReaderProtocol
 extension WorkingTreeReader: WorkingTreeReaderProtocol {
     public func indexSnapshot() async throws -> GitIndexSnapshot {
-        try await indexReader.readIndex(at: indexURL)
+        if let cached: GitIndexSnapshot = await cache.get(.indexSnapshot(url: indexURL)) {
+            return cached
+        }
+        let indexSnapshot = try await indexReader.readIndex(at: indexURL)
+        await cache.set(.indexSnapshot(url: indexURL), value: indexSnapshot)
+        return indexSnapshot
     }
 
     public func workingTreeStatus() async throws -> WorkingTreeStatus {
         let result = try await commandRunner.run(.status(porcelain: true))
-        
+
         guard result.exitCode == 0 else {
             throw GitError.workingTreeStatusFailed
         }
-        
+
         return await workingTreeParser.parseStatusOutput(result.stdout)
     }
 

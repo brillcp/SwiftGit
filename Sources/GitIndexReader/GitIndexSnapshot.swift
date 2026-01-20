@@ -1,20 +1,11 @@
 import Foundation
 
 public struct GitIndexSnapshot: Sendable {
-    public let entries: [IndexEntry]
     public let entriesByPath: [String: IndexEntry]
     public let conflictedPaths: Set<String>
     public let entryCount: Int
 
-    public var hasConflicts: Bool {
-        !conflictedPaths.isEmpty
-    }
-
     public init(entries: [IndexEntry]) {
-        self.entries = entries
-        self.entryCount = entries.count
-
-        // Detect duplicates (conflicts in index)
         var tempDict: [String: IndexEntry] = [:]
         var conflicts: Set<String> = []
 
@@ -27,6 +18,7 @@ public struct GitIndexSnapshot: Sendable {
         }
 
         self.entriesByPath = tempDict
+        self.entryCount = tempDict.count
         self.conflictedPaths = conflicts
     }
 }
