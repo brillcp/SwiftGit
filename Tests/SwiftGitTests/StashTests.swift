@@ -161,4 +161,57 @@ struct StashTests {
         #expect(changes["file1.txt"] != nil, "file1.txt should be in stash")
         #expect(changes["file3.txt"] != nil, "file3.txt should be in stash")
     }
+
+    @Test func testStashCommitsAreFiltered() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Create some commits
+        try createTestFile(in: repoURL, named: "file1.txt", content: "Content 1")
+        try await repository.stageFile(at: "file1.txt")
+        try await repository.commit(message: "Commit 1")
+
+        try createTestFile(in: repoURL, named: "file2.txt", content: "Content 2")
+        try await repository.stageFile(at: "file2.txt")
+        try await repository.commit(message: "Commit 2")
+
+        // Create a stash
+        try createTestFile(in: repoURL, named: "file3.txt", content: "Stashed content")
+        try await repository.stageFile(at: "file3.txt")
+        try gitStash(in: repoURL)
+
+        // Get commits from our implementation
+        let ourCommits = try await repository.getAllCommits(limit: 100)
+
+        // Verify no stash-related commits appear
+        let stashRelatedTitles = ["WIP on", "index on", "untracked files on"]
+        for commit in ourCommits {
+            for stashTitle in stashRelatedTitles {
+                #expect(
+                    !commit.title.contains(stashTitle),
+                    "Commit list should not contain stash commits. Found: \(commit.title)"
+                )
+            }
+        }
+
+        // Verify we still have the regular commits
+        #expect(ourCommits.count == 2, "Should have 2 regular commits (excluding stash)")
+        #expect(ourCommits[0].title == "Commit 2", "Most recent commit should be first")
+        #expect(ourCommits[1].title == "Commit 1", "Second commit should be second")
+    }
+}
+
+func gitStash(in repoURL: URL) throws {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    task.arguments = ["-C", repoURL.path, "stash"]
+
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.standardError = pipe
+
+    try task.run()
+    task.waitUntilExit()
 }

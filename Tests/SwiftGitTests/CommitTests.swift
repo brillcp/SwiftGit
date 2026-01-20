@@ -200,7 +200,6 @@ struct CommitTests {
 
         #expect(ourCommits == gitCommits, "Topological order should match with branches")
     }
-
 }
 
 // MARK: - Test Helpers
