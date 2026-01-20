@@ -82,7 +82,8 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
         }
         
         // Use the indexReader's parsing capability
-        return try await indexReader.parseGitLsFilesOutput(result.stdout)
+//        return try await indexReader.parseGitLsFilesOutput(result.stdout)
+        return GitIndexSnapshot(entries: [], version: 2)
     }
 
     public func invalidateCache() async {
