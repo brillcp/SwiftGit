@@ -26,17 +26,17 @@ extension CommandRunner: GitCommandable {
         )
 
         try process.run()
-        
+
         async let stdoutData = Task {
             stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
-        
+
         async let stderrData = Task {
             stderrPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
-        
+
         process.waitUntilExit()
-        
+
         let stdout = await stdoutData
         let stderr = await stderrData
 
@@ -61,7 +61,7 @@ extension CommandRunner: GitCommandable {
                     let commitLines = output.components(separatedBy: .newlines)
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
-                    
+
                     for line in commitLines {
                         do {
                             let commit = try Commit.parse(from: line)
@@ -75,7 +75,7 @@ extension CommandRunner: GitCommandable {
                     continuation.finish(throwing: error)
                     return
                 }
-                
+
                 continuation.finish()
             }
         }
@@ -126,7 +126,7 @@ private extension CommandRunner {
         process.executableURL = try findGitBinary()
         process.currentDirectoryURL = repoURL
         process.arguments = arguments
-        
+
         // Disable git pager to prevent interactive prompts
         process.environment = ProcessInfo.processInfo.environment
         process.environment?["GIT_PAGER"] = ""
