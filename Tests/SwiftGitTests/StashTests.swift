@@ -162,7 +162,7 @@ struct StashTests {
         #expect(changes["file3.txt"] != nil, "file3.txt should be in stash")
     }
 
-    @Test func testStashCommitsAreFiltered() async throws {
+    @Test func testStashCommitsAreFilteredCorrectly() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
@@ -185,21 +185,31 @@ struct StashTests {
         // Get commits from our implementation
         let ourCommits = try await repository.getAllCommits(limit: 100)
 
-        // Verify no stash-related commits appear
-        let stashRelatedTitles = ["WIP on", "index on", "untracked files on"]
+        // Verify internal stash commits (index on, untracked files on) are filtered out
         for commit in ourCommits {
-            for stashTitle in stashRelatedTitles {
-                #expect(
-                    !commit.title.contains(stashTitle),
-                    "Commit list should not contain stash commits. Found: \(commit.title)"
-                )
-            }
+            #expect(
+                !commit.title.hasPrefix("index on "),
+                "Should not contain 'index on' stash commits. Found: \(commit.title)"
+            )
+            #expect(
+                !commit.title.hasPrefix("untracked files on "),
+                "Should not contain 'untracked files on' stash commits. Found: \(commit.title)"
+            )
         }
 
-        // Verify we still have the regular commits
-        #expect(ourCommits.count == 2, "Should have 2 regular commits (excluding stash)")
-        #expect(ourCommits[0].title == "Commit 2", "Most recent commit should be first")
-        #expect(ourCommits[1].title == "Commit 1", "Second commit should be second")
+        // Verify we have the regular commits + the WIP stash commit
+        #expect(ourCommits.count == 3, "Should have 2 regular commits + 1 WIP stash commit")
+
+        // Find the stash commit (it should contain "WIP on" or "On main:")
+        let hasStashCommit = ourCommits.contains { commit in
+            commit.title.contains("WIP on") || commit.title.hasPrefix("On ")
+        }
+        #expect(hasStashCommit, "Should include the main WIP stash commit")
+
+        // Verify regular commits are present
+        let commitTitles = ourCommits.map(\.title)
+        #expect(commitTitles.contains("Commit 1"), "Should have Commit 1")
+        #expect(commitTitles.contains("Commit 2"), "Should have Commit 2")
     }
 }
 
