@@ -62,50 +62,51 @@ extension CommandRunner: GitCommandable {
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
 
+                    // Parse commits and build parent lookup map in single pass
                     var commits: [Commit] = []
-                    var commitsById: [String: Commit] = [:]
+                    commits.reserveCapacity(commitLines.count)
+                    var parentInfo: [String: [String]] = [:] // id -> parents array
+
                     for line in commitLines {
                         do {
                             let commit = try Commit.parse(from: line)
                             commits.append(commit)
-                            commitsById[commit.id] = commit
+                            parentInfo[commit.id] = commit.parents
                         } catch {
                             continue
                         }
                     }
-                    // Filter out stash internal commits:
-                    // Stash WIP commit has 2-3 parents: [base, index, untracked(optional)]
-                    // - Index commit: has 1 parent (the base commit)
-                    // - Untracked commit: has 0 parents (orphan commit)
+
+                    // Build set of stash internal commit IDs
+                    // Stash WIP: 2-3 parents [base, index, untracked?]
+                    // Index: 1 parent [base] - same as WIP's first
+                    // Untracked: 0 parents (orphan)
                     var stashInternalCommits = Set<String>()
-                    for commit in commits {
-                        if commit.parents.count >= 2 {
-                            let baseParent = commit.parents[0]
+                    for commit in commits where commit.parents.count >= 2 {
+                        let baseParent = commit.parents[0]
 
-                            // Check second parent (index commit)
-                            // Index commit has exactly 1 parent which is the base commit
-                            if let secondParent = commitsById[commit.parents[1]],
-                               secondParent.parents.count == 1,
-                               secondParent.parents[0] == baseParent {
-                                stashInternalCommits.insert(secondParent.id)
-                            }
-                            // Check third parent if exists (untracked commit)
-                            // Untracked commit has 0 parents (orphan)
-                            if commit.parents.count >= 3,
-                               let thirdParent = commitsById[commit.parents[2]],
-                               thirdParent.parents.isEmpty {
-                                stashInternalCommits.insert(thirdParent.id)
+                        // Check 2nd parent (index): 1 parent == base
+                        let secondParentId = commit.parents[1]
+                        if let secondParents = parentInfo[secondParentId],
+                           secondParents.count == 1,
+                           secondParents[0] == baseParent {
+                            stashInternalCommits.insert(secondParentId)
+                        }
+
+                        // Check 3rd parent (untracked): 0 parents
+                        if commit.parents.count >= 3 {
+                            let thirdParentId = commit.parents[2]
+                            if let thirdParents = parentInfo[thirdParentId],
+                               thirdParents.isEmpty {
+                                stashInternalCommits.insert(thirdParentId)
                             }
                         }
                     }
 
-                    // Yield commits that aren't stash internals
-                    for commit in commits {
-                        if !stashInternalCommits.contains(commit.id) {
-                            continuation.yield(commit)
-                        }
+                    // Yield non-internal commits
+                    for commit in commits where !stashInternalCommits.contains(commit.id) {
+                        continuation.yield(commit)
                     }
-
                 } catch {
                     continuation.finish(throwing: error)
                     return
