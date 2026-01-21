@@ -59,7 +59,7 @@ extension CommandRunner: GitCommandable {
                     let result = try await self.run(.log(limit: limit))
 
                     guard result.exitCode == 0 else {
-                        throw GitError.logFailed(reason: result.stdout)
+                        throw GitError.logFailed(reason: result.stderr)
                     }
 
                     let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
