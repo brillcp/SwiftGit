@@ -62,7 +62,7 @@ public enum GitError: LocalizedError {
     case conflictDetected
     case diffFailed
     case getCommittedFilesFailed
-    case logFailed
+    case logFailed(reason: String)
     case fileNotFound(path: String, ref: String)
     case getFileContentFailed(path: String, ref: String)
 
@@ -181,8 +181,8 @@ public enum GitError: LocalizedError {
             return "Merge conflicts detected. Resolve them before continuing."
         case .diffFailed:
             return "Failed to get file diff. Please try again."
-        case .logFailed:
-            return "Failed to get commit history. Please try again."
+        case .logFailed(let reason):
+            return "Failed to get commit history. Reason: \(reason)."
         case .getCommittedFilesFailed:
             return "Failed to get committed files."
         case .fileNotFound(let path, let ref):

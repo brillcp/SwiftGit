@@ -57,6 +57,11 @@ extension CommandRunner: GitCommandable {
 
                 do {
                     let result = try await self.run(.log(limit: limit))
+
+                    guard result.exitCode == 0 else {
+                        throw GitError.logFailed(reason: result.stdout)
+                    }
+
                     let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                     let commitLines = output.components(separatedBy: .newlines)
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
