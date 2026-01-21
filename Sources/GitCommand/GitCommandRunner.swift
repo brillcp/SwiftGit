@@ -62,12 +62,14 @@ extension CommandRunner: GitCommandable {
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
 
+                    var commits: [Commit] = []
+                    var commitsById: [String: Commit] = [:]
                     for line in commitLines {
                         do {
                             let commit = try Commit.parse(from: line)
-                            continuation.yield(commit)
+                            commits.append(commit)
+                            commitsById[commit.id] = commit
                         } catch {
-                            // Skip malformed commits but continue processing
                             continue
                         }
                     }
