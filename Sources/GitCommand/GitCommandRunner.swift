@@ -67,57 +67,18 @@ extension CommandRunner: GitCommandable {
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
 
-                    // Parse commits and build parent lookup map in single pass
-                    var commits: [Commit] = []
-                    commits.reserveCapacity(commitLines.count)
-                    var parentInfo: [String: [String]] = [:] // id -> parents array
-
                     for line in commitLines {
                         do {
                             let commit = try Commit.parse(from: line)
-                            commits.append(commit)
-                            parentInfo[commit.id] = commit.parents
+                            continuation.yield(commit)
                         } catch {
                             continue
                         }
                     }
-
-                    // Build set of stash internal commit IDs
-                    // Stash WIP: 2-3 parents [base, index, untracked?]
-                    // Index: 1 parent [base] - same as WIP's first
-                    // Untracked: 0 parents (orphan)
-                    var stashInternalCommits = Set<String>()
-                    for commit in commits where commit.parents.count >= 2 {
-                        let baseParent = commit.parents[0]
-
-                        // Check 2nd parent (index): 1 parent == base
-                        let secondParentId = commit.parents[1]
-                        if let secondParents = parentInfo[secondParentId],
-                           secondParents.count == 1,
-                           secondParents[0] == baseParent {
-                            stashInternalCommits.insert(secondParentId)
-                        }
-
-                        // Check 3rd parent (untracked): 0 parents
-                        if commit.parents.count >= 3 {
-                            let thirdParentId = commit.parents[2]
-                            if let thirdParents = parentInfo[thirdParentId],
-                               thirdParents.isEmpty {
-                                stashInternalCommits.insert(thirdParentId)
-                            }
-                        }
-                    }
-
-                    // Yield non-internal commits
-                    for commit in commits where !stashInternalCommits.contains(commit.id) {
-                        continuation.yield(commit)
-                    }
+                    continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
-                    return
                 }
-
-                continuation.finish()
             }
         }
     }
