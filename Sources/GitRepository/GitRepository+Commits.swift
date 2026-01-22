@@ -2,14 +2,14 @@ import Foundation
 
 extension GitRepository: CommitReadable {
     public func getCommit(_ hash: String) async throws -> Commit? {
-        if let cached: Commit = await cache.get(.commit(hash: hash)) { return cached }
+        let result = try await commandRunner.run(.showCommit(hash: hash))
 
-        guard let parsedObject = try await loadObject(hash: hash),
-              case .commit(let commit) = parsedObject
-        else { return nil }
+        guard result.exitCode == 0 else {
+            throw GitError.commitNotFound
+        }
 
-        await cache.set(.commit(hash: hash), value: commit)
-        return commit
+        let line = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return try Commit.parse(from: line)
     }
 
     public func getAllCommits(limit: Int) async throws -> [Commit] {
@@ -73,23 +73,5 @@ extension GitRepository: CommitWritable {
 
         let hash = try await getHEAD() ?? ""
         eventSubject.send(.committed(hash: hash))
-    }
-}
-
-// MARK: - Private helper
-private extension GitRepository {
-    func loadObject(hash: String) async throws -> ParsedObject? {
-        guard let location = try await locator.locate(hash) else { return nil }
-
-        switch location {
-        case .loose(let fileURL):
-            let data = try Data(contentsOf: fileURL)
-            return try looseParser.parse(hash: hash, data: data)
-        case .packed(let packLocation):
-            guard let packIndex = try await locator.getPackIndex(for: packLocation.packURL) else {
-                throw RepositoryError.packIndexNotFound
-            }
-            return try await packReader.parseObject(at: packLocation, packIndex: packIndex)
-        }
     }
 }

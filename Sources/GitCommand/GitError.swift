@@ -63,6 +63,7 @@ public enum GitError: LocalizedError {
     case diffFailed
     case getCommittedFilesFailed
     case logFailed(reason: String)
+    case commitNotFound
     case fileNotFound(path: String, ref: String)
     case getFileContentFailed(path: String, ref: String)
 
@@ -77,6 +78,7 @@ public enum GitError: LocalizedError {
     case revertAbortFailed
 
     case workflowFailed(name: String)
+    case refsFailed
 
     public var errorDescription: String? {
         switch self {
@@ -166,15 +168,15 @@ public enum GitError: LocalizedError {
 
         // MARK: - Advanced Operations
         case .cherryPickFailed(let commit):
-            return "Failed to cherry-pick commit \(commit.prefix(7))."
+            return "Failed to cherry-pick commit \(commit.shortHash)."
         case .cherryPickSkipFailed:
             return "Cherrypick skip failed."
         case .cherryPickConflict(let commit):
-            return "Cherry-picking \(commit.prefix(7)) caused conflicts. Resolve them and commit."
+            return "Cherry-picking \(commit.shortHash) caused conflicts. Resolve them and commit."
         case .revertFailed(let commit):
-            return "Failed to revert commit \(commit.prefix(7))."
+            return "Failed to revert commit \(commit.shortHash)."
         case .revertConflict(let commit):
-            return "Reverting \(commit.prefix(7)) caused conflicts. Resolve them and commit."
+            return "Reverting \(commit.shortHash) caused conflicts. Resolve them and commit."
 
         // MARK: - Conflict Detection
         case .conflictDetected:
@@ -183,6 +185,8 @@ public enum GitError: LocalizedError {
             return "Failed to get file diff. Please try again."
         case .logFailed(let reason):
             return "Failed to get commit history. Reason: \(reason)."
+        case .commitNotFound:
+            return "Commit not found."
         case .getCommittedFilesFailed:
             return "Failed to get committed files."
         case .fileNotFound(let path, let ref):
@@ -208,6 +212,9 @@ public enum GitError: LocalizedError {
 
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."
+
+        case .refsFailed:
+            return "Failed to read refs."
         }
     }
 }

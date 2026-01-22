@@ -1,5 +1,7 @@
 import Foundation
 
+fileprivate let commitFormat: String = "%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b"
+
 public enum GitCommand: Sendable {
     // MARK: - Pushing
     case push(remote: String?, branch: String?, setUpstream: Bool, force: Bool)
@@ -12,6 +14,7 @@ public enum GitCommand: Sendable {
 
     // MARK: - Commits
     case log(limit: Int)
+    case showCommit(hash: String)
     case commit(message: String, author: String?)
 
     // MARK: - Branches
@@ -54,6 +57,13 @@ public enum GitCommand: Sendable {
     // MARK: - Working Tree Status
     case status(porcelain: Bool)
     case lsFilesStaged
+
+    // MARK: - Refs and HEAD
+    case showRef
+    case revParse(rev: String)
+    case symbolicRef
+    case stashList
+    case showCommitDate(ref: String)
 }
 
 extension GitCommand {
@@ -94,7 +104,14 @@ extension GitCommand {
                 "--all",
                 "--topo-order",
                 "-n", "\(limit)",
-                "--format=%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b"
+                "--format=\(commitFormat)"
+            ]
+        case .showCommit(let hash):
+            return [
+                "show",
+                "-s",
+                "--format=\(commitFormat)",
+                hash
             ]
         case .commit(let message, let author):
             var args = ["commit", "-m", message]
@@ -217,6 +234,18 @@ extension GitCommand {
             return args
         case .lsFilesStaged:
             return ["ls-files", "--stage"]
+
+        // MARK: - Refs and HEAD
+        case .showRef:
+            return ["show-ref", "--heads", "--tags", "--dereference"]
+        case .revParse(let rev):
+            return ["rev-parse", "--verify", rev]
+        case .symbolicRef:
+            return ["symbolic-ref", "HEAD"]
+        case .stashList:
+            return ["stash", "list"]
+        case .showCommitDate(let ref):
+            return ["show", "-s", "--format=%at", ref]
         }
     }
 }

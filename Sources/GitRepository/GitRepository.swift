@@ -9,9 +9,6 @@ public actor GitRepository: GitRepositoryProtocol {
     let eventSubject = PassthroughSubject<GitEvent, Never>()
     let workingTreeParser: WorkingTreeParserProtocol
     let workingTree: WorkingTreeReaderProtocol
-    let looseParser: LooseObjectParserProtocol
-    let packReader: PackFileReaderProtocol
-    let locator: ObjectLocatorProtocol
     let patchGenerator: PatchGenerator
     let commandRunner: GitCommandable
     let refReader: RefReaderProtocol
@@ -33,18 +30,12 @@ public actor GitRepository: GitRepositoryProtocol {
     public init(url: URL, cache: ObjectCacheProtocol = ObjectCache()) {
         self.url = url
         self.cache = cache
-        self.locator = ObjectLocator(
-            repoURL: url,
-            packIndexManager: PackIndexManager(repoURL: url)
-        )
-        self.looseParser = LooseObjectParser()
-        self.packReader = PackFileReader()
         self.diffParser = GitDiffParser()
+        self.commandRunner = CommandRunner(repoURL: url)
         self.refReader = RefReader(
-            repoURL: url,
+            commandRunner: commandRunner,
             cache: cache
         )
-        self.commandRunner = CommandRunner(repoURL: url)
         self.workingTreeParser = WorkingTreeParser()
         self.workingTree = WorkingTreeReader(
             repoURL: url,

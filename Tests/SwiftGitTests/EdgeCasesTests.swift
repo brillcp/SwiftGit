@@ -8,7 +8,7 @@ struct EdgeCasesTests {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
-        let refReader = RefReader(repoURL: repoURL, cache: ObjectCache())
+        let refReader = RefReader(commandRunner: CommandRunner(repoURL: repoURL), cache: ObjectCache())
 
         let refs = try await refReader.getRefs()
         #expect(refs.count == 0)
@@ -16,14 +16,11 @@ struct EdgeCasesTests {
         let head = try await refReader.getHEAD()
         #expect(head == nil)
 
-        let locator = ObjectLocator(
-            repoURL: repoURL,
-            packIndexManager: PackIndexManager(repoURL: repoURL)
-        )
+        let headBranch = try await refReader.getHEADBranch()
+        #expect(headBranch == "main")
 
-        let fakeHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
-        let location = try await locator.locate(fakeHash)
-        #expect(location == nil)
+        let stashes = try await refReader.getStashes()
+        #expect(stashes.isEmpty)
     }
 
     @Test func testEmptyCommitMessage() async throws {
@@ -78,26 +75,6 @@ struct EdgeCasesTests {
         #expect(commits.count == 1, "Should have created commit with valid message")
     }
 
-    @Test func testInvalidPackedRefsFormat() async throws {
-        let repoURL = try createIsolatedTestRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-
-        // Malformed packed-refs
-        let packedRefsContent = """
-        # pack-refs with: peeled fully-peeled sorted
-        invalid line without hash
-        notahash refs/heads/main
-        a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-        """
-        try writePackedRefs(packedRefsContent, to: repoURL)
-
-        let refReader = RefReader(repoURL: repoURL, cache: ObjectCache())
-
-        // Should not crash, should skip invalid lines
-        let refs = try await refReader.getRefs()
-        #expect(refs.count == 0) // All lines were invalid
-    }
-
     @Test func testInvalidHEADContent() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -106,7 +83,7 @@ struct EdgeCasesTests {
         // Invalid HEAD content
         try writeHEAD("this is not a valid ref or hash", to: repoURL)
 
-        let refReader = RefReader(repoURL: repoURL, cache: ObjectCache())
+        let refReader = RefReader(commandRunner: CommandRunner(repoURL: repoURL), cache: ObjectCache())
 
         let head = try await refReader.getHEAD()
         #expect(head == nil) // Should handle gracefully
