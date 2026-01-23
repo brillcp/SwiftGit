@@ -147,15 +147,8 @@ struct StashTests {
             return
         }
 
-        print("📦 Stash commit: \(stashCommit.id)")
-        print("📦 Parents: \(stashCommit.parents)")
-        print("📦 Message: \(stashCommit.body)")
-
         // Get changed files from stash
         let changes = try await repository.getStashedFiles(stashCommit.id)
-
-        print("📦 Changed files: \(changes.keys.sorted())")
-        print("📦 Change count: \(changes.count)")
 
         #expect(changes.count >= 2, "Stash should show at least 2 changed files")
         #expect(changes["file1.txt"] != nil, "file1.txt should be in stash")

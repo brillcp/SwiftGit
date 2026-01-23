@@ -43,33 +43,16 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
 
     public func parseFilesOutput(_ output: String) async -> [String: CommittedFile] {
         var files: [String: CommittedFile] = [:]
-        let parts = output.split(separator: String.null)
 
-        var i = 0
-        while i < parts.count {
-            let status = String(parts[i])
-            i += 1
+        let lines = output.split(separator: String.newLine)
 
-            if status.hasPrefix("R") || status.hasPrefix("C") {
-                // Rename/Copy: next two entries are old and new paths
-                guard i + 1 < parts.count else { break }
-                let oldPath = String(parts[i])
-                let newPath = String(parts[i + 1])
-                i += 2
+        for line in lines {
+            let parts = line.split(separator: String.tab, maxSplits: 1)
+            guard parts.count == 2 else { continue }
 
-                files[newPath] = CommittedFile(
-                    path: newPath,
-                    changeType: .renamed(from: oldPath)
-                )
-            } else {
-                // Regular change: next entry is path
-                guard i < parts.count else { break }
-                let path = String(parts[i])
-                i += 1
-
-                let changeType = parseStatusCharacter(status)
-                files[path] = CommittedFile(path: path, changeType: changeType)
-            }
+            let status = String(parts[0])
+            let path = String(parts[1])
+            files[path] = CommittedFile(path: path, changeType: parseStatusCharacter(status))
         }
 
         return files
