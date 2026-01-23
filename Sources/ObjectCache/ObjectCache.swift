@@ -35,9 +35,6 @@ public protocol ObjectCacheProtocol: Actor {
 
     /// Clear objects matching a predicate
     func clear(where predicate: (CacheKey) -> Bool) async
-    
-    /// Clear diff-related caches (useful after staging/committing)
-    func clearDiffCaches() async
 
     /// Get current cache statistics
     func stats() async -> CacheStats
@@ -145,15 +142,6 @@ extension ObjectCache: ObjectCacheProtocol {
             currentSize: storage.count,
             memoryUsage: currentMemoryUsage
         )
-    }
-
-    public func clearDiffCaches() async {
-        await clear { key in
-            switch key {
-            case .fileDiff: return true
-            default: return false
-            }
-        }
     }
 }
 

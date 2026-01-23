@@ -13,7 +13,8 @@ extension GitRepository: RevertWritable {
             throw GitError.revertFailed(commit: commitHash)
         }
 
-        await invalidateAllCaches()
+        await cache.remove(.head)
+        await workingTree.invalidateIndexCache()
         eventSubject.send(.revertedCommit(hash: commitHash))
     }
 }

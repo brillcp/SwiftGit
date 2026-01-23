@@ -69,7 +69,8 @@ extension GitRepository: CommitWritable {
             throw GitError.commitFailed
         }
 
-        await invalidateAllCaches()
+        await cache.remove(.head)
+        await workingTree.invalidateIndexCache()
 
         let hash = try await getHEAD() ?? ""
         eventSubject.send(.committed(hash: hash))

@@ -49,7 +49,7 @@ extension GitRepository: ConflictWritable {
             abortedOperation = .revertAborted
         }
 
-        await invalidateAllCaches()
+        await workingTree.invalidateIndexCache()
 
         if let abortedOperation {
             eventSubject.send(abortedOperation)
@@ -88,7 +88,8 @@ extension GitRepository: ConflictWritable {
             continuedOperation = .revertContinued
         }
 
-        await invalidateAllCaches()
+        await cache.remove(.head)
+        await workingTree.invalidateIndexCache()
 
         if let event = continuedOperation {
             eventSubject.send(event)

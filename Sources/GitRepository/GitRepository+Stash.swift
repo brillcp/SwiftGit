@@ -40,7 +40,7 @@ extension GitRepository: StashWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        await cache.remove(.refs)
+        await cache.remove(.stashes)
         eventSubject.send(.stashPopped(id: stashId))
     }
 
@@ -66,7 +66,7 @@ extension GitRepository: StashWritable {
             throw GitError.stashDropFailed
         }
 
-        await cache.remove(.refs)
+        await cache.remove(.stashes)
         eventSubject.send(.stashDropped(id: stashId))
     }
 }

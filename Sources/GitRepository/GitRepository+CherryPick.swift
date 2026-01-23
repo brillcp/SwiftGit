@@ -31,6 +31,7 @@ extension GitRepository: CherryPickWritable {
             try await stashPop(index: 0)
         }
 
+        await cache.remove(.head)
         await workingTree.invalidateIndexCache()
         eventSubject.send(.cherryPickCompleted)
     }

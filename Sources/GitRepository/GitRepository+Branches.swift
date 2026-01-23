@@ -60,7 +60,8 @@ extension GitRepository: BranchWritable {
             throw GitError.checkoutFailed(branch: name)
         }
 
-        await invalidateAllCaches()
+        await cache.remove(.head)
+        await workingTree.invalidateIndexCache()
         eventSubject.send(.branchChanged(name: name))
     }
 
