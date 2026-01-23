@@ -92,7 +92,7 @@ extension PatchGenerator {
     /// Generate a reverse patch (for unstaging/discarding)
     public func generateReversePatch(hunk: DiffHunk, file: WorkingTreeFile) -> String {
         var patch = ""
-        patch += makeHeader(for: file)
+        patch += makeHeader(for: file)  // Already has \n at end
         patch += reverseHunkHeader(hunk.header) + String.newLine
 
         // Find last result line
@@ -103,34 +103,23 @@ extension PatchGenerator {
             }
         }
 
-        // Process lines IN ORIGINAL ORDER
+        // Process lines
         for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
             let isLastResultLine = (index == lastResultLineIndex)
 
             switch line.type {
-            case .added:  // Becomes removed in reverse
+            case .added:
                 patch += "-\(lineText)\(String.newLine)"
-
-            case .removed:  // Becomes added in reverse
-                patch += "+\(lineText)"
-
-                // Handle newline and marker for last result line
+            case .removed:
+                patch += "+\(lineText)\(String.newLine)"
                 if isLastResultLine && hunk.hasNoNewlineAtEnd {
-                    // Don't add newline, add marker instead
-                    patch += String.newLine + String.noNewLineAtEnd
-                } else {
-                    patch += String.newLine
+                    patch += "\(String.noNewLine)\(String.newLine)"
                 }
-
             case .unchanged:
-                patch += " \(lineText)"
-
-                // Handle newline and marker for last result line
+                patch += " \(lineText)\(String.newLine)"
                 if isLastResultLine && hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine + String.noNewLineAtEnd
-                } else {
-                    patch += String.newLine
+                    patch += "\(String.noNewLine)\(String.newLine)"
                 }
             }
         }
