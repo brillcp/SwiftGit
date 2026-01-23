@@ -117,12 +117,6 @@ struct EdgeCasesTests {
 
 // MARK: - Private helpers
 private extension EdgeCasesTests {
-    func writePackedRefs(_ content: String, to repoURL: URL) throws {
-        let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
-        let packedFile = gitDir.appendingPathComponent(GitPath.packedRefs.rawValue)
-        try content.write(to: packedFile, atomically: true, encoding: .utf8)
-    }
-
     func writeHEAD(_ content: String, to repoURL: URL) throws {
         let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
         let headFile = gitDir.appendingPathComponent(GitPath.head.rawValue)
