@@ -208,7 +208,7 @@ extension GitCommand {
             args.append(path)
             return args
         case .diffTree(let commitId):
-            return ["diff-tree", "-z", "--no-commit-id", "--name-status", "-r", "-M", commitId]
+            return ["diff-tree", "-z", "--no-commit-id", "--name-status", "-r", "-M", "--first-parent", commitId]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .diffFromEmpty(let to, let path):
