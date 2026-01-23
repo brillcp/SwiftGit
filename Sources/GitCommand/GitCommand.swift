@@ -208,7 +208,7 @@ extension GitCommand {
             args.append(path)
             return args
         case .showCommitFiles(let commitId):
-            return ["show", "-z", "-M", "--name-status", "--pretty=", commitId]
+            return ["show", "-z", "-M", "-m", "--name-status", "--pretty=", commitId]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .diffFromEmpty(let to, let path):
