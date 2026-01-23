@@ -231,6 +231,7 @@ extension GitCommand {
             if porcelain {
                 args.append("--porcelain=v1")
             }
+            args.append("-z")
             args.append("-uall")
             return args
         case .lsFilesStaged:

@@ -20,7 +20,7 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
     public func parseStatusOutput(_ output: String) async -> WorkingTreeStatus {
         var files: [String: WorkingTreeFile] = [:]
 
-        let lines = output.split(separator: String.newLine)
+        let lines = output.split(separator: String.null)
 
         for line in lines {
             guard line.count >= 3,
