@@ -23,6 +23,21 @@ extension GitRepository: DiffReadable {
             .diffCommits(from: parentId, to: commitId, path: path)
         )
 
+        if result.stdout.isEmpty && commit.parents.count >= 3 {
+            let untrackedParent = commit.parents[2]
+
+            // Diff from empty tree to show file as "added"
+            let untrackedResult = try await commandRunner.run(
+                .diffFromEmpty(to: untrackedParent, path: path)
+            )
+
+            if untrackedResult.exitCode == 0 {
+                let hunks = await diffParser.parse(untrackedResult.stdout)
+                await cache.set(cacheKey, value: hunks)
+                return hunks
+            }
+        }
+
         let hunks = await diffParser.parse(result.stdout)
         await cache.set(cacheKey, value: hunks)
         return hunks

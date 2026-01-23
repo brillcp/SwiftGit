@@ -154,6 +154,61 @@ struct StashTests {
         #expect(changes["file1.txt"] != nil, "file1.txt should be in stash")
         #expect(changes["file3.txt"] != nil, "file3.txt should be in stash")
     }
+
+    @Test func testGetStashedUntrackedFileDiff() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Create initial commit
+        try createTestFile(in: repoURL, named: "existing.txt", content: "Original")
+        try await repository.stageFile(at: "existing.txt")
+        try await repository.commit(message: "Initial")
+
+        // Create a new untracked file
+        try createTestFile(in: repoURL, named: "newfile.txt", content: "Line 1\nLine 2\nLine 3")
+
+        // Stash with untracked files
+        try await repository.stashPush(message: "Stash with untracked")
+
+        // Get stashes
+        let stashes = try await repository.getStashes()
+        guard let stash = stashes.first else {
+            Issue.record("No stash found")
+            return
+        }
+
+        // Get stashed files
+        let files = try await repository.getStashedFiles(stash.id)
+
+        #expect(files["newfile.txt"] != nil, "Should have untracked file")
+
+        guard let untrackedFile = files["newfile.txt"] else {
+            Issue.record("Untracked file not found")
+            return
+        }
+
+        print("📦 Getting diff for stash: \(stash.id), path: \(untrackedFile.path)")
+        // Get diff for the untracked file
+        let diff = try await repository.getFileDiff(for: stash.id, at: untrackedFile.path)
+
+        print("📦 Diff hunks: \(diff.count)")
+        print("📦 Diff: \(diff)")
+
+        #expect(!diff.isEmpty, "Should have diff hunks for untracked file")
+
+        // Verify the content shows as added
+        let allLines = diff.flatMap { $0.lines }
+        let addedLines = allLines.filter { $0.type == .added }
+
+        #expect(addedLines.count == 3, "Should have 3 added lines")
+
+        let content = addedLines.map { $0.segments.map { $0.text }.joined() }.joined(separator: "\n")
+        #expect(content.contains("Line 1"), "Should contain Line 1")
+        #expect(content.contains("Line 2"), "Should contain Line 2")
+        #expect(content.contains("Line 3"), "Should contain Line 3")
+    }
 }
 
 func gitStash(in repoURL: URL) throws {
