@@ -94,6 +94,10 @@ extension GitRepository: DiffReadable {
         )
 
         guard result.exitCode == 0 else {
+            print("⚠️ Failed to get content for \(path) at \(ref)")
+            print("⚠️ Exit code: \(result.exitCode)")
+            print("⚠️ Stderr: \(result.stderr)")
+
             if result.stderr.contains("does not exist") || result.stderr.contains("unknown revision") {
                 throw GitError.fileNotFound(path: path, ref: ref)
             }
