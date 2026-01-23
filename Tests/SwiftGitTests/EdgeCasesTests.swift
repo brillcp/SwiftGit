@@ -113,6 +113,70 @@ struct EdgeCasesTests {
         let detachedHead = try await repository.getHEAD()
         #expect(detachedHead == hash, "Should read detached HEAD")
     }
+
+    @Test func testGetMergeCommitFilesWithMultipleParents() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Create initial commit on main
+        try createTestFile(in: repoURL, named: "main.txt", content: "Main content")
+        try await repository.stageFile(at: "main.txt")
+        try await repository.commit(message: "Initial on main")
+
+        // Create and checkout feature branch
+        try await repository.checkoutBranch("feature", createNew: true)
+
+        // Add multiple files on feature branch
+        try createTestFile(in: repoURL, named: "feature1.txt", content: "Feature 1")
+        try createTestFile(in: repoURL, named: "feature2.txt", content: "Feature 2")
+        try createTestFile(in: repoURL, named: "feature3.txt", content: "Feature 3")
+        try await repository.stageAllFiles()
+        try await repository.commit(message: "Add feature files")
+
+        // Modify main.txt on feature branch
+        try createTestFile(in: repoURL, named: "main.txt", content: "Modified on feature")
+        try await repository.stageFile(at: "main.txt")
+        try await repository.commit(message: "Modify main.txt on feature")
+
+        // Go back to main and add a different file (no conflict)
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "main2.txt", content: "Another main file")
+        try await repository.stageFile(at: "main2.txt")
+        try await repository.commit(message: "Add main2.txt on main")
+
+        // Merge feature into main (no conflicts)
+        try await repository.merge(branch: "feature", noFastForward: true)
+
+        // Get the merge commit (HEAD)
+        guard let mergeHash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+
+        print("📦 Merge commit: \(mergeHash)")
+
+        // Get files changed in merge commit
+        let files = try await repository.getCommittedFiles(mergeHash)
+
+        print("📦 Files in merge: \(files.keys.sorted())")
+        print("📦 File count: \(files.count)")
+
+        #expect(files.count >= 4, "Should show at least 4 files (main.txt + feature1-3)")
+        #expect(files["main.txt"] != nil, "Should include main.txt")
+        #expect(files["feature1.txt"] != nil, "Should include feature1.txt")
+        #expect(files["feature2.txt"] != nil, "Should include feature2.txt")
+        #expect(files["feature3.txt"] != nil, "Should include feature3.txt")
+
+        // Try to get content for each file
+        for (path, _) in files {
+            print("📦 Getting content for: \(path)")
+            let content = try await repository.getFileContent(at: path, ref: mergeHash)
+            #expect(!content.isEmpty, "Content for \(path) should not be empty")
+            print("📦 Content length for \(path): \(content.count)")
+        }
+    }
 }
 
 // MARK: - Private helpers

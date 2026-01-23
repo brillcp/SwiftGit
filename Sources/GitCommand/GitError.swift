@@ -10,6 +10,7 @@ public enum GitError: LocalizedError {
     case noUpstream
     case authenticationFailed
     case pushFailed
+    case mergeFailed(branch: String)
 
     // MARK: - Commit Operations
     case emptyCommitMessage
@@ -97,6 +98,8 @@ public enum GitError: LocalizedError {
             return "Authentication failed"
         case .pushFailed:
             return "Push failed"
+        case .mergeFailed(let branch):
+            return "Failed to merge branch '\(branch)'. Please try again."
 
             // MARK: - Commit Operations
         case .emptyCommitMessage:

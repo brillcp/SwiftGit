@@ -5,6 +5,7 @@ fileprivate let commitFormat: String = "%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%
 public enum GitCommand: Sendable {
     // MARK: - Pushing
     case push(remote: String?, branch: String?, setUpstream: Bool, force: Bool)
+    case merge(branch: String, noFastForward: Bool = true)
 
     // MARK: - Staging
     case add(path: String)
@@ -86,6 +87,14 @@ extension GitCommand {
             if setUpstream { args.append("--set-upstream") }
             if let remote { args.append(remote) }
             if let branch { args.append(branch) }
+            return args
+        case .merge(let branch, let noFastForward):
+            var args = ["merge", branch]
+            if noFastForward {
+                args.append("--no-ff")
+            }
+            args.append("-m")
+            args.append("Merge \(branch)")
             return args
 
         // MARK: - Staging
