@@ -25,7 +25,7 @@ extension GitRepository: CommitReadable {
             throw GitError.getCommittedFilesFailed
         }
 
-        return await workingTreeParser.parseFilesOutput(result.stdout)
+        return await workingTreeParser.parseFilesNullDelimited(result.stdout)
     }
 
     public func getStashedFiles(_ stashId: String) async throws -> [String: CommittedFile] {
@@ -37,7 +37,7 @@ extension GitRepository: CommitReadable {
             throw GitError.diffFailed
         }
 
-        return await workingTreeParser.parseFilesOutput(result.stdout)
+        return await workingTreeParser.parseFilesNewlineDelimited(result.stdout)
     }
 
     public func getHEAD() async throws -> String? {
