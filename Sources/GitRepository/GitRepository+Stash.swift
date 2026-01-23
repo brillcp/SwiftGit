@@ -22,7 +22,7 @@ extension GitRepository: StashWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        await cache.remove(.refs)
+        await cache.remove(.stashes)
 
         if let id = try await getStashes().first?.id {
             eventSubject.send(.stashed(id: id))
