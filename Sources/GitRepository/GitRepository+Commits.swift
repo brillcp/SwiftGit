@@ -21,6 +21,16 @@ extension GitRepository: CommitReadable {
             .diffTree(commitId: commitId)
         )
 
+        print("📦 diff-tree for commit: \(commitId)")
+        print("📦 Exit code: \(result.exitCode)")
+        print("📦 Stdout: '\(result.stdout)'")
+        print("📦 Stderr: '\(result.stderr)'")
+
+        if let commit = try await getCommit(commitId) {
+            print("📦 Commit parents count: \(commit.parents.count)")
+            print("📦 Commit parents: \(commit.parents)")
+        }
+
         guard result.exitCode == 0 else {
             throw GitError.getCommittedFilesFailed
         }
