@@ -33,7 +33,7 @@ private extension GitIndexReader {
     func parseIndexFromLsFilesStage(_ output: String) async -> [IndexEntry] {
         var entries: [IndexEntry] = []
 
-        let lines = output.split(separator: String.newLine)
+        let lines = output.split(separator: String.null)
 
         for line in lines {
             if line.isEmpty { continue }

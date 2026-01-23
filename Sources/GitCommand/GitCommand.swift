@@ -207,7 +207,7 @@ extension GitCommand {
             args.append(path)
             return args
         case .diffTree(let commitId):
-            return ["diff-tree", "--no-commit-id", "--name-status", "-r", "-M", commitId]
+            return ["diff-tree", "-z", "--no-commit-id", "--name-status", "-r", "-M", commitId]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .showFile(let commitId, let path):
@@ -235,7 +235,7 @@ extension GitCommand {
             args.append("-uall")
             return args
         case .lsFilesStaged:
-            return ["ls-files", "--stage"]
+            return ["ls-files", "-z", "--stage"]
 
         // MARK: - Refs and HEAD
         case .showRef:
