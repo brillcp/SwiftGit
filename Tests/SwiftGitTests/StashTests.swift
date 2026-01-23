@@ -189,12 +189,8 @@ struct StashTests {
             return
         }
 
-        print("📦 Getting diff for stash: \(stash.id), path: \(untrackedFile.path)")
         // Get diff for the untracked file
         let diff = try await repository.getFileDiff(for: stash.id, at: untrackedFile.path)
-
-        print("📦 Diff hunks: \(diff.count)")
-        print("📦 Diff: \(diff)")
 
         #expect(!diff.isEmpty, "Should have diff hunks for untracked file")
 
