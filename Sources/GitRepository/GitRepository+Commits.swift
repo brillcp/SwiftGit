@@ -78,6 +78,7 @@ extension GitRepository: CommitWritable {
         }
 
         await cache.remove(.head)
+        await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
 
         let hash = try await getHEAD() ?? ""

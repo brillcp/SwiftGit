@@ -61,6 +61,7 @@ extension GitRepository: BranchWritable {
         }
 
         await cache.remove(.head)
+        await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
         eventSubject.send(.branchChanged(name: name))
     }
