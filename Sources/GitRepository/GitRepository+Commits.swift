@@ -21,19 +21,11 @@ extension GitRepository: CommitReadable {
             .showCommitFiles(commitId: commitId)
         )
 
-        let parts = result.stdout.split(separator: "\0").map { String($0) }
-        print("📦 Commit: \(commitId)")
-        print("📦 Split parts count: \(parts.count)")
-        print("📦 Split parts: \(parts)")
-
         guard result.exitCode == 0 else {
             throw GitError.getCommittedFilesFailed
         }
 
-        let files = await workingTreeParser.parseFilesNullDelimited(result.stdout)
-        print("📦 Parsed files: \(files)")
-
-        return files
+        return await workingTreeParser.parseFilesNullDelimited(result.stdout)
     }
 
     public func getStashedFiles(_ stashId: String) async throws -> [String: CommittedFile] {

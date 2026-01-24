@@ -46,7 +46,6 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
         var files: [String: CommittedFile] = [:]
 
         let parts = output.split(separator: String.null)
-        print("📦 Split parts: \(output.split(separator: String.null).map { String($0) })")
 
         var i = 0
         while i < parts.count {

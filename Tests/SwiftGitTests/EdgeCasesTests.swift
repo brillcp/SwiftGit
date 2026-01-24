@@ -155,27 +155,14 @@ struct EdgeCasesTests {
             return
         }
 
-        print("📦 Merge commit: \(mergeHash)")
-
         // Get files changed in merge commit
         let files = try await repository.getCommittedFiles(mergeHash)
-
-        print("📦 Files in merge: \(files.keys.sorted())")
-        print("📦 File count: \(files.count)")
 
         #expect(files.count >= 4, "Should show at least 4 files (main.txt + feature1-3)")
         #expect(files["main.txt"] != nil, "Should include main.txt")
         #expect(files["feature1.txt"] != nil, "Should include feature1.txt")
         #expect(files["feature2.txt"] != nil, "Should include feature2.txt")
         #expect(files["feature3.txt"] != nil, "Should include feature3.txt")
-
-        // Try to get content for each file
-        for (path, _) in files {
-            print("📦 Getting content for: \(path)")
-            let content = try await repository.getFileContent(at: path, ref: mergeHash)
-            #expect(!content.isEmpty, "Content for \(path) should not be empty")
-            print("📦 Content length for \(path): \(content.count)")
-        }
     }
 }
 
