@@ -9,37 +9,12 @@ extension GitRepository: DiffReadable {
 
         guard let commit = try await getCommit(commitId) else { return [] }
 
-        guard let parentId = commit.parents.first else {
-            let result = try await commandRunner.run(
-                .showFile(commitId: commitId, path: path)
-            )
+        let hunks = try await fetchFileDiff(for: commit, at: path)
 
-            let hunks = await diffParser.parse(result.stdout)
+        if !hunks.isEmpty {
             await cache.set(cacheKey, value: hunks)
-            return hunks
         }
 
-        let result = try await commandRunner.run(
-            .diffCommits(from: parentId, to: commitId, path: path)
-        )
-
-        if result.stdout.isEmpty && commit.parents.count >= 3 {
-            let untrackedParent = commit.parents[2]
-
-            // Diff from empty tree to show file as "added"
-            let untrackedResult = try await commandRunner.run(
-                .diffFromEmpty(to: untrackedParent, path: path)
-            )
-
-            if untrackedResult.exitCode == 0 {
-                let hunks = await diffParser.parse(untrackedResult.stdout)
-                await cache.set(cacheKey, value: hunks)
-                return hunks
-            }
-        }
-
-        let hunks = await diffParser.parse(result.stdout)
-        await cache.set(cacheKey, value: hunks)
         return hunks
     }
 
@@ -94,10 +69,6 @@ extension GitRepository: DiffReadable {
         )
 
         guard result.exitCode == 0 else {
-            print("⚠️ Failed to get content for \(path) at \(ref)")
-            print("⚠️ Exit code: \(result.exitCode)")
-            print("⚠️ Stderr: \(result.stderr)")
-
             if result.stderr.contains("does not exist") || result.stderr.contains("unknown revision") {
                 throw GitError.fileNotFound(path: path, ref: ref)
             }
@@ -105,5 +76,52 @@ extension GitRepository: DiffReadable {
         }
 
         return result.stdout
+    }
+}
+
+// MARK: - Private functions
+private extension GitRepository {
+    func fetchFileDiff(for commit: Commit, at path: String) async throws -> [DiffHunk] {
+        if commit.parents.isEmpty {
+            return try await getDiffForInitialCommit(commitId: commit.id, path: path)
+        }
+
+        if commit.parents.count > 1 {
+            return try await getDiffForMergeCommit(commitId: commit.id, path: path)
+        }
+
+        return try await getDiffForRegularCommit(commitId: commit.id, parentId: commit.parents[0], path: path)
+    }
+
+    func getDiffForInitialCommit(commitId: String, path: String) async throws -> [DiffHunk] {
+        let result = try await commandRunner.run(.showFile(commitId: commitId, path: path))
+        return await diffParser.parse(result.stdout)
+    }
+
+    func getDiffForMergeCommit(commitId: String, path: String) async throws -> [DiffHunk] {
+        let result = try await commandRunner.run(.showFileDiff(commitId: commitId, path: path))
+        return await diffParser.parse(result.stdout)
+    }
+
+    func getDiffForRegularCommit(commitId: String, parentId: String, path: String) async throws -> [DiffHunk] {
+        let result = try await commandRunner.run(.diffCommits(from: parentId, to: commitId, path: path))
+
+        if result.stdout.isEmpty {
+            return try await getDiffForUntrackedStashFile(commitId: commitId, path: path)
+        }
+
+        return await diffParser.parse(result.stdout)
+    }
+
+    func getDiffForUntrackedStashFile(commitId: String, path: String) async throws -> [DiffHunk] {
+        guard let commit = try await getCommit(commitId), commit.parents.count >= 3 else {
+            return []
+        }
+
+        let untrackedParent = commit.parents[2]
+        let result = try await commandRunner.run(.diffFromEmpty(to: untrackedParent, path: path))
+
+        guard result.exitCode == 0 else { return [] }
+        return await diffParser.parse(result.stdout)
     }
 }

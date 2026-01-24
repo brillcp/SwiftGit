@@ -50,6 +50,7 @@ public enum GitCommand: Sendable {
     // MARK: - Diff & Patches
     case diff(path: String, staged: Bool, untracked: Bool, deleted: Bool)
     case showCommitFiles(commitId: String)
+    case showFileDiff(commitId: String, path: String)
     case diffCommits(from: String, to: String, path: String)
     case diffFromEmpty(to: String, path: String)
     case showFile(commitId: String, path: String)
@@ -218,6 +219,8 @@ extension GitCommand {
             return args
         case .showCommitFiles(let commitId):
             return ["show", "-z", "-M", "-m", "--name-status", "--pretty=", commitId]
+        case .showFileDiff(let commitId, let path):
+            return ["show", "-m", commitId, "--", path]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .diffFromEmpty(let to, let path):
