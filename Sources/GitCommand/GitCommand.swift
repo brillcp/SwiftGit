@@ -254,7 +254,7 @@ extension GitCommand {
 
         // MARK: - Refs and HEAD
         case .showRef:
-            return ["show-ref", "--heads", "--tags", "--dereference"]
+            return ["show-ref"]
         case .revParse(let rev):
             return ["rev-parse", "--verify", rev]
         case .symbolicRef:
