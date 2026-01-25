@@ -38,28 +38,24 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
             // Handle renames: R  new_path\0old_path
             if stagedChar == "R" || stagedChar == "C" { // R=rename, C=copy
                 i += 1 // Move to next entry which contains the old path
-                let oldPath = String(lines[i])
 
-                guard i < lines.count else {
-                    // Malformed rename entry, treat as modified
+                if i < lines.count {
+                    let oldPath = String(lines[i])
+
+                    // Create entry for the new path showing it as renamed from oldPath
                     files[path] = WorkingTreeFile(
                         path: path,
                         staged: .renamed(from: oldPath),
                         unstaged: nil
                     )
-                    break
+                } else {
+                    // Malformed rename entry, treat as modified
+                    files[path] = WorkingTreeFile(
+                        path: path,
+                        staged: .modified,
+                        unstaged: nil
+                    )
                 }
-
-                // Create entry for the new path showing it as renamed
-                files[path] = WorkingTreeFile(
-                    path: path,
-                    staged: .renamed(from: oldPath),
-                    unstaged: nil
-                )
-
-                // Optionally store old path info if WorkingTreeFile supports it
-                // Otherwise, the new path entry with .renamed is sufficient
-
             } else {
                 let staged = parseChangeType(from: stagedChar, isStaged: true)
                 let unstaged = parseChangeType(from: unstagedChar, isStaged: false)
@@ -136,30 +132,19 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
 
 // MARK: - Private Helpers
 private extension WorkingTreeParser {
-    func parseChangeType(from char: Character, isStaged: Bool) -> GitChangeType? {
+    func parseChangeType(from char: Character, isStaged: Bool) -> GitChangeType {
         let s = String(char)
-        if s == "?" { return isStaged ? nil : .untracked }
-        return mapSimpleStatusCode(s)
+        if s == "?" { return isStaged ? .modified : .untracked }
+        return parseStatusCharacter(s)
     }
 
     func parseStatusCharacter(_ status: String) -> GitChangeType {
-        if status.hasPrefix("R") {
-            return .modified
-        }
-        if let mapped = mapSimpleStatusCode(status) {
-            return mapped
-        }
-        return .modified
-    }
-
-    func mapSimpleStatusCode(_ code: String) -> GitChangeType? {
-        switch code {
-        case "M": return .modified
+        switch status {
         case "A": return .added
         case "D": return .deleted
         case "R", "C": return .renamed(from: "")
         case "U": return .conflicted
-        default: return nil
+        default: return .modified
         }
     }
 }
