@@ -145,19 +145,27 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
 
 // MARK: - Private Helpers
 private extension WorkingTreeParser {
-    func parseChangeType(from char: Character, isStaged: Bool) -> GitChangeType {
+    func parseChangeType(from char: Character, isStaged: Bool) -> GitChangeType? {
         let s = String(char)
-        if s == "?" { return isStaged ? .modified : .untracked }
-        return parseStatusCharacter(s)
+        if s == "?" { return isStaged ? nil : .untracked }
+        return mapSimpleStatusCode(s)
     }
 
     func parseStatusCharacter(_ status: String) -> GitChangeType {
-        switch status {
+        if let mapped = mapSimpleStatusCode(status) {
+            return mapped
+        }
+        return .modified
+    }
+
+    func mapSimpleStatusCode(_ code: String) -> GitChangeType? {
+        switch code {
+        case "M": return .modified
         case "A": return .added
         case "D": return .deleted
         case "R", "C": return .renamed(from: "")
         case "U": return .conflicted
-        default: return .modified
+        default: return nil
         }
     }
 }
