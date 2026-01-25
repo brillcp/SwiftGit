@@ -48,7 +48,7 @@ extension RefReader: RefReaderProtocol {
             .filter { !$0.isEmpty }
 
         for line in lines {
-            let parts = line.split(separator: " ", maxSplits: 1)
+            let parts = line.split(separator: String.space, maxSplits: 1)
             guard parts.count == 2 else { continue }
 
             let hash = String(parts[0])
@@ -56,14 +56,22 @@ extension RefReader: RefReaderProtocol {
 
             // Parse ref type and name
             let ref: GitRef
-            if fullName.hasPrefix("refs/heads/") {
-                let name = String(fullName.dropFirst("refs/heads/".count))
+            let refHeads = "refs/heads/"
+            let refRemotes = "refs/remotes/"
+            let refTags = "refs/tags/"
+
+            if fullName.hasPrefix(refHeads) {
+                let name = String(fullName.dropFirst(refHeads.count))
                 ref = GitRef(name: name, hash: hash, type: .localBranch)
-            } else if fullName.hasPrefix("refs/remotes/") {
-                let name = String(fullName.dropFirst("refs/remotes/".count))
+            } else if fullName.hasPrefix(refRemotes) {
+                let name = String(fullName.dropFirst(refRemotes.count))
+                // Skip origin/HEAD (symbolic ref to default branch)
+                if name.hasSuffix("/HEAD") {
+                    continue
+                }
                 ref = GitRef(name: name, hash: hash, type: .remoteBranch)
-            } else if fullName.hasPrefix("refs/tags/") {
-                let name = String(fullName.dropFirst("refs/tags/".count))
+            } else if fullName.hasPrefix(refTags) {
+                let name = String(fullName.dropFirst(refTags.count))
                 ref = GitRef(name: name, hash: hash, type: .tag)
             } else {
                 continue // Skip other refs
