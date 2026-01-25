@@ -35,25 +35,29 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
 
             let path = String(line.dropFirst(3))
 
-            // Handle renames: R  new_path\0old_path
-            if stagedChar == "R" || stagedChar == "C" { // R=rename, C=copy
+            // Handle renames: R  new_path\0old_path OR  R new_path\0old_path
+            if stagedChar == "R" || stagedChar == "C" || unstagedChar == "R" || unstagedChar == "C" {
                 i += 1 // Move to next entry which contains the old path
 
                 if i < lines.count {
                     let oldPath = String(lines[i])
 
-                    // Create entry for the new path showing it as renamed from oldPath
+                    let staged: GitChangeType? = (stagedChar == "R" || stagedChar == "C") ?
+                        .renamed(from: oldPath) : parseChangeType(from: stagedChar, isStaged: true)
+                    let unstaged: GitChangeType? = (unstagedChar == "R" || unstagedChar == "C") ?
+                        .renamed(from: oldPath) : parseChangeType(from: unstagedChar, isStaged: false)
+
                     files[path] = WorkingTreeFile(
                         path: path,
-                        staged: .renamed(from: oldPath),
-                        unstaged: nil
+                        staged: staged,
+                        unstaged: unstaged
                     )
                 } else {
                     // Malformed rename entry, treat as modified
                     files[path] = WorkingTreeFile(
                         path: path,
-                        staged: .modified,
-                        unstaged: nil
+                        staged: parseChangeType(from: stagedChar, isStaged: true),
+                        unstaged: parseChangeType(from: unstagedChar, isStaged: false)
                     )
                 }
             } else {
