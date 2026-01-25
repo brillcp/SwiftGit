@@ -21,22 +21,57 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
 
         let lines = output.split(separator: String.null)
 
-        for line in lines {
+        var i = 0
+        while i < lines.count {
+            let line = lines[i]
+
             guard line.count >= 3,
                   let stagedChar = line.first,
                   let unstagedChar = line.dropFirst().first
-            else { continue }
+            else {
+                i += 1
+                continue
+            }
 
             let path = String(line.dropFirst(3))
 
-            let staged = parseChangeType(from: stagedChar, isStaged: true)
-            let unstaged = parseChangeType(from: unstagedChar, isStaged: false)
+            // Handle renames: R  new_path\0old_path
+            if stagedChar == "R" || stagedChar == "C" { // R=rename, C=copy
+                i += 1 // Move to next entry which contains the old path
+                let oldPath = String(lines[i])
 
-            files[path] = WorkingTreeFile(
-                path: path,
-                staged: staged,
-                unstaged: unstaged
-            )
+                guard i < lines.count else {
+                    // Malformed rename entry, treat as modified
+                    files[path] = WorkingTreeFile(
+                        path: path,
+                        staged: .renamed(from: oldPath),
+                        unstaged: nil
+                    )
+                    break
+                }
+
+                // Create entry for the new path showing it as renamed
+                files[path] = WorkingTreeFile(
+                    path: path,
+                    staged: .renamed(from: oldPath),
+                    unstaged: nil
+                )
+
+                // Optionally store old path info if WorkingTreeFile supports it
+                // Otherwise, the new path entry with .renamed is sufficient
+
+            } else {
+                let staged = parseChangeType(from: stagedChar, isStaged: true)
+                let unstaged = parseChangeType(from: unstagedChar, isStaged: false)
+
+                files[path] = WorkingTreeFile(
+                    path: path,
+                    staged: staged,
+                    unstaged: unstaged
+                )
+            }
+
+            i += 1
         }
 
         return WorkingTreeStatus(files: files)
@@ -119,12 +154,11 @@ private extension WorkingTreeParser {
 
     func mapSimpleStatusCode(_ code: String) -> GitChangeType? {
         switch code {
-        case " ": return nil
         case "M": return .modified
         case "A": return .added
         case "D": return .deleted
+        case "R", "C": return .renamed(from: "")
         case "U": return .conflicted
-        case "!": return nil
         default: return nil
         }
     }
