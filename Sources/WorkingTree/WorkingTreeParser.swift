@@ -114,16 +114,29 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
         let lines = output.split(separator: String.newLine)
 
         for line in lines {
-            let parts = line.split(separator: String.tab, maxSplits: 1)
-            guard parts.count == 2 else { continue }
+            let parts = line.split(separator: String.tab)
+            guard parts.count >= 2 else { continue }
 
             let status = String(parts[0])
-            let path = String(parts[1])
 
-            files[path] = CommittedFile(
-                path: path,
-                changeType: parseStatusCharacter(status)
-            )
+            // Handle renames: R100    oldPath    newPath
+            if status.hasPrefix("R") || status.hasPrefix("C") {
+                guard parts.count == 3 else { continue }
+                let oldPath = String(parts[1])
+                let newPath = String(parts[2])
+
+                files[newPath] = CommittedFile(
+                    path: newPath,
+                    changeType: .renamed(from: oldPath)
+                )
+            } else {
+                let path = String(parts[1])
+
+                files[path] = CommittedFile(
+                    path: path,
+                    changeType: parseStatusCharacter(status)
+                )
+            }
         }
 
         return files

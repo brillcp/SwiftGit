@@ -228,7 +228,7 @@ extension GitCommand {
         case .showFile(let commitId, let path):
             return ["show", "\(commitId):\(path)"]
         case .stashShow(let ref):
-            return ["stash", "show", "--include-untracked", "--name-status", ref]
+            return ["stash", "show", "--include-untracked", "--name-status", "--find-renames", ref]
         case .applyPatch(_, let cached):
             var args = ["apply"]
             if cached {
