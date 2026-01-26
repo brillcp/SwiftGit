@@ -220,7 +220,7 @@ extension GitCommand {
         case .showCommitFiles(let commitId):
             return ["show", "-z", "-M", "-m", "--name-status", "--pretty=", commitId]
         case .showFileDiff(let commitId, let path):
-            return ["show", "-m", commitId, "--", path]
+            return ["diff", "\(commitId)^1", commitId, "--", path]
         case .diffCommits(let from, let to, let path):
             return ["diff", from, to, "--", path]
         case .diffFromEmpty(let to, let path):
