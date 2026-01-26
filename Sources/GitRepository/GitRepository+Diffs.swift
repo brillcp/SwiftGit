@@ -82,15 +82,28 @@ extension GitRepository: DiffReadable {
 // MARK: - Private functions
 private extension GitRepository {
     func fetchFileDiff(for commit: Commit, at path: String) async throws -> [DiffHunk] {
-        if commit.parents.isEmpty {
-            return try await getDiffForInitialCommit(commitId: commit.id, path: path)
+        // Stash commits have 3 parents (HEAD, index, untracked)
+        if commit.parents.count == 3 {
+            // Try regular diff first (for tracked files in stash)
+            let parentId = commit.parents[0]
+            let result = try await commandRunner.run(.diffCommits(from: parentId, to: commit.id, path: path))
+
+            if !result.stdout.isEmpty {
+                return await diffParser.parse(result.stdout)
+            }
+
+            // Fall back to untracked file diff
+            return try await getDiffForUntrackedStashFile(commitId: commit.id, path: path)
         }
 
-        if commit.parents.count > 1 {
+        // Merge commits have 2 parents
+        if commit.parents.count == 2 {
             return try await getDiffForMergeCommit(commitId: commit.id, path: path)
         }
 
-        return try await getDiffForRegularCommit(commitId: commit.id, parentId: commit.parents[0], path: path)
+        // Regular commits have 1 parent
+        guard let parentId = commit.parents.first else { return [] }
+        return try await getDiffForRegularCommit(commitId: commit.id, parentId: parentId, path: path)
     }
 
     func getDiffForInitialCommit(commitId: String, path: String) async throws -> [DiffHunk] {
