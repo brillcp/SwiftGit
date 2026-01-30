@@ -5,7 +5,7 @@ public enum RefType: Sendable {
 }
 
 public struct GitRef: Identifiable, Hashable, Sendable {
-    public var id: String { hash }
+    public var id: String { name }
     public let name: String
     public let hash: String
     public let type: RefType
