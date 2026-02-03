@@ -17,7 +17,10 @@ public protocol GitRepositoryProtocol:
     RevertWritable,
     ConflictReadable,
     ConflictWritable,
-    MergeWritable
+    MergeWritable,
+    ResetWritable,
+    RebaseWritable,
+    RemoteWritable
 {
     /// The URL of the repository
     var url: URL { get }

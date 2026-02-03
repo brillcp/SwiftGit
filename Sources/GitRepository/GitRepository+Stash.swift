@@ -74,4 +74,25 @@ extension GitRepository: StashWritable {
         await cache.remove(.stashes)
         eventSubject.send(.stashDropped(id: stashId))
     }
+
+    public func stashFile(path: String, message: String? = nil) async throws {
+        let result = try await commandRunner.run(
+            .stashPushFile(path: path, message: message))
+
+        let output = result.stderr + result.stdout
+        if output.contains("No local changes") {
+            throw GitError.nothingToStash
+        }
+
+        guard result.exitCode == 0 else {
+            throw GitError.stashFailed
+        }
+
+        await workingTree.invalidateIndexCache()
+        await cache.remove(.stashes)
+
+        if let id = try await getStashes().first?.id {
+            eventSubject.send(.stashed(id: id))
+        }
+    }
 }

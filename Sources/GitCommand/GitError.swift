@@ -52,6 +52,18 @@ public enum GitError: LocalizedError {
     case stashApplyFailed
     case stashDropFailed
 
+    // MARK: - Reset Operations
+    case resetFailed(commit: String)
+
+    // MARK: - Rebase Operations
+    case rebaseFailed(branch: String)
+    case rebaseConflict(branch: String)
+
+    // MARK: - Remote Operations
+    case fetchFailed
+    case pullFailed
+    case pullConflict
+
     // MARK: - Advanced Operations
     case cherryPickFailed(commit: String)
     case cherryPickSkipFailed
@@ -72,11 +84,13 @@ public enum GitError: LocalizedError {
     case cherryPickContinueFailed
     case mergeContinueFailed
     case revertContinueFailed
+    case rebaseContinueFailed
 
     // MARK: - Abort operations
     case cherryPickAbortFailed
     case mergeAbortFailed
     case revertAbortFailed
+    case rebaseAbortFailed
 
     case workflowFailed(name: String)
     case refsFailed
@@ -169,6 +183,24 @@ public enum GitError: LocalizedError {
         case .stashDropFailed:
             return "Failed to delete stash."
 
+        // MARK: - Reset Operations
+        case .resetFailed(let commit):
+            return "Failed to reset to \(commit.shortHash)."
+
+        // MARK: - Rebase Operations
+        case .rebaseFailed(let branch):
+            return "Failed to rebase onto '\(branch)'."
+        case .rebaseConflict(let branch):
+            return "Rebasing onto '\(branch)' caused conflicts. Resolve them and continue."
+
+        // MARK: - Remote Operations
+        case .fetchFailed:
+            return "Failed to fetch from remote."
+        case .pullFailed:
+            return "Failed to pull from remote."
+        case .pullConflict:
+            return "Pulling caused conflicts. Resolve them and commit."
+
         // MARK: - Advanced Operations
         case .cherryPickFailed(let commit):
             return "Failed to cherry-pick commit \(commit.shortHash)."
@@ -204,6 +236,8 @@ public enum GitError: LocalizedError {
             return "Failed to continue merge"
         case .revertContinueFailed:
             return "Failed to continue revert"
+        case .rebaseContinueFailed:
+            return "Failed to continue rebase"
 
         // MARK: - Abort operations
         case .cherryPickAbortFailed:
@@ -212,6 +246,8 @@ public enum GitError: LocalizedError {
             return "Failed to abort merge"
         case .revertAbortFailed:
             return "Failed to abort revert"
+        case .rebaseAbortFailed:
+            return "Failed to abort rebase"
 
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."

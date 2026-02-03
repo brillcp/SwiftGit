@@ -13,4 +13,7 @@ public protocol StashWritable: Actor {
 
     /// Delete a stash
     func stashDrop(index: Int) async throws
+
+    /// Stash changes for a single file
+    func stashFile(path: String, message: String?) async throws
 }

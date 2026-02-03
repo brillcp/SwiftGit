@@ -7,7 +7,7 @@ public protocol ConflictReadable: Actor {
     /// Get list of conflicted file paths
     func getConflictedFiles() async throws -> Set<String>
 
-    /// Get the type of operation causing conflicts (merge, cherry-pick, revert)
+    /// Get the type of operation causing conflicts (merge, cherry-pick, revert, rebase)
     func conflictOperation() async -> ConflictOperation?
 }
 
@@ -16,6 +16,7 @@ public enum ConflictOperation: Sendable {
     case merge
     case cherryPick
     case revert
+    case rebase
 
     /// The Git ref file that contains the commit hash for "theirs" side
     public var refFile: String {
@@ -26,6 +27,8 @@ public enum ConflictOperation: Sendable {
             "\(GitPath.git.rawValue)/\(GitPath.cherryPickHead.rawValue)"
         case .revert:
             "\(GitPath.git.rawValue)/\(GitPath.revertHead.rawValue)"
+        case .rebase:
+            "\(GitPath.git.rawValue)/\(GitPath.rebaseHead.rawValue)"
         }
     }
 }

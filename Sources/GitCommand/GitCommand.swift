@@ -3,8 +3,10 @@ import Foundation
 fileprivate let commitFormat: String = "%H%x00%P%x00%T%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b"
 
 public enum GitCommand: Sendable {
-    // MARK: - Pushing
+    // MARK: - Remote
     case push(remote: String?, branch: String?, setUpstream: Bool, force: Bool)
+    case fetch(remote: String?, prune: Bool)
+    case pull(remote: String?, branch: String?)
     case merge(branch: String, noFastForward: Bool = true)
 
     // MARK: - Staging
@@ -30,22 +32,27 @@ public enum GitCommand: Sendable {
 
     // MARK: - Stash
     case stashPush(message: String?)
+    case stashPushFile(path: String, message: String?)
     case stashPop(index: Int)
     case stashApply(index: Int)
     case stashDrop(index: Int)
 
     // MARK: - History Manipulation
+    case resetToCommit(mode: ResetMode, target: String)
     case cherryPick(commitHash: String)
     case cherryPickSkip
     case revert(commitHash: String, noCommit: Bool)
+    case rebase(onto: String)
     case cherryPickContinue
     case mergeContinue
     case revertContinue
+    case rebaseContinue
 
     // MARK: - Conflict Resolution
     case mergeAbort
     case cherryPickAbort
     case revertAbort
+    case rebaseAbort
 
     // MARK: - Diff & Patches
     case diff(path: String, staged: Bool, untracked: Bool, deleted: Bool)
@@ -81,11 +88,21 @@ extension GitCommand {
 
     var arguments: [String] {
         switch self {
-        // MARK: - Pushing
+        // MARK: - Remote
         case .push(let remote, let branch, let setUpstream, let force):
             var args = ["push"]
             if force { args.append("--force") }
             if setUpstream { args.append("--set-upstream") }
+            if let remote { args.append(remote) }
+            if let branch { args.append(branch) }
+            return args
+        case .fetch(let remote, let prune):
+            var args = ["fetch"]
+            if let remote { args.append(remote) }
+            if prune { args.append("--prune") }
+            return args
+        case .pull(let remote, let branch):
+            var args = ["pull"]
             if let remote { args.append(remote) }
             if let branch { args.append(branch) }
             return args
@@ -165,6 +182,13 @@ extension GitCommand {
                 args += ["-m", message]
             }
             return args
+        case .stashPushFile(let path, let message):
+            var args = ["stash", "push"]
+            if let message {
+                args += ["-m", message]
+            }
+            args += ["--", path]
+            return args
         case .stashPop(let index):
             return ["stash", "pop", String.stashId(for: index)]
         case .stashApply(let index):
@@ -173,6 +197,8 @@ extension GitCommand {
             return ["stash", "drop", String.stashId(for: index)]
 
         // MARK: - History Manipulation
+        case .resetToCommit(let mode, let target):
+            return ["reset", mode.rawValue, target]
         case .cherryPick(let commitHash):
             return ["cherry-pick", commitHash]
         case .cherryPickSkip:
@@ -184,12 +210,16 @@ extension GitCommand {
             }
             args.append(commitHash)
             return args
+        case .rebase(let onto):
+            return ["rebase", onto]
         case .cherryPickContinue:
             return ["cherry-pick", "--continue", "--no-edit"]
         case .mergeContinue:
             return ["merge", "--continue", "--no-edit"]
         case .revertContinue:
             return ["revert", "--continue", "--no-edit"]
+        case .rebaseContinue:
+            return ["rebase", "--continue"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:
@@ -198,6 +228,8 @@ extension GitCommand {
             return ["cherry-pick", "--abort"]
         case .revertAbort:
             return ["revert", "--abort"]
+        case .rebaseAbort:
+            return ["rebase", "--abort"]
 
         // MARK: - Diff & Patches
         case .diff(let path, let staged, let untracked, let deleted):

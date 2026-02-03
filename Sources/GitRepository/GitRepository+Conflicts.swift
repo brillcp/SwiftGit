@@ -5,10 +5,12 @@ extension GitRepository: ConflictReadable {
         let mergeHead = gitURL.appendingPathComponent(GitPath.mergeHead.rawValue)
         let cherryPickHead = gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue)
         let revertHead = gitURL.appendingPathComponent(GitPath.revertHead.rawValue)
+        let rebaseHead = gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue)
 
         return fileManager.fileExists(atPath: mergeHead.path) ||
                fileManager.fileExists(atPath: cherryPickHead.path) ||
-               fileManager.fileExists(atPath: revertHead.path)
+               fileManager.fileExists(atPath: revertHead.path) ||
+               fileManager.fileExists(atPath: rebaseHead.path)
     }
 
     public func getConflictedFiles() async throws -> Set<String> {
@@ -25,6 +27,9 @@ extension GitRepository: ConflictReadable {
         }
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             return .revert
+        }
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+            return .rebase
         }
         return nil
     }
@@ -44,6 +49,12 @@ extension GitRepository: ConflictWritable {
         } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             try await commandRunner.run(.revertAbort)
             abortedOperation = .revertAborted
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+            let result = try await commandRunner.run(.rebaseAbort)
+            guard result.exitCode == 0 else {
+                throw GitError.rebaseAbortFailed
+            }
+            abortedOperation = .rebaseAborted
         }
 
         await workingTree.invalidateIndexCache()
@@ -83,6 +94,12 @@ extension GitRepository: ConflictWritable {
                 throw GitError.revertContinueFailed
             }
             continuedOperation = .revertContinued
+        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+            let result = try await commandRunner.run(.rebaseContinue)
+            guard result.exitCode == 0 else {
+                throw GitError.rebaseContinueFailed
+            }
+            continuedOperation = .rebaseContinued
         }
 
         await cache.remove(.head)
