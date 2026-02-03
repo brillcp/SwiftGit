@@ -14,11 +14,15 @@ let package = Package(
             name: "SwiftGit",
             targets: ["SwiftGit"]),
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.3.0"),
+    ],
     targets: [
         .target(
             name: "SwiftGit",
-            dependencies: [],
+            dependencies: [
+                .product(name: "Collections", package: "swift-collections"),
+            ],
             path: "Sources"
         ),
         .testTarget(

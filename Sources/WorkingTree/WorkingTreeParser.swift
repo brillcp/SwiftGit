@@ -1,12 +1,13 @@
 import Foundation
+import Collections
 
 public protocol WorkingTreeParserProtocol: Actor {
     /// Parse git status --porcelain output into working tree status
     func parseStatusOutput(_ output: String) async -> WorkingTreeStatus
 
     /// Parse git diff-index --cached output (staged files)
-    func parseFilesNullDelimited(_ output: String) async -> [String: CommittedFile]
-    func parseFilesNewlineDelimited(_ output: String) async -> [String: CommittedFile]
+    func parseFilesNullDelimited(_ output: String) async -> OrderedDictionary<String, CommittedFile>
+    func parseFilesNewlineDelimited(_ output: String) async -> OrderedDictionary<String, CommittedFile>
 }
 
 public actor WorkingTreeParser: @unchecked Sendable {
@@ -17,7 +18,7 @@ public actor WorkingTreeParser: @unchecked Sendable {
 // MARK: - WorkingTreeParserProtocol
 extension WorkingTreeParser: WorkingTreeParserProtocol {
     public func parseStatusOutput(_ output: String) async -> WorkingTreeStatus {
-        var files: [String: WorkingTreeFile] = [:]
+        var files: OrderedDictionary<String, WorkingTreeFile> = [:]
 
         let lines = output.split(separator: String.null)
 
@@ -77,8 +78,8 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
         return WorkingTreeStatus(files: files)
     }
 
-    public func parseFilesNullDelimited(_ output: String) async -> [String: CommittedFile] {
-        var files: [String: CommittedFile] = [:]
+    public func parseFilesNullDelimited(_ output: String) async -> OrderedDictionary<String, CommittedFile> {
+        var files: OrderedDictionary<String, CommittedFile> = [:]
 
         let parts = output.split(separator: String.null)
 
@@ -112,8 +113,8 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
         return files
     }
 
-    public func parseFilesNewlineDelimited(_ output: String) async -> [String: CommittedFile] {
-        var files: [String: CommittedFile] = [:]
+    public func parseFilesNewlineDelimited(_ output: String) async -> OrderedDictionary<String, CommittedFile> {
+        var files: OrderedDictionary<String, CommittedFile> = [:]
 
         let lines = output.split(separator: String.newLine)
 

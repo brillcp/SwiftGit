@@ -1,8 +1,9 @@
 import Foundation
+import Collections
 
 public protocol RefReaderProtocol: Actor {
     /// Get all refs (branches, tags, etc.)
-    func getRefs() async throws -> [String: [GitRef]]
+    func getRefs() async throws -> OrderedDictionary<String, [GitRef]>
 
     /// Get HEAD commit SHA
     func getHEAD() async throws -> String?
@@ -29,8 +30,8 @@ public actor RefReader {
 
 // MARK: - RefReaderProtocol
 extension RefReader: RefReaderProtocol {
-    public func getRefs() async throws -> [String: [GitRef]] {
-        if let cached: [String: [GitRef]] = await cache.get(.refs) {
+    public func getRefs() async throws -> OrderedDictionary<String, [GitRef]> {
+        if let cached: OrderedDictionary<String, [GitRef]> = await cache.get(.refs) {
             return cached
         }
 
@@ -40,7 +41,7 @@ extension RefReader: RefReaderProtocol {
             return [:]
         }
 
-        var refsByHash: [String: [GitRef]] = [:]
+        var refsByHash: OrderedDictionary<String, [GitRef]> = [:]
 
         let lines = result.stdout
             .trimmingCharacters(in: .whitespacesAndNewlines)

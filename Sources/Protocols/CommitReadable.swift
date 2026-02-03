@@ -1,4 +1,5 @@
 import Foundation
+import Collections
 
 /// Protocol for reading commit information from a Git repository
 public protocol CommitReadable: Actor {
@@ -6,7 +7,7 @@ public protocol CommitReadable: Actor {
     func getCommit(_ hash: String) async throws -> Commit?
 
     /// Get all commits up to a specified limit
-    func getAllCommits(limit: Int) async throws -> [Commit]
+    func getAllCommits(limit: Int) async throws -> Deque<Commit>
 
     /// Get the current HEAD commit SHA
     func getHEAD() async throws -> String?
@@ -15,8 +16,8 @@ public protocol CommitReadable: Actor {
     func getHEADBranch() async throws -> String?
 
     /// Get changed files for a commit
-    func getCommittedFiles(_ commitId: String) async throws -> [String: CommittedFile]
+    func getCommittedFiles(_ commitId: String) async throws -> OrderedDictionary<String, CommittedFile>
 
     /// Get changed files for a stash commit
-    func getStashedFiles(_ stashId: String) async throws -> [String: CommittedFile]
+    func getStashedFiles(_ stashId: String) async throws -> OrderedDictionary<String, CommittedFile>
 }

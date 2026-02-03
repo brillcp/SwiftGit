@@ -1,10 +1,11 @@
 import Foundation
+import Collections
 
 public struct WorkingTreeStatus: Sendable {
-    public let files: [String: WorkingTreeFile]
+    public let files: OrderedDictionary<String, WorkingTreeFile>
     public let conflictedFiles: Set<String>
 
-    public init(files: [String: WorkingTreeFile]) {
+    public init(files: OrderedDictionary<String, WorkingTreeFile>) {
         self.files = files
 
         let conflicted = files.values

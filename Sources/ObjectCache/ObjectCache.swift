@@ -1,4 +1,5 @@
 import Foundation
+import Collections
 
 public enum CacheKey: Hashable, Sendable {
     case commit(hash: String)
@@ -42,7 +43,7 @@ public protocol ObjectCacheProtocol: Actor {
 
 public actor ObjectCache {
     private var storage: [CacheKey: CacheEntry] = [:]
-    private var accessOrder: LinkedList<CacheKey> = LinkedList()
+    private var accessOrder: OrderedSet<CacheKey> = []
 
     private var hitCount: Int = 0
     private var missCount: Int = 0
@@ -67,6 +68,7 @@ extension ObjectCache: ObjectCacheProtocol {
         }
 
         hitCount += 1
+        // Move to end (most recently used)
         accessOrder.remove(key)
         accessOrder.append(key)
         entry.lastAccessed = .now
@@ -86,7 +88,9 @@ extension ObjectCache: ObjectCacheProtocol {
                 lastAccessed: Date(),
                 estimatedSize: estimatedSize
             )
-            accessOrder.moveToFront(key)
+            // Move to end (most recently used)
+            accessOrder.remove(key)
+            accessOrder.append(key)
             return
         }
 
@@ -122,8 +126,7 @@ extension ObjectCache: ObjectCacheProtocol {
     }
 
     public func clear(where predicate: (CacheKey) -> Bool) async {
-        let allKeys = Array(storage.keys)
-        let keysToRemove = allKeys.filter(predicate)
+        let keysToRemove = accessOrder.filter(predicate)
 
         for key in keysToRemove {
             if let entry = storage[key] {
@@ -154,14 +157,14 @@ private extension ObjectCache {
     }
 
     func evictIfNeeded() {
-        // Evict until we're under both limits
+        // Evict least recently used (first element) until we're under both limits
         while storage.count > maxObjects || currentMemoryUsage > maxMemory {
             guard let lruKey = accessOrder.first else { break }
 
             if let entry = storage[lruKey] {
                 currentMemoryUsage -= entry.estimatedSize
                 storage.removeValue(forKey: lruKey)
-                accessOrder.removeFirst()
+                accessOrder.remove(at: 0)
                 evictionCount += 1
             }
         }
@@ -194,84 +197,5 @@ private extension ObjectCache {
         default:
             return 500
         }
-    }
-}
-
-// MARK: - Private linked list
-private class LinkedList<T: Hashable> {
-    private class Node {
-        let value: T
-        var prev: Node?
-        var next: Node?
-
-        init(value: T) {
-            self.value = value
-        }
-    }
-
-    private var head: Node?
-    private var tail: Node?
-    private var nodeMap: [T: Node] = [:]
-
-    var first: T? {
-        head?.value
-    }
-
-    func append(_ value: T) {
-        let node = Node(value: value)
-        nodeMap[value] = node
-
-        if head == nil {
-            head = node
-            tail = node
-        } else {
-            tail?.next = node
-            node.prev = tail
-            tail = node
-        }
-    }
-
-    func remove(_ value: T) {
-        guard let node = nodeMap[value] else { return }
-
-        if node === head {
-            head = node.next
-        }
-        if node === tail {
-            tail = node.prev
-        }
-
-        node.prev?.next = node.next
-        node.next?.prev = node.prev
-
-        nodeMap.removeValue(forKey: value)
-    }
-
-    func removeFirst() {
-        guard let head = head else { return }
-        remove(head.value)
-    }
-
-    func moveToFront(_ value: T) {
-        guard let node = nodeMap[value], node !== tail else { return }
-
-        // Remove from current position
-        if node === head {
-            head = node.next
-        }
-        node.prev?.next = node.next
-        node.next?.prev = node.prev
-
-        // Move to tail (most recently used)
-        tail?.next = node
-        node.prev = tail
-        node.next = nil
-        tail = node
-    }
-
-    func removeAll() {
-        head = nil
-        tail = nil
-        nodeMap.removeAll()
     }
 }

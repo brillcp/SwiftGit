@@ -1,4 +1,5 @@
 import Foundation
+import Collections
 
 extension GitRepository: CommitReadable {
     public func getCommit(_ hash: String) async throws -> Commit? {
@@ -12,11 +13,11 @@ extension GitRepository: CommitReadable {
         return try Commit.parse(from: line)
     }
 
-    public func getAllCommits(limit: Int) async throws -> [Commit] {
-        try await commandRunner.streamCommits(limit: limit).reduce(into: [Commit]()) { $0.append($1) }
+    public func getAllCommits(limit: Int) async throws -> Deque<Commit> {
+        try await commandRunner.streamCommits(limit: limit).reduce(into: Deque<Commit>()) { $0.append($1) }
     }
 
-    public func getCommittedFiles(_ commitId: String) async throws -> [String: CommittedFile] {
+    public func getCommittedFiles(_ commitId: String) async throws -> OrderedDictionary<String, CommittedFile> {
         let result = try await commandRunner.run(
             .showCommitFiles(commitId: commitId)
         )
@@ -28,7 +29,7 @@ extension GitRepository: CommitReadable {
         return await workingTreeParser.parseFilesNullDelimited(result.stdout)
     }
 
-    public func getStashedFiles(_ stashId: String) async throws -> [String: CommittedFile] {
+    public func getStashedFiles(_ stashId: String) async throws -> OrderedDictionary<String, CommittedFile> {
         let result = try await commandRunner.run(
             .stashShow(ref: stashId)
         )
