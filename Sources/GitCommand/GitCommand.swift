@@ -183,7 +183,7 @@ extension GitCommand {
             }
             return args
         case .stashPushFile(let path, let message):
-            var args = ["stash", "push"]
+            var args = ["stash", "push", "--include-untracked"]
             if let message {
                 args += ["-m", message]
             }
