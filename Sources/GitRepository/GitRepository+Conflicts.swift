@@ -38,18 +38,21 @@ extension GitRepository: ConflictReadable {
 // MARK: - ConflictWritable
 extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
+        guard let op = await conflictOperation() else { return }
+
         var abortedOperation: GitEvent?
 
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
+        switch op {
+        case .merge:
             try await commandRunner.run(.mergeAbort)
             abortedOperation = .mergeAborted
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
+        case .cherryPick:
             try await commandRunner.run(.cherryPickAbort)
             abortedOperation = .cherryPickAborted
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
+        case .revert:
             try await commandRunner.run(.revertAbort)
             abortedOperation = .revertAborted
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+        case .rebase:
             let result = try await commandRunner.run(.rebaseAbort)
             guard result.exitCode == 0 else {
                 throw GitError.rebaseAbortFailed
@@ -65,15 +68,17 @@ extension GitRepository: ConflictWritable {
     }
 
     public func continueOperation() async throws {
-        var continuedOperation: GitEvent?
+        guard let op = await conflictOperation() else { return }
 
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
+        var continuedOperation: GitEvent?
+        switch op {
+        case .merge:
             let result = try await commandRunner.run(.mergeContinue)
             guard result.exitCode == 0 else {
                 throw GitError.mergeContinueFailed
             }
             continuedOperation = .mergeContinued
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) {
+        case .cherryPick:
             let result = try await commandRunner.run(.cherryPickContinue)
             // Check for empty cherry-pick
             if result.exitCode != 0 && result.stderr.contains("now empty") {
@@ -88,13 +93,13 @@ extension GitRepository: ConflictWritable {
             } else {
                 continuedOperation = .cherryPickContinued
             }
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
+        case .revert:
             let result = try await commandRunner.run(.revertContinue)
             guard result.exitCode == 0 else {
                 throw GitError.revertContinueFailed
             }
             continuedOperation = .revertContinued
-        } else if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+        case .rebase:
             let result = try await commandRunner.run(.rebaseContinue)
             guard result.exitCode == 0 else {
                 throw GitError.rebaseContinueFailed
