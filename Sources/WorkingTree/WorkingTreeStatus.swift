@@ -12,6 +12,5 @@ public struct WorkingTreeStatus: Sendable {
             .filter { $0.staged == .conflicted || $0.unstaged == .conflicted }
             .map(\.path)
         conflictedFiles = Set(conflicted)
-
     }
 }

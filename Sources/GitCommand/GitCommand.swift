@@ -215,7 +215,7 @@ extension GitCommand {
         case .cherryPickContinue:
             return ["cherry-pick", "--continue", "--no-edit"]
         case .mergeContinue:
-            return ["merge", "--continue", "--no-edit"]
+            return ["merge", "--continue"]
         case .revertContinue:
             return ["revert", "--continue", "--no-edit"]
         case .rebaseContinue:

@@ -129,9 +129,10 @@ private extension CommandRunner {
         process.currentDirectoryURL = repoURL
         process.arguments = arguments
 
-        // Disable git pager to prevent interactive prompts
+        // Disable git pager and editor to prevent interactive prompts
         process.environment = ProcessInfo.processInfo.environment
         process.environment?["GIT_PAGER"] = ""
+        process.environment?["GIT_EDITOR"] = "true"
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
