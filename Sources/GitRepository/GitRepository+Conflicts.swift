@@ -1,15 +1,6 @@
 import Foundation
 
 extension GitRepository: ConflictReadable {
-    public func hasOperationInProgress() -> Bool {
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) ||
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) ||
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) ||
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) ||
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseMerge.rawValue).path) ||
-        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseApply.rawValue).path)
-    }
-
     public func getConflictedFiles() async throws -> Set<String> {
         let status = try await workingTree.workingTreeStatus()
         return status.conflictedFiles

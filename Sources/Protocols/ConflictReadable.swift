@@ -1,13 +1,10 @@
 import Foundation
 
 public protocol ConflictReadable: Actor {
-    /// Check if repository has an operation in progress (merge, rebase, cherry-pick, revert)
-    func hasOperationInProgress() -> Bool
-
     /// Get list of conflicted file paths
     func getConflictedFiles() async throws -> Set<String>
 
-    /// Get the type of operation causing conflicts (merge, cherry-pick, revert, rebase)
+    /// Get the type of operation in progress (merge, cherry-pick, revert, rebase), or nil if none
     func conflictOperation() -> ConflictOperation?
 
     /// Get the commit hash of "theirs" side in a conflict (from MERGE_HEAD, CHERRY_PICK_HEAD, etc.)
