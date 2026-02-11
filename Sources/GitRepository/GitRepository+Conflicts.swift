@@ -1,16 +1,13 @@
 import Foundation
 
 extension GitRepository: ConflictReadable {
-    public func hasConflicts() async throws -> Bool {
-        let mergeHead = gitURL.appendingPathComponent(GitPath.mergeHead.rawValue)
-        let cherryPickHead = gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue)
-        let revertHead = gitURL.appendingPathComponent(GitPath.revertHead.rawValue)
-        let rebaseHead = gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue)
-
-        return fileManager.fileExists(atPath: mergeHead.path) ||
-               fileManager.fileExists(atPath: cherryPickHead.path) ||
-               fileManager.fileExists(atPath: revertHead.path) ||
-               fileManager.fileExists(atPath: rebaseHead.path)
+    public func hasOperationInProgress() -> Bool {
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) ||
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.cherryPickHead.rawValue).path) ||
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) ||
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) ||
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseMerge.rawValue).path) ||
+        fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseApply.rawValue).path)
     }
 
     public func getConflictedFiles() async throws -> Set<String> {
@@ -18,7 +15,7 @@ extension GitRepository: ConflictReadable {
         return status.conflictedFiles
     }
 
-    public func conflictOperation() async -> ConflictOperation? {
+    public func conflictOperation() -> ConflictOperation? {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.mergeHead.rawValue).path) {
             return .merge
         }
@@ -28,17 +25,35 @@ extension GitRepository: ConflictReadable {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             return .revert
         }
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) {
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) ||
+           fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseMerge.rawValue).path) ||
+           fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseApply.rawValue).path) {
             return .rebase
         }
         return nil
+    }
+
+    public func theirsCommitHash() -> String? {
+        guard let operation = conflictOperation() else { return nil }
+
+        let refPath: GitPath
+        switch operation {
+        case .merge: refPath = .mergeHead
+        case .cherryPick: refPath = .cherryPickHead
+        case .revert: refPath = .revertHead
+        case .rebase: refPath = .rebaseHead
+        }
+
+        let refURL = gitURL.appendingPathComponent(refPath.rawValue)
+        return try? String(contentsOf: refURL, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
 // MARK: - ConflictWritable
 extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
-        guard let op = await conflictOperation() else { return }
+        guard let op = conflictOperation() else { return }
 
         var abortedOperation: GitEvent?
 
@@ -68,7 +83,7 @@ extension GitRepository: ConflictWritable {
     }
 
     public func continueOperation() async throws {
-        guard let op = await conflictOperation() else { return }
+        guard let op = conflictOperation() else { return }
 
         var continuedOperation: GitEvent?
         switch op {

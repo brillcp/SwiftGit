@@ -10,5 +10,7 @@ enum GitPath: String {
     case mergeHead = "MERGE_HEAD"
     case cherryPickHead = "CHERRY_PICK_HEAD"
     case revertHead = "REVERT_HEAD"
-    case rebaseHead = "rebase-merge"
+    case rebaseHead = "REBASE_HEAD"
+    case rebaseMerge = "rebase-merge"
+    case rebaseApply = "rebase-apply"
 }
