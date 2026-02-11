@@ -17,7 +17,33 @@ public actor GitRepository: GitRepositoryProtocol {
     let diffParser: GitDiffParser
 
     var gitURL: URL {
-        url.appendingPathComponent(GitPath.git.rawValue)
+        let dotGit = url.appendingPathComponent(GitPath.git.rawValue)
+
+        // Check if .git is a file (worktree) or directory (normal repo)
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: dotGit.path, isDirectory: &isDirectory) else {
+            return dotGit
+        }
+
+        // Normal repo - .git is a directory
+        if isDirectory.boolValue {
+            return dotGit
+        }
+
+        // Worktree - .git is a file containing "gitdir: /path/to/git/dir"
+        guard let content = try? String(contentsOf: dotGit, encoding: .utf8),
+              let line = content.split(whereSeparator: \.isNewline).first else {
+            return dotGit
+        }
+
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let prefix = "gitdir:"
+        guard trimmed.lowercased().hasPrefix(prefix) else {
+            return dotGit
+        }
+
+        let path = trimmed.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
+        return URL(fileURLWithPath: path, relativeTo: url).standardizedFileURL
     }
 
     // MARK: - Public properties
