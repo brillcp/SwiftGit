@@ -94,6 +94,7 @@ public enum GitError: LocalizedError {
 
     // MARK: - Tag Operations
     case tagCreationFailed(name: String)
+    case tagDeletionFailed(name: String)
 
     case workflowFailed(name: String)
     case refsFailed
@@ -255,6 +256,8 @@ public enum GitError: LocalizedError {
         // MARK: - Tag Operations
         case .tagCreationFailed(let name):
             return "Failed to create tag '\(name)'."
+        case .tagDeletionFailed(let name):
+            return "Failed to delete tag '\(name)'."
 
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."

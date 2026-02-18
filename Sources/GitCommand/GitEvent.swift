@@ -41,6 +41,7 @@ public enum GitEvent {
     case rebaseAborted
 
     case tagCreated(name: String)
+    case tagDeleted(name: String)
 
     case workflowCompleted(name: String)
 }

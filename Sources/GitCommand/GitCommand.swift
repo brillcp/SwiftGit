@@ -70,6 +70,7 @@ public enum GitCommand: Sendable {
 
     // MARK: - Tags
     case createTag(name: String, ref: String, message: String?)
+    case deleteTag(name: String)
 
     // MARK: - Refs and HEAD
     case showRef
@@ -295,6 +296,9 @@ extension GitCommand {
             } else {
                 return ["tag", name, ref]
             }
+
+        case .deleteTag(let name):
+            return ["tag", "-d", name]
 
         // MARK: - Refs and HEAD
         case .showRef:
