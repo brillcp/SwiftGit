@@ -9,5 +9,6 @@ extension GitRepository: TagWritable {
         }
 
         await cache.remove(.refs)
+        eventSubject.send(.tagCreated(name: name))
     }
 }
