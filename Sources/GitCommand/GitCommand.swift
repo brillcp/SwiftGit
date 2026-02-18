@@ -68,6 +68,9 @@ public enum GitCommand: Sendable {
     case status(porcelain: Bool)
     case lsFilesStaged
 
+    // MARK: - Tags
+    case createTag(name: String, ref: String, message: String?)
+
     // MARK: - Refs and HEAD
     case showRef
     case revParse(rev: String)
@@ -284,6 +287,14 @@ extension GitCommand {
             return args
         case .lsFilesStaged:
             return ["ls-files", "-z", "--stage"]
+
+        // MARK: - Tags
+        case .createTag(let name, let ref, let message):
+            if let message {
+                return ["tag", "-a", name, ref, "-m", message]
+            } else {
+                return ["tag", name, ref]
+            }
 
         // MARK: - Refs and HEAD
         case .showRef:

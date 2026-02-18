@@ -20,7 +20,8 @@ public protocol GitRepositoryProtocol:
     MergeWritable,
     ResetWritable,
     RebaseWritable,
-    RemoteWritable
+    RemoteWritable,
+    TagWritable
 {
     /// The URL of the repository
     var url: URL { get }

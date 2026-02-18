@@ -92,6 +92,9 @@ public enum GitError: LocalizedError {
     case revertAbortFailed
     case rebaseAbortFailed
 
+    // MARK: - Tag Operations
+    case tagCreationFailed(name: String)
+
     case workflowFailed(name: String)
     case refsFailed
 
@@ -248,6 +251,10 @@ public enum GitError: LocalizedError {
             return "Failed to abort revert"
         case .rebaseAbortFailed:
             return "Failed to abort rebase"
+
+        // MARK: - Tag Operations
+        case .tagCreationFailed(let name):
+            return "Failed to create tag '\(name)'."
 
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."
