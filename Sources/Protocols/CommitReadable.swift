@@ -6,8 +6,8 @@ public protocol CommitReadable: Actor {
     /// Get a specific commit by its SHA
     func getCommit(_ hash: String) async throws -> Commit?
 
-    /// Get all commits up to a specified limit
-    func getAllCommits(limit: Int) async throws -> Deque<Commit>
+    /// Get all commits up to a specified limit, optionally including additional refs (e.g. stash hashes)
+    func getAllCommits(limit: Int, additionalRefs: [String]) async throws -> Deque<Commit>
 
     /// Get the current HEAD commit SHA
     func getHEAD() async throws -> String?

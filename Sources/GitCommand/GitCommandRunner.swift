@@ -3,7 +3,7 @@ import Foundation
 public protocol GitCommandable: Actor {
     @discardableResult
     func run(_ command: GitCommand) async throws -> CommandResult
-    func streamCommits(limit: Int) -> AsyncThrowingStream<Commit, Error>
+    func streamCommits(limit: Int, additionalRefs: [String]) -> AsyncThrowingStream<Commit, Error>
 }
 
 // MARK: -
@@ -47,7 +47,7 @@ extension CommandRunner: GitCommandable {
         )
     }
 
-    public func streamCommits(limit: Int) -> AsyncThrowingStream<Commit, Error> {
+    public func streamCommits(limit: Int, additionalRefs: [String] = []) -> AsyncThrowingStream<Commit, Error> {
         AsyncThrowingStream { continuation in
             Task.detached { [weak self] in
                 guard let self else {
@@ -56,7 +56,7 @@ extension CommandRunner: GitCommandable {
                 }
 
                 do {
-                    let result = try await self.run(.log(limit: limit))
+                    let result = try await self.run(.log(limit: limit, additionalRefs: additionalRefs))
 
                     guard result.exitCode == 0 else {
                         throw GitError.logFailed(reason: result.stderr)

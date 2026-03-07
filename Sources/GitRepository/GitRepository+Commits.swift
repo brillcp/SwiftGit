@@ -13,8 +13,8 @@ extension GitRepository: CommitReadable {
         return try Commit.parse(from: line)
     }
 
-    public func getAllCommits(limit: Int) async throws -> Deque<Commit> {
-        try await commandRunner.streamCommits(limit: limit).reduce(into: Deque<Commit>()) { $0.append($1) }
+    public func getAllCommits(limit: Int, additionalRefs: [String] = []) async throws -> Deque<Commit> {
+        try await commandRunner.streamCommits(limit: limit, additionalRefs: additionalRefs).reduce(into: Deque<Commit>()) { $0.append($1) }
     }
 
     public func getCommittedFiles(_ commitId: String) async throws -> OrderedDictionary<String, CommittedFile> {

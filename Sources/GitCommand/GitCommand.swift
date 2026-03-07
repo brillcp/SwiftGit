@@ -16,7 +16,7 @@ public enum GitCommand: Sendable {
     case resetAll
 
     // MARK: - Commits
-    case log(limit: Int)
+    case log(limit: Int, additionalRefs: [String] = [])
     case showCommit(hash: String)
     case commit(message: String, author: String?)
 
@@ -130,14 +130,16 @@ extension GitCommand {
             return ["reset", "HEAD", "--", "."]
 
         // MARK: - Commits
-        case .log(let limit):
-            return [
+        case .log(let limit, let additionalRefs):
+            var args = [
                 "log",
                 "--all",
                 "--topo-order",
                 "-n", "\(limit)",
                 "--format=\(commitFormat)"
             ]
+            args += additionalRefs
+            return args
         case .showCommit(let hash):
             return [
                 "show",
