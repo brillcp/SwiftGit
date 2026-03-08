@@ -11,6 +11,7 @@ public protocol GitRepositoryProtocol:
     WorkingTreeReadable,
     StagingWritable,
     DiscardWritable,
+    IgnoreWritable,
     StashReadable,
     StashWritable,
     CherryPickWritable,
