@@ -22,8 +22,7 @@ public protocol GitRepositoryProtocol:
     ResetWritable,
     RebaseWritable,
     RemoteWritable,
-    TagWritable,
-    CredentialWritable
+    TagWritable
 {
     /// The URL of the repository
     var url: URL { get }
