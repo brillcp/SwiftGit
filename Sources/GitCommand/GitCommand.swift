@@ -72,6 +72,10 @@ public enum GitCommand: Sendable {
     case createTag(name: String, ref: String, message: String?)
     case deleteTag(name: String)
 
+    // MARK: - Credentials
+    case credentialApprove(host: String, username: String, password: String)
+    case credentialErase(host: String)
+
     // MARK: - Refs and HEAD
     case showRef
     case revParse(rev: String)
@@ -85,6 +89,10 @@ extension GitCommand {
         switch self {
         case .applyPatch(let patch, _):
             return patch.data(using: .utf8)
+        case .credentialApprove(let host, let username, let password):
+            return "protocol=https\nhost=\(host)\nusername=\(username)\npassword=\(password)\n".data(using: .utf8)
+        case .credentialErase(let host):
+            return "protocol=https\nhost=\(host)\n".data(using: .utf8)
         default:
             return nil
         }
@@ -301,6 +309,12 @@ extension GitCommand {
 
         case .deleteTag(let name):
             return ["tag", "-d", name]
+
+        // MARK: - Credentials
+        case .credentialApprove:
+            return ["credential", "approve"]
+        case .credentialErase:
+            return ["credential", "erase"]
 
         // MARK: - Refs and HEAD
         case .showRef:

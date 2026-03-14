@@ -96,6 +96,10 @@ public enum GitError: LocalizedError {
     case tagCreationFailed(name: String)
     case tagDeletionFailed(name: String)
 
+    // MARK: - Credential Operations
+    case credentialStoreFailed(host: String)
+    case credentialEraseFailed(host: String)
+
     case workflowFailed(name: String)
     case refsFailed
 
@@ -258,6 +262,12 @@ public enum GitError: LocalizedError {
             return "Failed to create tag '\(name)'."
         case .tagDeletionFailed(let name):
             return "Failed to delete tag '\(name)'."
+
+        // MARK: - Credential Operations
+        case .credentialStoreFailed(let host):
+            return "Failed to store credentials for '\(host)'."
+        case .credentialEraseFailed(let host):
+            return "Failed to erase credentials for '\(host)'."
 
         case .workflowFailed(let name):
             return "Failed to run workflow '\(name)'."
