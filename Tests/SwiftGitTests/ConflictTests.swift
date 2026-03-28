@@ -30,7 +30,7 @@ struct ConflictTests {
         }
 
         // Verify conflict state
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == true, "Should have conflicts after failed merge")
 
         let operation = await repository.conflictOperation()
@@ -51,13 +51,13 @@ struct ConflictTests {
         try? await repository.merge(branch: "feature", noFastForward: true)
 
         // Verify we're in conflict state
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         // Abort merge
         try await repository.abortOperation()
 
         // Verify conflict state is cleared
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == false, "Should have no conflicts after abort")
 
         let operation = await repository.conflictOperation()
@@ -82,7 +82,7 @@ struct ConflictTests {
         try await repository.continueOperation()
 
         // Verify merge completed
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == false)
 
         let operation = await repository.conflictOperation()
@@ -114,7 +114,7 @@ struct ConflictTests {
         }
 
         // Verify conflict state
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == true)
 
         let operation = await repository.conflictOperation()
@@ -130,11 +130,11 @@ struct ConflictTests {
         let cherryPickHash = try await setupCherryPickConflict(in: repoURL, repository: repository)
         try? await repository.cherryPick(cherryPickHash)
 
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         try await repository.abortOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -153,7 +153,7 @@ struct ConflictTests {
 
         try await repository.continueOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -181,7 +181,7 @@ struct ConflictTests {
             }
         }
 
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == true)
 
         let operation = await repository.conflictOperation()
@@ -197,11 +197,11 @@ struct ConflictTests {
         let revertHash = try await setupRevertConflict(in: repoURL, repository: repository)
         try? await repository.revertCommit(revertHash)
 
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         try await repository.abortOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -220,7 +220,7 @@ struct ConflictTests {
 
         try await repository.continueOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -248,7 +248,7 @@ struct ConflictTests {
             }
         }
 
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == true)
 
         let operation = await repository.conflictOperation()
@@ -264,11 +264,11 @@ struct ConflictTests {
         try await setupRebaseConflict(in: repoURL, repository: repository)
         try? await repository.rebase(onto: "main")
 
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         try await repository.abortOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -287,7 +287,7 @@ struct ConflictTests {
 
         try await repository.continueOperation()
 
-        #expect(try await repository.hasConflicts() == false)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == false)
         #expect(await repository.conflictOperation() == nil)
     }
 
@@ -304,7 +304,7 @@ struct ConflictTests {
         try await repository.stageFile(at: "file.txt")
         try await repository.commit(message: "Initial commit")
 
-        let hasConflicts = try await repository.hasConflicts()
+        let hasConflicts = !(try await repository.getConflictedFiles().isEmpty)
         #expect(hasConflicts == false)
 
         let operation = await repository.conflictOperation()
@@ -361,7 +361,7 @@ struct ConflictTests {
         try? await repository.merge(branch: "feature", noFastForward: true)
 
         // Verify we're in conflict state
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         // Get the three versions using stage numbers:
         // :1: = base (common ancestor)
@@ -408,7 +408,7 @@ struct ConflictTests {
         // Trigger cherry-pick conflict
         try? await repository.cherryPick(cherryHash)
 
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         // For cherry-pick:
         // :1: = base (parent of cherry-picked commit)
@@ -452,7 +452,7 @@ struct ConflictTests {
         try await repository.checkoutBranch("feature", createNew: false)
         try? await repository.rebase(onto: "main")
 
-        #expect(try await repository.hasConflicts() == true)
+        #expect(!(try await repository.getConflictedFiles().isEmpty) == true)
 
         // For rebase:
         // :1: = base (common ancestor)

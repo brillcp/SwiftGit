@@ -16,8 +16,7 @@ extension GitRepository: ConflictReadable {
         if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.revertHead.rawValue).path) {
             return .revert
         }
-        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseHead.rawValue).path) ||
-           fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseMerge.rawValue).path) ||
+        if fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseMerge.rawValue).path) ||
            fileManager.fileExists(atPath: gitURL.appendingPathComponent(GitPath.rebaseApply.rawValue).path) {
             return .rebase
         }
