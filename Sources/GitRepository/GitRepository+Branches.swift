@@ -41,6 +41,7 @@ extension GitRepository: BranchWritable {
             throw GitError.pushFailed
         }
 
+        await cache.remove(.refs)
         eventSubject.send(.pushed(remote: remote ?? "origin", branch: branch))
     }
 

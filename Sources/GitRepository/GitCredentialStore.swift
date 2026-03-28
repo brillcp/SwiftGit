@@ -18,7 +18,6 @@ public actor GitCredentialStore: CredentialWritable {
     }
 
     public func eraseCredential(host: String) async throws {
-        let result = try await runner.run(.credentialErase(host: host))
-        guard result.exitCode == 0 else { throw GitError.credentialEraseFailed(host: host) }
+        _ = try await runner.run(.credentialErase(host: host))
     }
 }
