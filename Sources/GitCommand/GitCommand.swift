@@ -7,6 +7,8 @@ public enum GitCommand: Sendable {
     case push(remote: String?, branch: String?, setUpstream: Bool, force: Bool)
     case fetch(remote: String?, prune: Bool)
     case pull(remote: String?, branch: String?)
+    case addRemote(name: String, url: String)
+    case clone(url: String, destination: String)
     case merge(branch: String, noFastForward: Bool = true)
 
     // MARK: - Staging
@@ -118,6 +120,10 @@ extension GitCommand {
             if let remote { args.append(remote) }
             if let branch { args.append(branch) }
             return args
+        case .addRemote(let name, let url):
+            return ["remote", "add", name, url]
+        case .clone(let url, let destination):
+            return ["clone", url, destination]
         case .merge(let branch, let noFastForward):
             var args = ["merge", branch]
             if noFastForward {

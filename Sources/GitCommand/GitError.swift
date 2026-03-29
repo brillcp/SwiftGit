@@ -63,6 +63,8 @@ public enum GitError: LocalizedError {
     case fetchFailed
     case pullFailed
     case pullConflict
+    case remoteAddFailed(String)
+    case cloneFailed(String)
 
     // MARK: - Advanced Operations
     case cherryPickFailed(commit: String)
@@ -208,6 +210,10 @@ public enum GitError: LocalizedError {
             return "Failed to pull from remote."
         case .pullConflict:
             return "Pulling caused conflicts. Resolve them and commit."
+        case .remoteAddFailed(let msg):
+            return "Failed to add remote: \(msg)"
+        case .cloneFailed(let msg):
+            return msg
 
         // MARK: - Advanced Operations
         case .cherryPickFailed(let commit):

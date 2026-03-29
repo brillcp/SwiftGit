@@ -4,6 +4,7 @@ public enum GitEvent {
     case pushed(remote: String, branch: String?)
     case fetched(remote: String)
     case pulled(remote: String)
+    case remoteAdded(name: String)
 
     case fileStaged(path: String)
     case fileUnstaged(path: String)
