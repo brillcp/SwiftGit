@@ -108,17 +108,4 @@ extension GitRepository: BranchWritable {
         await cache.remove(.refs)
         eventSubject.send(.branchDeleted(name: name))
     }
-
-    public func deleteRemoteTrackingRef(_ name: String) async throws {
-        let result = try await commandRunner.run(
-            .deleteRemoteTrackingRef(name: name)
-        )
-
-        guard result.exitCode == 0 else {
-            throw GitError.deleteRemoteBranchFailed(branch: name)
-        }
-
-        await cache.remove(.refs)
-        eventSubject.send(.branchDeleted(name: name))
-    }
 }

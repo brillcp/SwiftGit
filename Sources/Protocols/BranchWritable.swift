@@ -18,7 +18,4 @@ public protocol BranchWritable: Actor {
 
     /// Delete a remote branch (pushes deletion to remote)
     func deleteRemoteBranch(_ name: String) async throws
-
-    /// Delete a local remote-tracking reference (e.g. origin/feature)
-    func deleteRemoteTrackingRef(_ name: String) async throws
 }
