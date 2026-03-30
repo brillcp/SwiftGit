@@ -81,6 +81,7 @@ public enum GitCommand: Sendable {
     case credentialErase(host: String)
 
     // MARK: - Refs and HEAD
+    case lsRemoteTags(remote: String)
     case showRef
     case revParse(rev: String)
     case symbolicRef
@@ -329,6 +330,8 @@ extension GitCommand {
             return ["credential", "erase"]
 
         // MARK: - Refs and HEAD
+        case .lsRemoteTags(let remote):
+            return ["ls-remote", "--tags", remote]
         case .showRef:
             return ["show-ref"]
         case .revParse(let rev):
