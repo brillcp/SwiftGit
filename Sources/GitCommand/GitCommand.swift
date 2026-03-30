@@ -25,6 +25,8 @@ public enum GitCommand: Sendable {
     // MARK: - Branches
     case checkout(branch: String, create: Bool = false)
     case deleteBranch(name: String, force: Bool = false)
+    case deleteRemoteBranch(remote: String, branch: String)
+    case deleteRemoteTrackingRef(name: String)
 
     // MARK: - Working Tree
     case restore(path: String)
@@ -181,6 +183,10 @@ extension GitCommand {
             args.append(force ? "-D" : "-d")
             args.append(name)
             return args
+        case .deleteRemoteBranch(let remote, let branch):
+            return ["push", remote, "--delete", branch]
+        case .deleteRemoteTrackingRef(let name):
+            return ["branch", "-d", "-r", name]
 
         // MARK: - Working Tree
         case .restore(let path):

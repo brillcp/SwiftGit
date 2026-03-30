@@ -23,6 +23,7 @@ public enum GitError: LocalizedError {
     case cannotDeleteCurrentBranch
     case cannotDeleteProtectedBranch(String)
     case deleteBranchFailed(branch: String)
+    case deleteRemoteBranchFailed(branch: String)
 
     // MARK: - Staging Operations
     case cannotStageHunkFromUntrackedFile
@@ -144,6 +145,8 @@ public enum GitError: LocalizedError {
             return "Cannot delete '\(name)'. This is a protected branch (main, master, develop, etc.)."
         case .deleteBranchFailed(let branch):
             return "Failed to delete '\(branch)'. The branch may have unmerged changes."
+        case .deleteRemoteBranchFailed(let branch):
+            return "Failed to delete remote branch '\(branch)'."
 
         // MARK: - Staging Operations
         case .cannotStageHunkFromUntrackedFile:

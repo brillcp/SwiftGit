@@ -87,4 +87,38 @@ extension GitRepository: BranchWritable {
         await cache.remove(.refs)
         eventSubject.send(.branchDeleted(name: name))
     }
+
+    public func deleteRemoteBranch(_ name: String) async throws {
+        let components = name.split(separator: "/", maxSplits: 1)
+        let remote = components.count > 1 ? String(components[0]) : "origin"
+        let branch = components.count > 1 ? String(components[1]) : name
+
+        let result = try await commandRunner.run(
+            .deleteRemoteBranch(remote: remote, branch: branch)
+        )
+
+        guard result.exitCode == 0 else {
+            let output = result.stderr + result.stdout
+            if output.contains("authentication") || output.contains("denied") {
+                throw GitError.authenticationFailed
+            }
+            throw GitError.deleteRemoteBranchFailed(branch: name)
+        }
+
+        await cache.remove(.refs)
+        eventSubject.send(.branchDeleted(name: name))
+    }
+
+    public func deleteRemoteTrackingRef(_ name: String) async throws {
+        let result = try await commandRunner.run(
+            .deleteRemoteTrackingRef(name: name)
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.deleteRemoteBranchFailed(branch: name)
+        }
+
+        await cache.remove(.refs)
+        eventSubject.send(.branchDeleted(name: name))
+    }
 }
