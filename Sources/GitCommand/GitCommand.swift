@@ -75,6 +75,7 @@ public enum GitCommand: Sendable {
     // MARK: - Tags
     case createTag(name: String, ref: String, message: String?)
     case deleteTag(name: String)
+    case deleteRemoteTag(remote: String, name: String)
 
     // MARK: - Credentials
     case credentialApprove(host: String, username: String, password: String)
@@ -321,6 +322,8 @@ extension GitCommand {
 
         case .deleteTag(let name):
             return ["tag", "-d", name]
+        case .deleteRemoteTag(let remote, let name):
+            return ["push", remote, "--delete", name]
 
         // MARK: - Credentials
         case .credentialApprove:
