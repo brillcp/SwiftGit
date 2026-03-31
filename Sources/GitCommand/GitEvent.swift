@@ -1,6 +1,6 @@
 import Foundation
 
-public enum GitEvent {
+public enum GitEvent: Sendable {
     case pushed(remote: String, branch: String?)
     case fetched(remote: String)
     case pulled(remote: String)

@@ -82,11 +82,11 @@ public actor GitRepository: GitRepositoryProtocol {
     }
 
     public func executeWorkflow(_ workflow: GitWorkflow) async throws {
-        for command in workflow.commands {
-            let result = try await commandRunner.run(command)
+        for step in workflow.steps {
+            let result = try await commandRunner.run(step.command)
 
             guard result.exitCode == 0 else {
-                throw GitError.workflowFailed(name: workflow.name ?? "workflow")
+                throw step.mapError(result)
             }
         }
 
