@@ -1,7 +1,7 @@
 import Foundation
 
-/// Protocol for rebasing the current branch onto another branch
+/// Protocol for rebasing branches
 public protocol RebaseWritable: Actor {
-    /// Rebase the current branch onto another branch
-    func rebase(onto branch: String) async throws
+    /// Rebase a branch onto another branch. If `branch` is nil, rebases the current branch.
+    func rebase(onto target: String, branch: String?) async throws
 }

@@ -1,9 +1,9 @@
 import Foundation
 
 extension GitRepository: RebaseWritable {
-    public func rebase(onto branch: String) async throws {
+    public func rebase(onto target: String, branch: String? = nil) async throws {
         let result = try await commandRunner.run(
-            .rebase(onto: branch)
+            .rebase(onto: target, branch: branch)
         )
 
         guard result.exitCode == 0 else {
