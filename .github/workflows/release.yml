@@ -43,6 +43,30 @@ jobs:
           git tag ${{ steps.bump.outputs.new_tag }}
           git push origin ${{ steps.bump.outputs.new_tag }}
 
+      - name: Delete old tags (keep latest two)
+        run: |
+          # After creating the new tag, we have: old_old, old (previous latest), new (just created)
+          # We want to keep only the latest two (old + new), so delete old_old
+          ALL_TAGS=$(git tag --sort=-v:refname)
+          COUNT=0
+          for TAG in $ALL_TAGS; do
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -gt 2 ]; then
+              echo "Deleting old tag: $TAG"
+              git push origin --delete "$TAG" 2>/dev/null || true
+              git tag -d "$TAG" 2>/dev/null || true
+            fi
+          done
+
+      - name: Delete old releases (keep latest two)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --json tagName -q '.[].tagName' | tail -n +3 | while read -r TAG; do
+            echo "Deleting release: $TAG"
+            gh release delete "$TAG" --yes 2>/dev/null || true
+          done
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:

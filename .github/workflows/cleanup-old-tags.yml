@@ -1,0 +1,44 @@
+name: Cleanup Old Tags and Releases
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete old tags (keep latest two)
+        run: |
+          ALL_TAGS=$(git tag --sort=-v:refname)
+          LATEST_TWO=$(echo "$ALL_TAGS" | head -n 2)
+          echo "Keeping: $LATEST_TWO"
+
+          echo "$ALL_TAGS" | tail -n +3 | while read -r TAG; do
+            [ -z "$TAG" ] && continue
+            echo "Deleting tag: $TAG"
+            git push origin --delete "$TAG" 2>/dev/null || true
+            git tag -d "$TAG" 2>/dev/null || true
+          done
+
+      - name: Delete old releases (keep latest two)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --json tagName -q '.[].tagName' | tail -n +3 | while read -r TAG; do
+            [ -z "$TAG" ] && continue
+            echo "Deleting release: $TAG"
+            gh release delete "$TAG" --yes 2>/dev/null || true
+          done
+
+      - name: Summary
+        run: |
+          echo "Remaining tags:"
+          git tag --sort=-v:refname
