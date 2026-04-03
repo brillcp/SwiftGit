@@ -82,21 +82,19 @@ public actor GitRepository: GitRepositoryProtocol {
     }
 
     public func executeWorkflow(_ workflow: GitWorkflow) async throws {
-        for step in workflow.steps {
-            let result = try await commandRunner.run(step.command)
+        for command in workflow.commands {
+            let result = try await commandRunner.run(command)
 
             guard result.exitCode == 0 else {
-                throw step.mapError(result)
+                let message = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw GitError.workflowFailed(name: message.isEmpty ? (workflow.name ?? "workflow") : message)
             }
         }
 
+        await cache.remove(.head)
+        await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-
-        if let event = workflow.onComplete {
-            eventSubject.send(event)
-        } else if let name = workflow.name {
-            eventSubject.send(.workflowCompleted(name: name))
-        }
+        eventSubject.send(workflow.onComplete)
     }
 }
 
