@@ -11,6 +11,7 @@ public actor GitRepository: GitRepositoryProtocol {
     let workingTree: WorkingTreeReaderProtocol
     let patchGenerator: PatchGenerator
     let commandRunner: GitCommandable
+    let backgroundRunner: GitCommandable
     let refReader: RefReaderProtocol
     let cache: ObjectCacheProtocol
     let fileManager: FileManager
@@ -58,6 +59,7 @@ public actor GitRepository: GitRepositoryProtocol {
         self.cache = cache
         self.diffParser = GitDiffParser()
         self.commandRunner = CommandRunner(repoURL: url)
+        self.backgroundRunner = CommandRunner(repoURL: url)
         self.refReader = RefReader(
             commandRunner: commandRunner,
             cache: cache

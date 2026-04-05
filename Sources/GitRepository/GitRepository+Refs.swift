@@ -7,7 +7,7 @@ extension GitRepository: RefReadable {
     }
 
     public func getRemoteTagNames(remote: String = "origin") async throws -> Set<String> {
-        let result = try await commandRunner.run(.lsRemoteTags(remote: remote))
+        let result = try await backgroundRunner.run(.lsRemoteTags(remote: remote))
         guard result.exitCode == 0 else { return [] }
 
         let prefix = "refs/tags/"
