@@ -24,7 +24,7 @@ extension GitRepository: TagWritable {
     }
 
     public func deleteRemoteTag(name: String, remote: String = "origin") async throws {
-        let result = try await commandRunner.run(.deleteRemoteTag(remote: remote, name: name))
+        let result = try await backgroundRunner.run(.deleteRemoteTag(remote: remote, name: name))
 
         guard result.exitCode == 0 else {
             let output = result.stderr + result.stdout

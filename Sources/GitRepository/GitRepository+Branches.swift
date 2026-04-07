@@ -21,7 +21,7 @@ extension GitRepository: BranchWritable {
         setUpstream: Bool = false,
         force: Bool = false
     ) async throws {
-        let result = try await commandRunner.run(
+        let result = try await backgroundRunner.run(
             .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force)
         )
 
@@ -93,7 +93,7 @@ extension GitRepository: BranchWritable {
         let remote = components.count > 1 ? String(components[0]) : "origin"
         let branch = components.count > 1 ? String(components[1]) : name
 
-        let result = try await commandRunner.run(
+        let result = try await backgroundRunner.run(
             .deleteRemoteBranch(remote: remote, branch: branch)
         )
 

@@ -27,15 +27,19 @@ extension CommandRunner: GitCommandable {
 
         try process.run()
 
-        async let stdoutData = Task {
+        // Read stdout and stderr concurrently on background threads
+        async let stdoutData = Task.detached {
             stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
 
-        async let stderrData = Task {
+        async let stderrData = Task.detached {
             stderrPipe.fileHandleForReading.readDataToEndOfFile()
         }.value
 
-        process.waitUntilExit()
+        // Suspend the actor (freeing the thread) until the process exits
+        await withCheckedContinuation { continuation in
+            process.terminationHandler = { _ in continuation.resume() }
+        }
 
         let stdout = await stdoutData
         let stderr = await stderrData
