@@ -104,6 +104,47 @@ extension GitRepository: StagingWritable {
         try await cleanupTrailingNewlineChange(for: path)
         eventSubject.send(.hunkUnstaged(hunk: hunk, path: path))
     }
+
+    public func stageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws {
+        try await checkIndex(for: file)
+
+        if file.unstaged == .untracked {
+            throw GitError.cannotStageHunkFromUntrackedFile
+        }
+
+        let patch = patchGenerator.generateSingleLinePatch(
+            lineIndex: lineIndex, in: hunk, file: file,
+            oldLineNum: oldNum, newLineNum: newNum
+        )
+        guard !patch.isEmpty else { return }
+
+        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true))
+        guard result.exitCode == 0 else {
+            throw GitError.stageHunkFailed(path: file.path)
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.hunkStaged(hunk: hunk, path: file.path))
+    }
+
+    public func unstageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws {
+        try await checkIndex(for: file)
+
+        let patch = patchGenerator.generateReverseSingleLinePatch(
+            lineIndex: lineIndex, in: hunk, file: file,
+            oldLineNum: oldNum, newLineNum: newNum
+        )
+        guard !patch.isEmpty else { return }
+
+        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true))
+        guard result.exitCode == 0 else {
+            throw GitError.unstageHunkFailed(path: file.path)
+        }
+
+        await workingTree.invalidateIndexCache()
+        try await cleanupTrailingNewlineChange(for: file.path)
+        eventSubject.send(.hunkUnstaged(hunk: hunk, path: file.path))
+    }
 }
 
 // MARK: - Private helper

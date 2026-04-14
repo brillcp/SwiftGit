@@ -19,4 +19,10 @@ public protocol StagingWritable: Actor {
 
     /// Unstage a specific hunk
     func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws
+
+    /// Stage a single line from a hunk
+    func stageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws
+
+    /// Unstage a single line from a hunk
+    func unstageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws
 }

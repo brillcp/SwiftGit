@@ -89,6 +89,75 @@ extension PatchGenerator {
             .joined(separator: String.newLine)
     }
 
+    /// Generate a patch for staging a single line from a hunk.
+    /// Uses zero-context (--unidiff-zero) format so git applies it without needing surrounding lines.
+    /// - Parameters:
+    ///   - lineIndex: Index of the line within `hunk.lines` to stage
+    ///   - hunk: The parent hunk containing the line
+    ///   - file: The working tree file
+    ///   - oldLineNum: The 1-based old-file line number for the target line
+    ///   - newLineNum: The 1-based new-file line number for the target line
+    public func generateSingleLinePatch(
+        lineIndex: Int,
+        in hunk: DiffHunk,
+        file: WorkingTreeFile,
+        oldLineNum: Int?,
+        newLineNum: Int?
+    ) -> String {
+        let line = hunk.lines[lineIndex]
+        guard line.type == .added || line.type == .removed else { return "" }
+        let lineText = line.segments.map { $0.text }.joined()
+
+        var patch = makeHeader(for: file)
+
+        switch line.type {
+        case .added:
+            // Adding: old side has 0 lines at (newLineNum - 1), new side has 1 line at newLineNum
+            let pos = (newLineNum ?? 1) - 1
+            patch += "@@ -\(pos),0 +\(newLineNum ?? 1),1 @@\(String.newLine)"
+            patch += "+\(lineText)\(String.newLine)"
+        case .removed:
+            // Removing: old side has 1 line at oldLineNum, new side has 0 lines
+            patch += "@@ -\(oldLineNum ?? 1),1 +\(oldLineNum ?? 1),0 @@\(String.newLine)"
+            patch += "-\(lineText)\(String.newLine)"
+        case .unchanged:
+            break
+        }
+
+        return patch
+    }
+
+    /// Generate a reverse single-line patch (for unstaging one line).
+    public func generateReverseSingleLinePatch(
+        lineIndex: Int,
+        in hunk: DiffHunk,
+        file: WorkingTreeFile,
+        oldLineNum: Int?,
+        newLineNum: Int?
+    ) -> String {
+        let line = hunk.lines[lineIndex]
+        guard line.type == .added || line.type == .removed else { return "" }
+        let lineText = line.segments.map { $0.text }.joined()
+
+        var patch = makeHeader(for: file)
+
+        switch line.type {
+        case .added:
+            // Reverse of add: remove the line that was added
+            patch += "@@ -\(newLineNum ?? 1),1 +\(newLineNum ?? 1),0 @@\(String.newLine)"
+            patch += "-\(lineText)\(String.newLine)"
+        case .removed:
+            // Reverse of remove: re-add the line that was removed
+            let pos = (oldLineNum ?? 1) - 1
+            patch += "@@ -\(pos),0 +\(oldLineNum ?? 1),1 @@\(String.newLine)"
+            patch += "+\(lineText)\(String.newLine)"
+        case .unchanged:
+            break
+        }
+
+        return patch
+    }
+
     /// Generate a reverse patch (for unstaging/discarding)
     public func generateReversePatch(hunk: DiffHunk, file: WorkingTreeFile) -> String {
         var patch = ""
@@ -132,9 +201,9 @@ extension PatchGenerator {
 private extension PatchGenerator {
     func makeHeader(for file: WorkingTreeFile) -> String {
         var header = ""
-        header += "diff --git a/\(file.path) b/\(file.path)\n"
-        header += "--- a/\(file.path)\n"
-        header += "+++ b/\(file.path)\n"
+        header += "diff --git a/\(file.path) b/\(file.path)\(String.newLine)"
+        header += "--- a/\(file.path)\(String.newLine)"
+        header += "+++ b/\(file.path)\(String.newLine)"
         return header
     }
 
