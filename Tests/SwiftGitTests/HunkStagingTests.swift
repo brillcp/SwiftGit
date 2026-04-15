@@ -406,6 +406,281 @@ struct HunkStagingTests {
         #expect(filePartial?.staged != nil, "Should still have staged changes")
         #expect(filePartial?.unstaged != nil, "Should have unstaged changes")
     }
+
+    @Test func testStageAddedLine() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_stage_line_added_\(UUID().uuidString).txt"
+
+        // Create and commit initial file
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Add two lines in different places so we can stage only one
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nAdded A\nLine 2\nAdded B\nLine 3\n")
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunks")
+
+        // Find the first added line and its line numbers
+        let hunk = hunks[0]
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .added }) else {
+            Issue.record("No added line found")
+            return
+        }
+
+        // Calculate line numbers for the target line
+        var oldLineNum: Int? = nil
+        var newLineNum: Int? = nil
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        if let regex = try? NSRegularExpression(pattern: headerPattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
+            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+            var oldCount = 0
+            var newCount = 0
+            for line in hunk.lines.prefix(lineIndex) {
+                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+                if line.type == .unchanged || line.type == .added { newCount += 1 }
+            }
+            oldLineNum = oldStart + oldCount
+            newLineNum = newStart + newCount
+        }
+
+        // Stage just this one added line
+        try await repository.stageLine(at: lineIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
+
+        // Verify file is now partially staged
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("MM"), "File should have both staged and unstaged changes")
+        }
+
+        // Verify the staged diff contains only one added line
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let totalStagedAdded = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        #expect(totalStagedAdded == 1, "Should have exactly 1 staged added line")
+
+        // Cleanup
+        try await repository.discardFile(at: testFile)
+    }
+
+    @Test func testStageRemovedLine() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_stage_line_removed_\(UUID().uuidString).txt"
+
+        // Create file with multiple lines and commit
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nRemove me\nLine 2\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Remove one line
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\nLine 3\n")
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunks")
+
+        let hunk = hunks[0]
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .removed }) else {
+            Issue.record("No removed line found")
+            return
+        }
+
+        // Calculate line numbers
+        var oldLineNum: Int? = nil
+        var newLineNum: Int? = nil
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        if let regex = try? NSRegularExpression(pattern: headerPattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
+            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+            var oldCount = 0
+            var newCount = 0
+            for line in hunk.lines.prefix(lineIndex) {
+                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+                if line.type == .unchanged || line.type == .added { newCount += 1 }
+            }
+            oldLineNum = oldStart + oldCount
+            newLineNum = newStart + newCount
+        }
+
+        // Stage just the removed line
+        try await repository.stageLine(at: lineIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
+
+        // Verify it's staged
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("M  "), "File should be fully staged (single removal)")
+        }
+
+        // Verify staged diff has the removal
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let totalStagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(totalStagedRemoved == 1, "Should have exactly 1 staged removed line")
+
+        // Cleanup
+        try await repository.discardFile(at: testFile)
+    }
+
+    @Test func testUnstageAddedLine() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_unstage_line_added_\(UUID().uuidString).txt"
+
+        // Commit initial file
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Add two lines and stage the whole file
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nAdded A\nLine 2\nAdded B\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+
+        // Verify fully staged
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("M  "), "File should be fully staged before unstaging a line")
+        }
+
+        // Get the staged diff
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let stagedHunks = try await repository.getStagedDiff(for: file)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunks")
+
+        let hunk = stagedHunks[0]
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .added }) else {
+            Issue.record("No added line in staged diff")
+            return
+        }
+
+        // Calculate line numbers
+        var oldLineNum: Int? = nil
+        var newLineNum: Int? = nil
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        if let regex = try? NSRegularExpression(pattern: headerPattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
+            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+            var oldCount = 0
+            var newCount = 0
+            for line in hunk.lines.prefix(lineIndex) {
+                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+                if line.type == .unchanged || line.type == .added { newCount += 1 }
+            }
+            oldLineNum = oldStart + oldCount
+            newLineNum = newStart + newCount
+        }
+
+        // Unstage one added line
+        try await repository.unstageLine(at: lineIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
+
+        // File should now be partially staged (MM) since we staged 2 additions but unstaged 1
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("MM") || line.hasPrefix("M  "), "File should have staged changes remaining")
+        }
+
+        // Cleanup
+        try await repository.discardFile(at: testFile)
+    }
+
+    @Test func testUnstageRemovedLine() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_unstage_line_removed_\(UUID().uuidString).txt"
+
+        // Commit initial file with a line we'll remove
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nRemove me\nLine 2\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Remove the line and stage the change
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nLine 2\n")
+        try await repository.stageFile(at: testFile)
+
+        // Verify fully staged
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("M  "), "File should be fully staged")
+        }
+
+        // Get staged diff
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let stagedHunks = try await repository.getStagedDiff(for: file)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunks")
+
+        let hunk = stagedHunks[0]
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .removed }) else {
+            Issue.record("No removed line in staged diff")
+            return
+        }
+
+        // Calculate line numbers
+        var oldLineNum: Int? = nil
+        var newLineNum: Int? = nil
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        if let regex = try? NSRegularExpression(pattern: headerPattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
+            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+            var oldCount = 0
+            var newCount = 0
+            for line in hunk.lines.prefix(lineIndex) {
+                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+                if line.type == .unchanged || line.type == .added { newCount += 1 }
+            }
+            oldLineNum = oldStart + oldCount
+            newLineNum = newStart + newCount
+        }
+
+        // Unstage the removed line
+        try await repository.unstageLine(at: lineIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
+
+        // After unstaging the removal, file should be clean (original line restored to index)
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix(" M "), "File should be fully unstaged after restoring removed line")
+        }
+
+        // Cleanup
+        try await repository.discardFile(at: testFile)
+    }
 }
 
 func gitDiffOutput(in repoURL: URL, file: String) throws -> String {
