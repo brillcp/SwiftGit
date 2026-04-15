@@ -117,7 +117,8 @@ extension GitCommand {
         case .fetch(let remote, let prune):
             var args = ["fetch"]
             if let remote { args.append(remote) }
-            if prune { args.append("--prune") }
+            if prune { args.append(contentsOf: ["--prune", "--prune-tags"]) }
+            args.append("--tags")
             return args
         case .pull(let remote, let branch):
             var args = ["pull"]
