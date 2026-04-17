@@ -213,12 +213,13 @@ private extension GitDiffParser {
         let oldContent = old.drop(while: { $0.isWhitespace })
         let newContent = new.drop(while: { $0.isWhitespace })
 
-        // Split content into words (now safe to split on whitespace)
-        let oldWords = oldContent.split(whereSeparator: { $0.isWhitespace })
-        let newWords = newContent.split(whereSeparator: { $0.isWhitespace })
+        // Split on token boundaries for finer-grained highlights.
+        // Tokens preserve their trailing separator so reconstruction is lossless.
+        let oldTokens = tokenize(oldContent)
+        let newTokens = tokenize(newContent)
 
-        // Use Myers' algorithm for word diff
-        let difference = Array(newWords).difference(from: Array(oldWords))
+        // Use Myers' algorithm for token diff
+        let difference = newTokens.difference(from: oldTokens)
 
         var segments: [Segment] = []
         var segmentId = 0
@@ -248,39 +249,48 @@ private extension GitDiffParser {
         }
 
         // Generate segments based on which version we're building
-        if forOld {
-            for (index, word) in oldWords.enumerated() {
-                let isHighlighted = removals.contains(index)
-                segments.append(Segment(
-                    id: segmentId,
-                    text: String(word),
-                    isHighlighted: isHighlighted
-                ))
-                segmentId += 1
-            }
-        } else {
-            for (index, word) in newWords.enumerated() {
-                let isHighlighted = insertions.contains(index)
-                segments.append(Segment(
-                    id: segmentId,
-                    text: String(word),
-                    isHighlighted: isHighlighted
-                ))
-                segmentId += 1
+        let tokens = forOld ? oldTokens : newTokens
+        let changedIndices = forOld ? removals : insertions
+
+        for (index, token) in tokens.enumerated() {
+            segments.append(Segment(
+                id: segmentId,
+                text: token,
+                isHighlighted: changedIndices.contains(index)
+            ))
+            segmentId += 1
+        }
+
+        return segments
+    }
+
+    /// Split a string into tokens at identifier boundaries.
+    /// Each token includes any immediately following non-identifier, non-whitespace
+    /// punctuation so that `foo(` and `foo` are distinct tokens, matching the
+    /// granularity of tools like GitKraken.
+    func tokenize(_ s: Substring) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+
+        for ch in s {
+            let isIdent = ch.isLetter || ch.isNumber || ch == "_"
+            if current.isEmpty {
+                current.append(ch)
+            } else {
+                let lastIsIdent = current.last.map { $0.isLetter || $0.isNumber || $0 == "_" } ?? false
+                if isIdent == lastIsIdent || ch.isWhitespace {
+                    current.append(ch)
+                } else {
+                    tokens.append(current)
+                    current = String(ch)
+                }
             }
         }
 
-        // Add spaces between words (skip first if it's the leading whitespace)
-        let startIndex = leadingSpace.isEmpty ? 0 : 1
-        return segments.enumerated().map { index, segment in
-            if index >= startIndex && index < segments.count - 1 {
-                return Segment(
-                    id: segment.id,
-                    text: segment.text + String.space,
-                    isHighlighted: segment.isHighlighted
-                )
-            }
-            return segment
+        if !current.isEmpty {
+            tokens.append(current)
         }
+
+        return tokens
     }
 }
