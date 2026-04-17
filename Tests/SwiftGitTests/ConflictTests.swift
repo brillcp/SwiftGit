@@ -272,6 +272,46 @@ struct ConflictTests {
         #expect(await repository.conflictOperation() == nil)
     }
 
+    @Test func testRebaseSkip() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // Initial commit on main
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Initial content")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "Initial commit")
+
+        // Create feature branch with two commits — both will conflict so we can skip the first
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Feature commit 1")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "Feature commit 1")
+
+        try createTestFile(in: repoURL, named: "other.txt", content: "Non-conflicting")
+        try await repository.stageFile(at: "other.txt")
+        try await repository.commit(message: "Feature commit 2")
+
+        // Make main diverge so rebase produces a conflict on the first commit
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Main content")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "Main commit")
+
+        // Switch to feature and start the rebase — expect conflict on commit 1
+        try await repository.checkoutBranch("feature", createNew: false)
+        try? await repository.rebase(onto: "main")
+
+        #expect(await repository.conflictOperation() == .rebase)
+
+        // Skip the conflicting commit instead of resolving it
+        try await repository.skipOperation()
+
+        // After skip the rebase should complete (commit 2 has no conflict)
+        #expect(await repository.conflictOperation() == nil)
+    }
+
     @Test func testRebaseContinue() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
