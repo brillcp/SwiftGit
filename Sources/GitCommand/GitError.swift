@@ -89,6 +89,9 @@ public enum GitError: LocalizedError {
     case revertContinueFailed
     case rebaseContinueFailed
 
+    // MARK: - Skip operations
+    case rebaseSkipFailed
+
     // MARK: - Abort operations
     case cherryPickAbortFailed
     case mergeAbortFailed
@@ -255,6 +258,10 @@ public enum GitError: LocalizedError {
             return "Failed to continue revert"
         case .rebaseContinueFailed:
             return "Failed to continue rebase"
+
+        // MARK: - Skip operations
+        case .rebaseSkipFailed:
+            return "Failed to skip rebase commit"
 
         // MARK: - Abort operations
         case .cherryPickAbortFailed:

@@ -72,6 +72,24 @@ extension GitRepository: ConflictWritable {
         }
     }
 
+    public func skipOperation() async throws {
+        guard let op = conflictOperation() else { return }
+        guard op == .rebase else {
+            // Skip is only defined for rebase. Other operations have no equivalent
+            // "skip this commit and keep going" semantic.
+            throw GitError.rebaseSkipFailed
+        }
+
+        let result = try await commandRunner.run(.rebaseSkip)
+        guard result.exitCode == 0 else {
+            throw GitError.rebaseSkipFailed
+        }
+
+        await cache.remove(.head)
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.rebaseSkipped)
+    }
+
     public func continueOperation() async throws {
         guard let op = conflictOperation() else { return }
 

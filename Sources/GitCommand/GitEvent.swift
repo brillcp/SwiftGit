@@ -35,6 +35,7 @@ public enum GitEvent: Sendable {
     case mergeContinued
     case revertContinued
     case rebaseContinued
+    case rebaseSkipped
 
     case cherryPickAborted
     case mergeAborted
