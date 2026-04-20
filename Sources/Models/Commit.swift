@@ -9,6 +9,9 @@ public struct Commit: Identifiable, Sendable {
     public let parents: [String]
     public let tree: String
 
+    /// True when the commit has two or more parents — it's a merge commit.
+    public var isMerge: Bool { parents.count > 1 }
+
     public init(
         id: String,
         title: String,
