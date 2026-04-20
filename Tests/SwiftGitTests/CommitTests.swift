@@ -171,7 +171,7 @@ struct CommitTests {
         #expect(ourCommits == gitCommits, "Should have same commits IN SAME ORDER")
     }
 
-    @Test func testTopologicalOrderWithBranches() async throws {
+    @Test func testDateOrderWithBranches() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
@@ -198,7 +198,7 @@ struct CommitTests {
         let ourCommits = try await repository.getAllCommits(limit: 100).map(\.id)
         let gitCommits = try getGitLog(at: repoURL)
 
-        #expect(ourCommits == gitCommits, "Topological order should match with branches")
+        #expect(ourCommits == gitCommits, "Date order should match with branches")
     }
 }
 
@@ -207,7 +207,7 @@ private extension CommitTests {
     func getGitLog(at repoURL: URL) throws -> [String] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        task.arguments = ["-C", repoURL.path, "log", "--all", "--topo-order", "--pretty=format:%H", "-n", "100"]
+        task.arguments = ["-C", repoURL.path, "log", "--all", "--date-order", "--pretty=format:%H", "-n", "100"]
 
         let pipe = Pipe()
         task.standardOutput = pipe
