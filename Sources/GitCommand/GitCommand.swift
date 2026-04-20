@@ -154,7 +154,7 @@ extension GitCommand {
             var args = [
                 "log",
                 "--all",
-                "--topo-order",
+                "--date-order",
                 "-n", "\(limit)",
                 "--format=\(commitFormat)"
             ]
