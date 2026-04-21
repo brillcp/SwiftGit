@@ -13,8 +13,10 @@ public enum GitCommand: Sendable {
 
     // MARK: - Staging
     case add(path: String)
+    case addPaths(paths: [String])
     case addAll
     case reset(path: String)
+    case resetPaths(paths: [String])
     case resetAll
 
     // MARK: - Commits
@@ -143,10 +145,14 @@ extension GitCommand {
         // MARK: - Staging
         case .add(let path):
             return ["add", "--", path]
+        case .addPaths(let paths):
+            return ["add", "--"] + paths
         case .addAll:
             return ["add", "--all"]
         case .reset(let path):
             return ["reset", "HEAD", "--", path]
+        case .resetPaths(let paths):
+            return ["reset", "HEAD", "--"] + paths
         case .resetAll:
             return ["reset", "HEAD", "--", "."]
 

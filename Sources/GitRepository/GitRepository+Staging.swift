@@ -20,6 +20,29 @@ extension GitRepository: StagingWritable {
         eventSubject.send(.fileStaged(path: path))
     }
 
+    public func stageFiles(paths: [String]) async throws {
+        guard !paths.isEmpty else { return }
+
+        let status = try await getWorkingTreeStatus()
+        var pathsToAdd: [String] = []
+
+        for path in paths {
+            pathsToAdd.append(path)
+            if let file = status.files[path], case .renamed(let oldPath) = file.unstaged {
+                pathsToAdd.append(oldPath)
+            }
+        }
+
+        let result = try await commandRunner.run(.addPaths(paths: pathsToAdd))
+
+        guard result.exitCode == 0 else {
+            throw GitError.stageAllFailed
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesStaged)
+    }
+
     public func stageAllFiles() async throws {
         let result = try await commandRunner.run(.addAll)
 
@@ -48,6 +71,29 @@ extension GitRepository: StagingWritable {
 
         await workingTree.invalidateIndexCache()
         eventSubject.send(.fileUnstaged(path: path))
+    }
+
+    public func unstageFiles(paths: [String]) async throws {
+        guard !paths.isEmpty else { return }
+
+        let status = try await getWorkingTreeStatus()
+        var pathsToReset: [String] = []
+
+        for path in paths {
+            pathsToReset.append(path)
+            if let file = status.files[path], case .renamed(let oldPath) = file.staged {
+                pathsToReset.append(oldPath)
+            }
+        }
+
+        let result = try await commandRunner.run(.resetPaths(paths: pathsToReset))
+
+        guard result.exitCode == 0 else {
+            throw GitError.unstageAllFailed
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.allFilesUnstaged)
     }
 
     public func unstageAllFiles() async throws {
