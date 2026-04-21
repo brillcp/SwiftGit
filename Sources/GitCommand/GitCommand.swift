@@ -43,6 +43,7 @@ public enum GitCommand: Sendable {
     case stashApply(index: Int)
     case stashDrop(index: Int)
     case stashRestoreFile(index: Int, path: String)
+    case stashRestoreFiles(index: Int, paths: [String])
 
     // MARK: - History Manipulation
     case resetToCommit(mode: ResetMode, target: String)
@@ -239,6 +240,8 @@ extension GitCommand {
             return ["stash", "drop", String.stashId(for: index)]
         case .stashRestoreFile(let index, let path):
             return ["restore", "--source=\(String.stashId(for: index))", "--worktree", "--", path]
+        case .stashRestoreFiles(let index, let paths):
+            return ["restore", "--source=\(String.stashId(for: index))", "--worktree", "--"] + paths
 
         // MARK: - History Manipulation
         case .resetToCommit(let mode, let target):

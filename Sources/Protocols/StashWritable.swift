@@ -22,4 +22,7 @@ public protocol StashWritable: Actor {
 
     /// Restore a single file from a stash without applying the whole stash
     func stashRestoreFile(index: Int, path: String) async throws
+
+    /// Restore multiple files from a stash in a single operation
+    func stashRestoreFiles(index: Int, paths: [String]) async throws
 }

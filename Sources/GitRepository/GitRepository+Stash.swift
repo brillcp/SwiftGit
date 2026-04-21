@@ -130,4 +130,18 @@ extension GitRepository: StashWritable {
         await workingTree.invalidateIndexCache()
         eventSubject.send(.stashApplied)
     }
+
+    public func stashRestoreFiles(index: Int, paths: [String]) async throws {
+        guard !paths.isEmpty else { return }
+
+        let result = try await commandRunner.run(
+            .stashRestoreFiles(index: index, paths: paths))
+
+        guard result.exitCode == 0 else {
+            throw GitError.restoreFailed
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.stashApplied)
+    }
 }
