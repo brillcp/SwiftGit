@@ -17,6 +17,9 @@ public protocol StashWritable: Actor {
     /// Stash changes for a single file
     func stashFile(path: String, message: String?) async throws
 
+    /// Stash changes for multiple files in a single git operation
+    func stashFiles(paths: [String], message: String?) async throws
+
     /// Restore a single file from a stash without applying the whole stash
     func stashRestoreFile(index: Int, path: String) async throws
 }

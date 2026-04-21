@@ -36,6 +36,7 @@ public enum GitCommand: Sendable {
     // MARK: - Stash
     case stashPush(message: String?)
     case stashPushFile(path: String, message: String?)
+    case stashPushFiles(paths: [String], message: String?)
     case stashPop(index: Int)
     case stashApply(index: Int)
     case stashDrop(index: Int)
@@ -216,6 +217,13 @@ extension GitCommand {
                 args += ["-m", message]
             }
             args += ["--", path]
+            return args
+        case .stashPushFiles(let paths, let message):
+            var args = ["stash", "push", "--include-untracked"]
+            if let message {
+                args += ["-m", message]
+            }
+            args += ["--"] + paths
             return args
         case .stashPop(let index):
             return ["stash", "pop", String.stashId(for: index)]
