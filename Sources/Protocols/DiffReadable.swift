@@ -14,6 +14,9 @@ public protocol DiffReadable: Actor {
     /// Get raw file diff for staged changes
     func getRawStagedDiff() async throws -> String
 
+    /// Get total added/removed line counts. Pass nil for working tree (HEAD), or a commit SHA for that commit.
+    func getLineStats(for commitId: String?) async throws -> (added: Int, removed: Int)
+
     /// Get file content at a specific ref (commit, branch, or stage number)
     func getFileContent(at path: String, ref: String) async throws -> String
 }

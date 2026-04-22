@@ -51,6 +51,26 @@ extension GitRepository: DiffReadable {
         return hunks
     }
 
+    public func getLineStats(for commitId: String?) async throws -> (added: Int, removed: Int) {
+        if let commitId {
+            return try await parseNumstat(from: commandRunner.run(.numstat(commitId: commitId)))
+        }
+
+        // Working tree: run both HEAD diff and staged-only diff concurrently,
+        // then union them to cover tracked modifications and newly staged files.
+        async let headResult = commandRunner.run(.numstat(commitId: nil))
+        async let stagedResult = commandRunner.run(.numstat(staged: true))
+        let (head, staged) = try await (headResult, stagedResult)
+
+        let headStats = try parseNumstat(from: head)
+        let stagedStats = try parseNumstat(from: staged)
+
+        return (
+            added: max(headStats.added, stagedStats.added),
+            removed: max(headStats.removed, stagedStats.removed)
+        )
+    }
+
     public func getRawStagedDiff() async throws -> String {
         let result = try await commandRunner.run(
             .diff(path: ".", staged: true, untracked: false, deleted: false)
@@ -81,6 +101,20 @@ extension GitRepository: DiffReadable {
 
 // MARK: - Private functions
 private extension GitRepository {
+    func parseNumstat(from result: CommandResult) throws -> (added: Int, removed: Int) {
+        guard result.exitCode == 0 else { throw GitError.diffFailed }
+        var added = 0
+        var removed = 0
+        for line in result.stdout.split(separator: "\n") {
+            let parts = line.split(separator: "\t")
+            guard parts.count >= 2, let a = Int(parts[0]), let r = Int(parts[1]) else { continue }
+            added += a
+            removed += r
+        }
+        return (added, removed)
+    }
+
+
     func fetchFileDiff(for commit: Commit, at path: String) async throws -> [DiffHunk] {
         // Stash commits have 3 parents (HEAD, index, untracked)
         if commit.parents.count == 3 {
