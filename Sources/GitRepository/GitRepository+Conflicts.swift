@@ -67,10 +67,10 @@ extension GitRepository: ConflictWritable {
 
         await cache.remove(.head)
         await cache.remove(.refs)
-        await cache.clear(where: { key in
-            if case .commit = key { return true }
+        await cache.clear {
+            if case .commit = $0 { return true }
             return false
-        })
+        }
         await workingTree.invalidateIndexCache()
 
         if let abortedOperation {
@@ -93,10 +93,10 @@ extension GitRepository: ConflictWritable {
 
         await cache.remove(.head)
         await cache.remove(.refs)
-        await cache.clear(where: { key in
-            if case .commit = key { return true }
+        await cache.clear {
+            if case .commit = $0 { return true }
             return false
-        })
+        }
         await workingTree.invalidateIndexCache()
         eventSubject.send(.rebaseSkipped)
     }
@@ -143,10 +143,10 @@ extension GitRepository: ConflictWritable {
 
         await cache.remove(.head)
         await cache.remove(.refs)
-        await cache.clear(where: { key in
-            if case .commit = key { return true }
+        await cache.clear {
+            if case .commit = $0 { return true }
             return false
-        })
+        }
         await workingTree.invalidateIndexCache()
 
         if let event = continuedOperation {

@@ -12,10 +12,10 @@ extension GitRepository: ResetWritable {
 
         await cache.remove(.head)
         await cache.remove(.refs)
-        await cache.clear(where: { key in
-            if case .commit = key { return true }
+        await cache.clear {
+            if case .commit = $0 { return true }
             return false
-        })
+        }
         await workingTree.invalidateIndexCache()
         eventSubject.send(.resetCompleted(mode: mode))
     }
