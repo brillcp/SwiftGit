@@ -16,6 +16,7 @@ extension GitRepository: MergeWritable {
         }
 
         await cache.remove(.head)
+        await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
     }
 }
