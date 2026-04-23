@@ -50,6 +50,8 @@ extension GitRepository: DiscardWritable {
         guard result.exitCode == 0 else {
             throw GitError.discardHunkFailed(path: path)
         }
+
+        await workingTree.invalidateIndexCache()
         eventSubject.send(.hunkDiscarded(hunk: hunk, path: path))
     }
 

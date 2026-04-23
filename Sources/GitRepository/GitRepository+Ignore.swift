@@ -10,11 +10,12 @@ extension GitRepository: IgnoreWritable {
         let lines = content.components(separatedBy: .newlines)
         guard !lines.contains(pattern) else { return }
 
-        if !content.isEmpty && !content.hasSuffix("\n") {
-            content += "\n"
+        if !content.isEmpty && !content.hasSuffix(String.newLine) {
+            content += String.newLine
         }
-        content += pattern + "\n"
+        content += pattern + String.newLine
 
         try content.write(to: gitignoreURL, atomically: true, encoding: .utf8)
+        await workingTree.invalidateIndexCache()
     }
 }

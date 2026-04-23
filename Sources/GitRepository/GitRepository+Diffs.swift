@@ -105,8 +105,8 @@ private extension GitRepository {
         guard result.exitCode == 0 else { throw GitError.diffFailed }
         var added = 0
         var removed = 0
-        for line in result.stdout.split(separator: "\n") {
-            let parts = line.split(separator: "\t")
+        for line in result.stdout.split(separator: String.newLine) {
+            let parts = line.split(separator: String.tab)
             guard parts.count >= 2, let a = Int(parts[0]), let r = Int(parts[1]) else { continue }
             added += a
             removed += r
