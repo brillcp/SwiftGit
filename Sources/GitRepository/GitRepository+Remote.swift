@@ -59,6 +59,9 @@ extension GitRepository: RemoteWritable {
             let output = result.stderr + result.stdout
 
             if output.localizedCaseInsensitiveContains("conflict") {
+                await cache.remove(.head)
+                await cache.remove(.refs)
+                await workingTree.invalidateIndexCache()
                 throw GitError.pullConflict
             }
             throw GitError.pullFailed

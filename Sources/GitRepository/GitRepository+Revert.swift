@@ -8,6 +8,7 @@ extension GitRepository: RevertWritable {
 
         if result.exitCode != 0 {
             if result.stderr.localizedCaseInsensitiveContains("conflict") {
+                await workingTree.invalidateIndexCache()
                 throw GitError.revertConflict(commit: commitHash)
             }
             throw GitError.revertFailed(commit: commitHash)

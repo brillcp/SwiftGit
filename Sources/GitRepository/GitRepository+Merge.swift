@@ -10,6 +10,7 @@ extension GitRepository: MergeWritable {
             let output = result.stderr + result.stdout
 
             if output.localizedCaseInsensitiveContains("conflict") {
+                await workingTree.invalidateIndexCache()
                 throw GitError.conflictDetected
             }
             throw GitError.mergeFailed(branch: branch)

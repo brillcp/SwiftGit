@@ -10,6 +10,8 @@ extension GitRepository: RebaseWritable {
             let output = result.stderr + result.stdout
 
             if output.localizedCaseInsensitiveContains("conflict") {
+                await cache.remove(.head)
+                await workingTree.invalidateIndexCache()
                 throw GitError.rebaseConflict(branch: branch ?? target)
             }
             throw GitError.rebaseFailed(branch: branch ?? target)

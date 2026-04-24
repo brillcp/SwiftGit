@@ -16,6 +16,7 @@ extension GitRepository: CherryPickWritable {
         if result.exitCode != 0 {
             // On conflict, DON'T pop stash - leave it for after resolution
             if result.stderr.localizedCaseInsensitiveContains("conflict") {
+                await workingTree.invalidateIndexCache()
                 throw GitError.cherryPickConflict(commit: commitHash)
             }
 
