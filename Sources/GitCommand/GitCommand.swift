@@ -140,8 +140,11 @@ extension GitCommand {
             if noFastForward {
                 args.append("--no-ff")
             }
+            // Match git's default message format ("Merge branch 'feature'") so
+            // tooling that reads MERGE_MSG to recover the merged-in branch name
+            // (e.g. ConflictReadable.theirsBranchName) sees the quoted token.
             args.append("-m")
-            args.append("Merge \(branch)")
+            args.append("Merge branch '\(branch)'")
             return args
 
         // MARK: - Staging
