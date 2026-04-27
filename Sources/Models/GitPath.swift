@@ -13,4 +13,5 @@ public enum GitPath: String {
     case rebaseHead = "REBASE_HEAD"
     case rebaseMerge = "rebase-merge"
     case rebaseApply = "rebase-apply"
+    case mergeMsg = "MERGE_MSG"
 }

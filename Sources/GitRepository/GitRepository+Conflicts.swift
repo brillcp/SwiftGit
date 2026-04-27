@@ -38,6 +38,27 @@ extension GitRepository: ConflictReadable {
         return try? String(contentsOf: refURL, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    public func theirsBranchName() -> String? {
+        guard let operation = conflictOperation() else { return nil }
+        switch operation {
+        case .merge:
+            return parseMergeMessageBranch()
+        case .rebase:
+            return rebaseHeadName()
+        case .cherryPick, .revert:
+            return nil
+        }
+    }
+
+    public func rebaseHeadName() -> String? {
+        readRebaseMergeFile(named: "head-name")
+            .flatMap { $0.components(separatedBy: "/").last }
+    }
+
+    public func rebaseOnto() -> String? {
+        readRebaseMergeFile(named: "onto")
+    }
 }
 
 // MARK: - ConflictWritable
@@ -153,4 +174,34 @@ extension GitRepository: ConflictWritable {
             eventSubject.send(event)
         }
     }
+}
+
+// MARK: - Private
+private extension GitRepository {
+    /// Read a file under `.git/rebase-merge/<name>` and return its trimmed
+    /// non-empty contents. Used by both `rebaseHeadName` and `rebaseOnto`.
+    func readRebaseMergeFile(named name: String) -> String? {
+        let path = gitURL
+            .appendingPathComponent(GitPath.rebaseMerge.rawValue)
+            .appendingPathComponent(name)
+        guard let raw = try? String(contentsOf: path, encoding: .utf8) else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Parse the first single-quoted token out of `.git/MERGE_MSG`. Git writes
+    /// "Merge branch 'feature' into main" or "Merge remote-tracking branch
+    /// 'origin/feature'" — we want the bare branch name in either case, so we
+    /// also drop everything before the last `/`.
+    func parseMergeMessageBranch() -> String? {
+        let url = gitURL.appendingPathComponent(GitPath.mergeMsg.rawValue)
+        guard let content = try? String(contentsOf: url, encoding: .utf8),
+              let firstQuote = content.firstIndex(of: "'")
+        else { return nil }
+        let afterFirst = content.index(after: firstQuote)
+        guard let secondQuote = content[afterFirst...].firstIndex(of: "'") else { return nil }
+        let raw = String(content[afterFirst..<secondQuote])
+        return raw.components(separatedBy: "/").last
+    }
+
 }
