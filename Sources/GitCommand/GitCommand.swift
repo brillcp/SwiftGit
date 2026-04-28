@@ -50,7 +50,7 @@ public enum GitCommand: Sendable {
     case cherryPick(commitHash: String)
     case cherryPickSkip
     case revert(commitHash: String, noCommit: Bool)
-    case rebase(onto: String, branch: String? = nil)
+    case rebase(branch: String? = nil, onto: String)
     case cherryPickContinue
     case mergeContinue
     case revertContinue
@@ -261,7 +261,7 @@ extension GitCommand {
             }
             args.append(commitHash)
             return args
-        case .rebase(let onto, let branch):
+        case .rebase(let branch, let onto):
             var args = ["rebase", onto]
             if let branch { args.append(branch) }
             return args
