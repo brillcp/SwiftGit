@@ -64,6 +64,12 @@ public enum GitError: LocalizedError {
     case fetchFailed
     case pullFailed
     case pullConflict
+    /// Pull failed because local and remote have diverged and git couldn't
+    /// reconcile automatically (no fast-forward, no merge strategy chosen,
+    /// or the user has `pull.ff = only` configured). Distinguished from
+    /// `pullConflict` (which means the merge ran but produced conflicts) so
+    /// the UI can offer rebase/merge/reset choices instead of conflict resolution.
+    case pullRejected(reason: String)
     case remoteAddFailed(String)
     case cloneFailed(String)
 
@@ -216,6 +222,12 @@ public enum GitError: LocalizedError {
             return "Failed to pull from remote."
         case .pullConflict:
             return "Pulling caused conflicts. Resolve them and commit."
+        case .pullRejected(let reason):
+            let detail = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+            if detail.isEmpty {
+                return "Pull rejected: local and remote have diverged."
+            }
+            return "Pull rejected: \(detail)"
         case .remoteAddFailed(let msg):
             return "Failed to add remote: \(msg)"
         case .cloneFailed(let msg):

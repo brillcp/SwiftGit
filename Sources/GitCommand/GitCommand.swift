@@ -94,6 +94,15 @@ public enum GitCommand: Sendable {
     case symbolicRef
     case stashList
     case showCommitDate(ref: String)
+
+    // MARK: - Upstream / Sync
+    /// `git rev-parse --abbrev-ref <branch>@{upstream}` — resolves the tracked
+    /// upstream of `branch` (or HEAD when nil). Non-zero exit when no upstream.
+    case revParseAbbrevUpstream(branch: String?)
+
+    /// `git rev-list --left-right --count <local>...<upstream>` — emits a single
+    /// "<ahead>\t<behind>" line.
+    case revListLeftRightCount(local: String, upstream: String)
 }
 
 extension GitCommand {
@@ -380,6 +389,15 @@ extension GitCommand {
             return ["stash", "list"]
         case .showCommitDate(let ref):
             return ["show", "-s", "--format=%at", ref]
+
+        // MARK: - Upstream / Sync
+        case .revParseAbbrevUpstream(let branch):
+            // `<branch>@{u}` resolves the upstream of an explicit branch;
+            // `@{u}` resolves the upstream of HEAD.
+            let target = branch.map { "\($0)@{upstream}" } ?? "@{upstream}"
+            return ["rev-parse", "--abbrev-ref", target]
+        case .revListLeftRightCount(let local, let upstream):
+            return ["rev-list", "--left-right", "--count", "\(local)...\(upstream)"]
         }
     }
 }

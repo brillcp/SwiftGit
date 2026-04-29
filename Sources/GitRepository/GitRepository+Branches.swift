@@ -11,6 +11,48 @@ extension GitRepository: BranchReadable {
             current: try await refReader.getHEADBranch()
         )
     }
+
+    public func getUpstream(for branch: String?) async throws -> Upstream? {
+        let result = try await commandRunner.run(.revParseAbbrevUpstream(branch: branch))
+
+        // Non-zero exit means no upstream is configured for this branch — git
+        // prints "fatal: no upstream configured" to stderr. Surface as nil
+        // rather than throwing, since "no upstream yet" is a normal state.
+        guard result.exitCode == 0 else { return nil }
+
+        let raw = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+
+        // Output format is "<remote>/<branch>". Split on the FIRST slash —
+        // the branch portion may itself contain slashes (e.g. "feature/foo").
+        guard let slashIndex = raw.firstIndex(of: "/") else { return nil }
+        let remote = String(raw[..<slashIndex])
+        let branchName = String(raw[raw.index(after: slashIndex)...])
+        guard !remote.isEmpty, !branchName.isEmpty else { return nil }
+
+        return Upstream(remote: remote, branch: branchName)
+    }
+
+    public func getAheadBehind(local: String, upstream: String) async throws -> (ahead: Int, behind: Int) {
+        let result = try await commandRunner.run(
+            .revListLeftRightCount(local: local, upstream: upstream)
+        )
+
+        guard result.exitCode == 0 else { return (0, 0) }
+
+        // Output is one line: "<ahead>\t<behind>". Anything else means git
+        // produced unexpected output — fall back to (0, 0) rather than throw.
+        let parts = result.stdout
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0 == "\t" || $0 == " " })
+
+        guard parts.count == 2,
+              let ahead = Int(parts[0]),
+              let behind = Int(parts[1])
+        else { return (0, 0) }
+
+        return (ahead, behind)
+    }
 }
 
 // MARK: - BranchManageable
