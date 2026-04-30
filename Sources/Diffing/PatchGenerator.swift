@@ -171,8 +171,43 @@ extension PatchGenerator {
     ) -> String {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
-        let lineText = line.segments.map { $0.text }.joined()
 
+        // Detect paired substitution: unstage both lines together.
+        let lineNums = hunkLineNumbers(hunk)
+
+        if line.type == .added,
+           lineIndex > 0,
+           hunk.lines[lineIndex - 1].type == .removed {
+            let removedLine = hunk.lines[lineIndex - 1]
+            let removedText = removedLine.segments.map { $0.text }.joined()
+            let addedText = line.segments.map { $0.text }.joined()
+            let new = lineNums[lineIndex].new ?? newLineNum ?? 1
+            let old = lineNums[lineIndex - 1].old ?? oldLineNum ?? new
+            // Reverse: swap added→removed and removed→added
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
+            patch += "-\(addedText)\(String.newLine)"
+            patch += "+\(removedText)\(String.newLine)"
+            return patch
+        }
+
+        if line.type == .removed,
+           lineIndex + 1 < hunk.lines.count,
+           hunk.lines[lineIndex + 1].type == .added {
+            let addedLine = hunk.lines[lineIndex + 1]
+            let removedText = line.segments.map { $0.text }.joined()
+            let addedText = addedLine.segments.map { $0.text }.joined()
+            let new = lineNums[lineIndex + 1].new ?? newLineNum ?? 1
+            let old = lineNums[lineIndex].old ?? oldLineNum ?? new
+            // Reverse: swap removed→added and added→removed
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
+            patch += "-\(addedText)\(String.newLine)"
+            patch += "+\(removedText)\(String.newLine)"
+            return patch
+        }
+
+        let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
 
         switch line.type {
