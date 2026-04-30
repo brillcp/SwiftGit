@@ -107,33 +107,14 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
-        // Detect paired substitution: a removed line immediately followed by an added line
-        // (or vice versa). Stage both together so the patch is valid.
+        // Detect paired substitution within a contiguous remove/add block and stage both together.
         let lineNums = hunkLineNumbers(hunk)
 
-        if line.type == .added,
-           lineIndex > 0,
-           hunk.lines[lineIndex - 1].type == .removed {
-            let removedLine = hunk.lines[lineIndex - 1]
-            let removedText = removedLine.segments.map { $0.text }.joined()
-            let addedText = line.segments.map { $0.text }.joined()
-            let old = lineNums[lineIndex - 1].old ?? oldLineNum ?? 1
-            let new = lineNums[lineIndex].new ?? newLineNum ?? old
-            var patch = makeHeader(for: file)
-            patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
-            patch += "-\(removedText)\(String.newLine)"
-            patch += "+\(addedText)\(String.newLine)"
-            return patch
-        }
-
-        if line.type == .removed,
-           lineIndex + 1 < hunk.lines.count,
-           hunk.lines[lineIndex + 1].type == .added {
-            let addedLine = hunk.lines[lineIndex + 1]
-            let removedText = line.segments.map { $0.text }.joined()
-            let addedText = addedLine.segments.map { $0.text }.joined()
-            let old = lineNums[lineIndex].old ?? oldLineNum ?? 1
-            let new = lineNums[lineIndex + 1].new ?? newLineNum ?? old
+        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
+            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
+            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
+            let old = lineNums[removedIndex].old ?? oldLineNum ?? 1
+            let new = lineNums[addedIndex].new ?? newLineNum ?? old
             var patch = makeHeader(for: file)
             patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
             patch += "-\(removedText)\(String.newLine)"
@@ -172,34 +153,15 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
-        // Detect paired substitution: unstage both lines together.
+        // Detect paired substitution within a contiguous remove/add block and unstage both together.
         let lineNums = hunkLineNumbers(hunk)
 
-        if line.type == .added,
-           lineIndex > 0,
-           hunk.lines[lineIndex - 1].type == .removed {
-            let removedLine = hunk.lines[lineIndex - 1]
-            let removedText = removedLine.segments.map { $0.text }.joined()
-            let addedText = line.segments.map { $0.text }.joined()
-            let new = lineNums[lineIndex].new ?? newLineNum ?? 1
-            let old = lineNums[lineIndex - 1].old ?? oldLineNum ?? new
-            // Reverse: swap added→removed and removed→added
-            var patch = makeHeader(for: file)
-            patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
-            patch += "-\(addedText)\(String.newLine)"
-            patch += "+\(removedText)\(String.newLine)"
-            return patch
-        }
-
-        if line.type == .removed,
-           lineIndex + 1 < hunk.lines.count,
-           hunk.lines[lineIndex + 1].type == .added {
-            let addedLine = hunk.lines[lineIndex + 1]
-            let removedText = line.segments.map { $0.text }.joined()
-            let addedText = addedLine.segments.map { $0.text }.joined()
-            let new = lineNums[lineIndex + 1].new ?? newLineNum ?? 1
-            let old = lineNums[lineIndex].old ?? oldLineNum ?? new
-            // Reverse: swap removed→added and added→removed
+        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
+            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
+            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
+            let new = lineNums[addedIndex].new ?? newLineNum ?? 1
+            let old = lineNums[removedIndex].old ?? oldLineNum ?? new
+            // Reverse: remove the added line from index, restore the removed line
             var patch = makeHeader(for: file)
             patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
             patch += "-\(addedText)\(String.newLine)"
@@ -274,6 +236,62 @@ private extension PatchGenerator {
         header += "--- a/\(file.path)\(String.newLine)"
         header += "+++ b/\(file.path)\(String.newLine)"
         return header
+    }
+
+    /// Find the paired (removedIndex, addedIndex) for a line that is part of a contiguous
+    /// remove/add substitution block. Returns nil if the line has no paired counterpart.
+    ///
+    /// A substitution block is a run of consecutive removed lines immediately followed by a run
+    /// of consecutive added lines (e.g. `---+++`). Lines are paired positionally: the Nth remove
+    /// pairs with the Nth add. If the block sizes differ, unpaired lines return nil.
+    func pairedSubstitution(for lineIndex: Int, in hunk: DiffHunk) -> (removedIndex: Int, addedIndex: Int)? {
+        let lines = hunk.lines
+        guard lineIndex < lines.count else { return nil }
+        let lineType = lines[lineIndex].type
+        guard lineType == .removed || lineType == .added else { return nil }
+
+        // Find the start of the contiguous removed run that contains (or precedes) this line.
+        // For a removed line: scan back to the block start, then forward to find the adds block.
+        // For an added line: scan back through the adds to find the removes block before it.
+
+        var blockStart = lineIndex
+        if lineType == .removed {
+            // Walk back to find start of the removes run
+            while blockStart > 0 && lines[blockStart - 1].type == .removed { blockStart -= 1 }
+            // Walk forward past all removes to find start of adds run
+            var addsStart = lineIndex
+            while addsStart + 1 < lines.count && lines[addsStart + 1].type == .removed { addsStart += 1 }
+            addsStart += 1  // first potential add
+            guard addsStart < lines.count, lines[addsStart].type == .added else { return nil }
+
+            // Offset of this remove within the removes run
+            let removeOffset = lineIndex - blockStart
+
+            var addsCount = 0
+            var addsEnd = addsStart
+            while addsEnd < lines.count && lines[addsEnd].type == .added { addsEnd += 1; addsCount += 1 }
+
+            guard removeOffset < addsCount else { return nil }
+            return (removedIndex: lineIndex, addedIndex: addsStart + removeOffset)
+
+        } else {
+            // lineType == .added
+            // Walk back through adds to find start of adds run
+            var addsStart = lineIndex
+            while addsStart > 0 && lines[addsStart - 1].type == .added { addsStart -= 1 }
+            // Walk back past any non-removed lines — the removes run must immediately precede the adds run
+            guard addsStart > 0, lines[addsStart - 1].type == .removed else { return nil }
+
+            // Find start of the removes run
+            var removesEnd = addsStart - 1
+            var removesStart = removesEnd
+            while removesStart > 0 && lines[removesStart - 1].type == .removed { removesStart -= 1 }
+
+            let addOffset = lineIndex - addsStart
+            let removesCount = removesEnd - removesStart + 1
+            guard addOffset < removesCount else { return nil }
+            return (removedIndex: removesStart + addOffset, addedIndex: lineIndex)
+        }
     }
 
     /// Compute (old, new) line numbers for each line in a hunk by walking from the hunk header start.
