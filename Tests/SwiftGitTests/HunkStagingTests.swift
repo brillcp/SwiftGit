@@ -681,6 +681,86 @@ struct HunkStagingTests {
         // Cleanup
         try await repository.discardFile(at: testFile)
     }
+    @Test func testStagePairedSubstitutionLine() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test_stage_substitution_\(UUID().uuidString).txt"
+
+        // Commit initial file
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nOld line\nLine 3\n")
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial commit")
+
+        // Replace "Old line" with "New line" — produces a paired remove+add in the diff
+        try createTestFile(in: repoURL, named: testFile, content: "Line 1\nNew line\nLine 3\n")
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunks")
+
+        let hunk = hunks[0]
+
+        // Find the added line index (the + side of the substitution)
+        guard let addedIndex = hunk.lines.firstIndex(where: { $0.type == .added }) else {
+            Issue.record("No added line found")
+            return
+        }
+
+        // Verify it is a paired substitution: removed line immediately before added line
+        #expect(addedIndex > 0 && hunk.lines[addedIndex - 1].type == .removed,
+                "Should be a paired remove+add substitution")
+
+        // Calculate line numbers for the added line
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        var oldLineNum: Int? = nil
+        var newLineNum: Int? = nil
+        if let regex = try? NSRegularExpression(pattern: headerPattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
+            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+            var oldCount = 0
+            var newCount = 0
+            for line in hunk.lines.prefix(addedIndex) {
+                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+                if line.type == .unchanged || line.type == .added { newCount += 1 }
+            }
+            oldLineNum = oldStart + oldCount
+            newLineNum = newStart + newCount
+        }
+
+        // Stage the added line — should stage the whole substitution (remove+add pair)
+        try await repository.stageLine(at: addedIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
+
+        // File should be fully staged (no unstaged changes remain)
+        if let line = try statusLine(for: testFile, in: repoURL) {
+            #expect(line.hasPrefix("M  "), "Substitution should be fully staged, not partially")
+        }
+
+        // Staged diff should have exactly 1 removed and 1 added line
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        #expect(stagedRemoved == 1, "Should have 1 staged removed line")
+        #expect(stagedAdded   == 1, "Should have 1 staged added line")
+
+        // Unstaged diff should be empty
+        let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
+        #expect(unstagedHunks.isEmpty, "No unstaged changes should remain after staging substitution")
+
+        try await repository.discardFile(at: testFile)
+    }
 }
 
 func gitDiffOutput(in repoURL: URL, file: String) throws -> String {

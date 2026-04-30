@@ -106,8 +106,42 @@ extension PatchGenerator {
     ) -> String {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
-        let lineText = line.segments.map { $0.text }.joined()
 
+        // Detect paired substitution: a removed line immediately followed by an added line
+        // (or vice versa). Stage both together so the patch is valid.
+        let lineNums = hunkLineNumbers(hunk)
+
+        if line.type == .added,
+           lineIndex > 0,
+           hunk.lines[lineIndex - 1].type == .removed {
+            let removedLine = hunk.lines[lineIndex - 1]
+            let removedText = removedLine.segments.map { $0.text }.joined()
+            let addedText = line.segments.map { $0.text }.joined()
+            let old = lineNums[lineIndex - 1].old ?? oldLineNum ?? 1
+            let new = lineNums[lineIndex].new ?? newLineNum ?? old
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
+            patch += "-\(removedText)\(String.newLine)"
+            patch += "+\(addedText)\(String.newLine)"
+            return patch
+        }
+
+        if line.type == .removed,
+           lineIndex + 1 < hunk.lines.count,
+           hunk.lines[lineIndex + 1].type == .added {
+            let addedLine = hunk.lines[lineIndex + 1]
+            let removedText = line.segments.map { $0.text }.joined()
+            let addedText = addedLine.segments.map { $0.text }.joined()
+            let old = lineNums[lineIndex].old ?? oldLineNum ?? 1
+            let new = lineNums[lineIndex + 1].new ?? newLineNum ?? old
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
+            patch += "-\(removedText)\(String.newLine)"
+            patch += "+\(addedText)\(String.newLine)"
+            return patch
+        }
+
+        let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
 
         switch line.type {
@@ -205,6 +239,37 @@ private extension PatchGenerator {
         header += "--- a/\(file.path)\(String.newLine)"
         header += "+++ b/\(file.path)\(String.newLine)"
         return header
+    }
+
+    /// Compute (old, new) line numbers for each line in a hunk by walking from the hunk header start.
+    func hunkLineNumbers(_ hunk: DiffHunk) -> [(old: Int?, new: Int?)] {
+        // Parse oldStart and newStart from the hunk header "@@ -oldStart,... +newStart,... @@"
+        let pattern = #"@@ -(\d+)[,\d]* \+(\d+)"#
+        var oldLine: Int?
+        var newLine: Int?
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)),
+           match.numberOfRanges >= 3 {
+            oldLine = Int((hunk.header as NSString).substring(with: match.range(at: 1)))
+            newLine = Int((hunk.header as NSString).substring(with: match.range(at: 2)))
+        }
+
+        var result: [(old: Int?, new: Int?)] = []
+        for line in hunk.lines {
+            switch line.type {
+            case .unchanged:
+                result.append((old: oldLine, new: newLine))
+                oldLine = oldLine.map { $0 + 1 }
+                newLine = newLine.map { $0 + 1 }
+            case .removed:
+                result.append((old: oldLine, new: nil))
+                oldLine = oldLine.map { $0 + 1 }
+            case .added:
+                result.append((old: nil, new: newLine))
+                newLine = newLine.map { $0 + 1 }
+            }
+        }
+        return result
     }
 
     func reverseHunkHeader(_ header: String) -> String {
