@@ -162,6 +162,19 @@ private extension GitDiffParser {
                     let oldText = removedLine.segments.map { $0.text }.joined()
                     let newText = addedLine.segments.map { $0.text }.joined()
 
+                    // Identical text means git was forced to show these as -/+ due to partial
+                    // staging — the content hasn't actually changed, so collapse them into a
+                    // single unchanged context line.
+                    guard oldText != newText else {
+                        enhancedLines.append(DiffLine(
+                            id: removedLine.id,
+                            type: .unchanged,
+                            segments: removedLine.segments
+                        ))
+                        i += 2
+                        continue
+                    }
+
                     let oldSegments = wordDiff(
                         old: Substring(oldText),
                         new: Substring(newText),
