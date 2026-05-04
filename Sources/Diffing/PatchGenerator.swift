@@ -13,31 +13,25 @@ extension PatchGenerator {
         patch += makeHeader(for: file)
         patch += hunk.header + String.newLine
 
+        // Find the index of the line after which "\ No newline" should be emitted.
+        // For .old side: after the last removed line. For .new/.both/nil: after the last added line.
+        let noNewlineAfterIndex: Int? = hunk.hasNoNewlineAtEnd ? noNewlineMarkerIndex(hunk) : nil
+
         for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
-            let isLastLine = (index == hunk.lines.count - 1)
 
             switch line.type {
             case .added:
-                patch += "+\(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
+                patch += "+\(lineText)\(String.newLine)"
             case .removed:
-                patch += "-\(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
+                patch += "-\(lineText)\(String.newLine)"
             case .unchanged:
-                patch += " \(lineText)"
-                if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                    patch += String.newLine
-                }
+                patch += " \(lineText)\(String.newLine)"
             }
-        }
 
-        if hunk.hasNoNewlineAtEnd {
-            patch += String.noNewLineAtEnd
+            if index == noNewlineAfterIndex {
+                patch += String.noNewLine + String.newLine
+            }
         }
 
         return patch
@@ -51,31 +45,23 @@ extension PatchGenerator {
         for hunk in hunks {
             patch += hunk.header + String.newLine
 
+            let noNewlineAfterIndex: Int? = hunk.hasNoNewlineAtEnd ? noNewlineMarkerIndex(hunk) : nil
+
             for (index, line) in hunk.lines.enumerated() {
                 let lineText = line.segments.map { $0.text }.joined()
-                let isLastLine = (index == hunk.lines.count - 1)
 
                 switch line.type {
                 case .added:
-                    patch += "+\(lineText)"
-                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                        patch += String.newLine
-                    }
+                    patch += "+\(lineText)\(String.newLine)"
                 case .removed:
-                    patch += "-\(lineText)"
-                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                        patch += String.newLine
-                    }
+                    patch += "-\(lineText)\(String.newLine)"
                 case .unchanged:
-                    patch += " \(lineText)"
-                    if !isLastLine || !hunk.hasNoNewlineAtEnd {
-                        patch += String.newLine
-                    }
+                    patch += " \(lineText)\(String.newLine)"
                 }
-            }
 
-            if hunk.hasNoNewlineAtEnd {
-                patch += String.noNewLineAtEnd
+                if index == noNewlineAfterIndex {
+                    patch += String.noNewLine + String.newLine
+                }
             }
         }
 
@@ -195,32 +181,29 @@ extension PatchGenerator {
         patch += makeHeader(for: file)  // Already has \n at end
         patch += reverseHunkHeader(hunk.header) + String.newLine
 
-        // Find last result line
-        var lastResultLineIndex = -1
-        for (index, line) in hunk.lines.enumerated() {
-            if line.type == .unchanged || line.type == .removed {
-                lastResultLineIndex = index
-            }
-        }
+        // In the reverse patch, added lines become '-' and removed lines become '+'.
+        // The "\ No newline" marker must follow the line that represents the side lacking a newline.
+        // - original .old side (removed) → in reverse becomes '+'; marker follows last '+' from removed
+        // - original .new side (added)   → in reverse becomes '-'; marker follows last '-' from added
+        // - .both / nil                  → follows last result line (unchanged or removed→'+')
+        let reverseNoNewlineAfterIndex: Int? = hunk.hasNoNewlineAtEnd
+            ? reverseNoNewlineMarkerIndex(hunk)
+            : nil
 
-        // Process lines
         for (index, line) in hunk.lines.enumerated() {
             let lineText = line.segments.map { $0.text }.joined()
-            let isLastResultLine = (index == lastResultLineIndex)
 
             switch line.type {
             case .added:
                 patch += "-\(lineText)\(String.newLine)"
             case .removed:
                 patch += "+\(lineText)\(String.newLine)"
-                if isLastResultLine && hunk.hasNoNewlineAtEnd {
-                    patch += "\(String.noNewLine)\(String.newLine)"
-                }
             case .unchanged:
                 patch += " \(lineText)\(String.newLine)"
-                if isLastResultLine && hunk.hasNoNewlineAtEnd {
-                    patch += "\(String.noNewLine)\(String.newLine)"
-                }
+            }
+
+            if index == reverseNoNewlineAfterIndex {
+                patch += String.noNewLine + String.newLine
             }
         }
 
@@ -230,6 +213,51 @@ extension PatchGenerator {
 
 // MARK: - Private Helpers
 private extension PatchGenerator {
+    /// Index of the line after which "\ No newline at end of file" should be emitted in a forward patch.
+    /// - .old side → after the last removed line
+    /// - .new/.both/nil → after the last added line (fallback: last line overall)
+    func noNewlineMarkerIndex(_ hunk: DiffHunk) -> Int {
+        switch hunk.noNewlineSide {
+        case .old:
+            // Marker follows last removed line
+            if let idx = hunk.lines.indices.reversed().first(where: { hunk.lines[$0].type == .removed }) {
+                return idx
+            }
+        default:
+            // Marker follows last added line
+            if let idx = hunk.lines.indices.reversed().first(where: { hunk.lines[$0].type == .added }) {
+                return idx
+            }
+        }
+        return hunk.lines.count - 1
+    }
+
+    /// Index of the line after which "\ No newline at end of file" should be emitted in a reverse patch.
+    /// In the reverse, removed→'+' and added→'-', so sides flip.
+    /// - original .old (removed→'+') → marker after last removed line (becomes '+')
+    /// - original .new (added→'-')   → marker after last added line (becomes '-')
+    /// - .both/nil                   → after last removed-or-unchanged line
+    func reverseNoNewlineMarkerIndex(_ hunk: DiffHunk) -> Int {
+        switch hunk.noNewlineSide {
+        case .old:
+            // Original removed lines become '+' in reverse; marker after last removed
+            if let idx = hunk.lines.indices.reversed().first(where: { hunk.lines[$0].type == .removed }) {
+                return idx
+            }
+        case .new:
+            // Original added lines become '-' in reverse; marker after last added
+            if let idx = hunk.lines.indices.reversed().first(where: { hunk.lines[$0].type == .added }) {
+                return idx
+            }
+        default:
+            // Marker after last result line (unchanged or removed→'+')
+            if let idx = hunk.lines.indices.reversed().first(where: { hunk.lines[$0].type == .unchanged || hunk.lines[$0].type == .removed }) {
+                return idx
+            }
+        }
+        return hunk.lines.count - 1
+    }
+
     func makeHeader(for file: WorkingTreeFile) -> String {
         var header = ""
         header += "diff --git a/\(file.path) b/\(file.path)\(String.newLine)"

@@ -13,6 +13,9 @@ extension GitDiffParser {
         var currentLines: [DiffLine] = []
         var lineId = 0
         var hunkId = 0
+        // Track which line type immediately preceded the last "\ No newline" marker
+        var lastLineType: DiffLine.LineType? = nil
+        var noNewlineSide: DiffHunk.NoNewlineSide? = nil
 
         let lines = diffOutput.split(separator: String.newLine, omittingEmptySubsequences: false)
 
@@ -36,7 +39,8 @@ extension GitDiffParser {
                         id: hunkId,
                         header: hunk.header,
                         lines: currentLines,
-                        hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd
+                        hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd,
+                        noNewlineSide: noNewlineSide
                     ))
                     hunkId += 1
                 }
@@ -52,17 +56,32 @@ extension GitDiffParser {
                 )
                 currentLines = []
                 lineId = 0
+                lastLineType = nil
+                noNewlineSide = nil
                 continue
             }
 
-            // No newline marker
+            // No newline marker — record which side it applies to based on last line type
             if lineStr.hasPrefix(String.noNewLine) {
                 if currentHunk != nil {
+                    let side: DiffHunk.NoNewlineSide
+                    switch lastLineType {
+                    case .removed: side = .old
+                    case .added:   side = .new
+                    default:       side = .both
+                    }
+                    // If marker appears twice (both sides), upgrade to .both
+                    if noNewlineSide != nil {
+                        noNewlineSide = .both
+                    } else {
+                        noNewlineSide = side
+                    }
                     currentHunk = DiffHunk(
                         id: currentHunk!.id,
                         header: currentHunk!.header,
                         lines: currentHunk!.lines,
-                        hasNoNewlineAtEnd: true
+                        hasNoNewlineAtEnd: true,
+                        noNewlineSide: noNewlineSide
                     )
                 }
                 continue
@@ -87,6 +106,8 @@ extension GitDiffParser {
                 continue
             }
 
+            lastLineType = type
+
             // Create DiffLine with single segment (no word-diff yet)
             let diffLine = DiffLine(
                 id: lineId,
@@ -108,7 +129,8 @@ extension GitDiffParser {
                 id: hunkId,
                 header: hunk.header,
                 lines: currentLines,
-                hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd
+                hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd,
+                noNewlineSide: noNewlineSide
             ))
         }
 
@@ -212,7 +234,8 @@ private extension GitDiffParser {
                 id: hunk.id,
                 header: hunk.header,
                 lines: enhancedLines,
-                hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd
+                hasNoNewlineAtEnd: hunk.hasNoNewlineAtEnd,
+                noNewlineSide: hunk.noNewlineSide
             ))
         }
 

@@ -320,6 +320,208 @@ struct HunkStagingTests {
         #expect(statusAfter.files[testFile] == nil, "File should be clean")
     }
 
+    @Test func testDiscardHunkRemovingTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITH trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Remove trailing newline
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunk for trailing newline removal")
+
+        try await repository.discardHunk(hunks[0], in: file)
+
+        // Verify newline is restored
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(content.hasSuffix("\n"), "Trailing newline should be restored")
+
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        #expect(statusAfter.files[testFile] == nil, "File should be clean")
+    }
+
+    @Test func testStageHunkAddingTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITHOUT trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Add trailing newline
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunk for trailing newline addition")
+
+        try await repository.stageHunk(hunks[0], in: file)
+
+        // Verify staged diff has the change
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("No file after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunk")
+
+        // Unstaged should be clean
+        let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
+        #expect(unstagedHunks.isEmpty, "No unstaged changes should remain")
+    }
+
+    @Test func testStageHunkRemovingTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITH trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Remove trailing newline
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Should have hunk for trailing newline removal")
+
+        try await repository.stageHunk(hunks[0], in: file)
+
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("No file after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunk")
+
+        let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
+        #expect(unstagedHunks.isEmpty, "No unstaged changes should remain")
+    }
+
+    @Test func testUnstageHunkAddingTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITHOUT trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Add trailing newline and stage it
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let stagedHunks = try await repository.getStagedDiff(for: file)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunk")
+
+        try await repository.unstageHunk(stagedHunks[0], in: file)
+
+        // Staged should be clean
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("No file after unstaging")
+            return
+        }
+        let stagedAfter = try await repository.getStagedDiff(for: fileAfter)
+        #expect(stagedAfter.isEmpty, "No staged changes should remain")
+
+        // Unstaged should have the change back
+        let unstagedAfter = try await repository.getUnstagedDiff(for: fileAfter)
+        #expect(!unstagedAfter.isEmpty, "Unstaged diff should be restored")
+    }
+
+    @Test func testUnstageHunkRemovingTrailingNewline() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+
+        // Create file WITH trailing newline
+        let fileURL = repoURL.appendingPathComponent(testFile)
+        try "Line 1\nLine 2\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        // Remove trailing newline and stage it
+        try "Line 1\nLine 2".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("No file")
+            return
+        }
+
+        let stagedHunks = try await repository.getStagedDiff(for: file)
+        #expect(!stagedHunks.isEmpty, "Should have staged hunk")
+
+        try await repository.unstageHunk(stagedHunks[0], in: file)
+
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("No file after unstaging")
+            return
+        }
+        let stagedAfter = try await repository.getStagedDiff(for: fileAfter)
+        #expect(stagedAfter.isEmpty, "No staged changes should remain")
+
+        let unstagedAfter = try await repository.getUnstagedDiff(for: fileAfter)
+        #expect(!unstagedAfter.isEmpty, "Unstaged diff should be restored")
+    }
+
     @Test func testUnstageMultipleHunks() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
