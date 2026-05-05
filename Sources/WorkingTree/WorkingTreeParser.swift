@@ -62,8 +62,20 @@ extension WorkingTreeParser: WorkingTreeParserProtocol {
                     )
                 }
             } else {
-                let staged = parseChangeType(from: stagedChar, isStaged: true)
-                let unstaged = parseChangeType(from: unstagedChar, isStaged: false)
+                // Detect conflict-pair codes that don't use 'U':
+                //   AA = both added, DD = both deleted, AU/UA/DU/UD = add/delete conflicts
+                let xy = "\(stagedChar)\(unstagedChar)"
+                let isConflictPair = ["AA", "DD", "AU", "UA", "DU", "UD"].contains(xy)
+
+                let staged: GitChangeType?
+                let unstaged: GitChangeType?
+                if isConflictPair {
+                    staged = .conflicted
+                    unstaged = .conflicted
+                } else {
+                    staged = parseChangeType(from: stagedChar, isStaged: true)
+                    unstaged = parseChangeType(from: unstagedChar, isStaged: false)
+                }
 
                 files[path] = WorkingTreeFile(
                     path: path,
