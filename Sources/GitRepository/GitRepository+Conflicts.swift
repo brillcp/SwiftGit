@@ -3,7 +3,18 @@ import Foundation
 extension GitRepository: ConflictReadable {
     public func getConflictedFiles() async throws -> Set<String> {
         let status = try await workingTree.workingTreeStatus()
-        return status.conflictedFiles
+        var files = status.conflictedFiles
+
+        if conflictOperation() != nil {
+            for file in status.files.values where file.staged != nil && !files.contains(file.path) {
+                let fileURL = url.appendingPathComponent(file.path)
+                if (try? String(contentsOf: fileURL, encoding: .utf8))?.contains("<<<<<<< ") == true {
+                    files.insert(file.path)
+                }
+            }
+        }
+
+        return files
     }
 
     public func conflictOperation() -> ConflictOperation? {
