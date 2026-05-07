@@ -93,6 +93,23 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
+        // Clean N-line substitution? Stage both halves together so single
+        // edits behave like GitKraken's "modify line" gesture. The strict
+        // size check inside `pairedSubstitution` keeps this from silently
+        // grabbing an unrelated add when the remove/add block sizes differ.
+        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
+            let lineNums = hunkLineNumbers(hunk)
+            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
+            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
+            let old = lineNums[removedIndex].old ?? oldLineNum ?? 1
+            let new = lineNums[addedIndex].new ?? newLineNum ?? old
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
+            patch += "-\(removedText)\(String.newLine)"
+            patch += "+\(addedText)\(String.newLine)"
+            return patch
+        }
+
         let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
 
@@ -124,6 +141,22 @@ extension PatchGenerator {
     ) -> String {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
+
+        // Symmetric to `generateSingleLinePatch`: a clean N-line substitution
+        // unstages as a pair so the staged area returns to its pre-edit
+        // state, not a half-applied substitution.
+        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
+            let lineNums = hunkLineNumbers(hunk)
+            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
+            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
+            let new = lineNums[addedIndex].new ?? newLineNum ?? 1
+            let old = lineNums[removedIndex].old ?? oldLineNum ?? new
+            var patch = makeHeader(for: file)
+            patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
+            patch += "-\(addedText)\(String.newLine)"
+            patch += "+\(removedText)\(String.newLine)"
+            return patch
+        }
 
         let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
@@ -239,59 +272,77 @@ private extension PatchGenerator {
         return header
     }
 
-    /// Find the paired (removedIndex, addedIndex) for a line that is part of a contiguous
-    /// remove/add substitution block. Returns nil if the line has no paired counterpart.
+    /// Find the paired (removedIndex, addedIndex) for a line that is part of a
+    /// clean N-line substitution: a contiguous run of N removed lines
+    /// immediately followed by a contiguous run of N added lines (e.g.
+    /// `---+++` with matching N).
     ///
-    /// A substitution block is a run of consecutive removed lines immediately followed by a run
-    /// of consecutive added lines (e.g. `---+++`). Lines are paired positionally: the Nth remove
-    /// pairs with the Nth add. If the block sizes differ, unpaired lines return nil.
+    /// Lines pair positionally — the Nth remove pairs with the Nth add. So
+    /// clicking either side of `s/foo/bar/` stages both halves together,
+    /// matching GitKraken's "modify line" UX.
+    ///
+    /// **Returns nil when the block sizes differ.** Asymmetric runs like
+    /// `[7 removes, 3 adds]` are not a substitution — they're a deletion
+    /// plus an unrelated insertion, and pairing would silently stage one
+    /// side of an unrelated edit. Each line in such a block is handled
+    /// independently as a single-line patch.
     func pairedSubstitution(for lineIndex: Int, in hunk: DiffHunk) -> (removedIndex: Int, addedIndex: Int)? {
         let lines = hunk.lines
         guard lineIndex < lines.count else { return nil }
         let lineType = lines[lineIndex].type
         guard lineType == .removed || lineType == .added else { return nil }
 
-        // Find the start of the contiguous removed run that contains (or precedes) this line.
-        // For a removed line: scan back to the block start, then forward to find the adds block.
-        // For an added line: scan back through the adds to find the removes block before it.
+        // Locate the boundaries of the removes run and the adds run that the
+        // clicked line sits in (or is adjacent to). The removes block must
+        // come immediately before the adds block — gaps disqualify pairing.
+        let removesStart: Int
+        let removesEnd: Int   // inclusive
+        let addsStart: Int
+        let addsEnd: Int      // inclusive
 
-        var blockStart = lineIndex
         if lineType == .removed {
-            // Walk back to find start of the removes run
-            while blockStart > 0 && lines[blockStart - 1].type == .removed { blockStart -= 1 }
-            // Walk forward past all removes to find start of adds run
-            var addsStart = lineIndex
-            while addsStart + 1 < lines.count && lines[addsStart + 1].type == .removed { addsStart += 1 }
-            addsStart += 1  // first potential add
-            guard addsStart < lines.count, lines[addsStart].type == .added else { return nil }
-
-            // Offset of this remove within the removes run
-            let removeOffset = lineIndex - blockStart
-
-            var addsCount = 0
-            var addsEnd = addsStart
-            while addsEnd < lines.count && lines[addsEnd].type == .added { addsEnd += 1; addsCount += 1 }
-
-            guard removeOffset < addsCount else { return nil }
-            return (removedIndex: lineIndex, addedIndex: addsStart + removeOffset)
-
+            var rs = lineIndex
+            while rs > 0 && lines[rs - 1].type == .removed { rs -= 1 }
+            var re = lineIndex
+            while re + 1 < lines.count && lines[re + 1].type == .removed { re += 1 }
+            // Adds must immediately follow the removes block.
+            guard re + 1 < lines.count, lines[re + 1].type == .added else { return nil }
+            var ae = re + 1
+            while ae + 1 < lines.count && lines[ae + 1].type == .added { ae += 1 }
+            removesStart = rs
+            removesEnd = re
+            addsStart = re + 1
+            addsEnd = ae
         } else {
-            // lineType == .added
-            // Walk back through adds to find start of adds run
-            var addsStart = lineIndex
-            while addsStart > 0 && lines[addsStart - 1].type == .added { addsStart -= 1 }
-            // Walk back past any non-removed lines — the removes run must immediately precede the adds run
-            guard addsStart > 0, lines[addsStart - 1].type == .removed else { return nil }
+            // .added — find the surrounding adds run and check that a removes
+            // run sits immediately before it.
+            var as_ = lineIndex
+            while as_ > 0 && lines[as_ - 1].type == .added { as_ -= 1 }
+            var ae = lineIndex
+            while ae + 1 < lines.count && lines[ae + 1].type == .added { ae += 1 }
+            guard as_ > 0, lines[as_ - 1].type == .removed else { return nil }
+            var rs = as_ - 1
+            while rs > 0 && lines[rs - 1].type == .removed { rs -= 1 }
+            removesStart = rs
+            removesEnd = as_ - 1
+            addsStart = as_
+            addsEnd = ae
+        }
 
-            // Find start of the removes run
-            var removesEnd = addsStart - 1
-            var removesStart = removesEnd
-            while removesStart > 0 && lines[removesStart - 1].type == .removed { removesStart -= 1 }
+        let removesCount = removesEnd - removesStart + 1
+        let addsCount = addsEnd - addsStart + 1
 
-            let addOffset = lineIndex - addsStart
-            let removesCount = removesEnd - removesStart + 1
-            guard addOffset < removesCount else { return nil }
-            return (removedIndex: removesStart + addOffset, addedIndex: lineIndex)
+        // Strict equality. If a user changed N lines into N lines, every
+        // remove has a clean partner. Anything else (e.g. 7 → 3) is not a
+        // substitution and falls through to single-line patching.
+        guard removesCount == addsCount else { return nil }
+
+        if lineType == .removed {
+            let offset = lineIndex - removesStart
+            return (removedIndex: lineIndex, addedIndex: addsStart + offset)
+        } else {
+            let offset = lineIndex - addsStart
+            return (removedIndex: removesStart + offset, addedIndex: lineIndex)
         }
     }
 

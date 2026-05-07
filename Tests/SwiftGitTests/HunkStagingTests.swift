@@ -883,13 +883,12 @@ struct HunkStagingTests {
         // Cleanup
         try await repository.discardFile(at: testFile)
     }
-    @Test func testStageOnlyOneSideOfSubstitution() async throws {
-        // A "substitution" (a removed line immediately followed by its
-        // replacement) used to be auto-paired: clicking either side staged
-        // BOTH lines. That magic surprised users for hunks like
-        // `[7 deletions, 3 additions]` where clicking a removal stealthily
-        // staged an unrelated addition. The new contract is "one click =
-        // one line"; pair-staging is reachable by clicking each side.
+    @Test func testStagePairedSubstitutionLine() async throws {
+        // Clean 1-for-1 substitution (`s/old/new/` on a single line):
+        // clicking either side stages both halves together. Mirrors
+        // GitKraken's "modify line" UX. Asymmetric blocks are covered by
+        // the duplicate-lines tests below — those still stage one side
+        // at a time.
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
@@ -922,10 +921,8 @@ struct HunkStagingTests {
         let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: addedIndex)
         try await repository.stageLine(at: addedIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
 
-        // File should be PARTIALLY staged — only the added side landed in
-        // the index. The removal still needs a separate click.
         if let line = try statusLine(for: testFile, in: repoURL) {
-            #expect(line.hasPrefix("MM"), "Only the added side should be staged; deletion still pending")
+            #expect(line.hasPrefix("M  "), "1:1 substitution should stage both halves together")
         }
 
         let statusAfter = try await repository.getWorkingTreeStatus()
@@ -936,13 +933,11 @@ struct HunkStagingTests {
         let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
         let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
         let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
-        #expect(stagedRemoved == 0, "No removal should be staged from the single added-line click")
-        #expect(stagedAdded == 1, "Exactly one addition should be staged")
+        #expect(stagedRemoved == 1, "Should have 1 staged removed line")
+        #expect(stagedAdded   == 1, "Should have 1 staged added line")
 
-        // Removal still in the unstaged diff for the user to opt into.
         let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
-        let unstagedRemoved = unstagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
-        #expect(unstagedRemoved == 1, "Removal should remain unstaged until clicked separately")
+        #expect(unstagedHunks.isEmpty, "No unstaged changes should remain after pair-staging")
 
         try await repository.discardFile(at: testFile)
     }
