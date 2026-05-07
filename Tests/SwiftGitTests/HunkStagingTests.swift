@@ -883,19 +883,23 @@ struct HunkStagingTests {
         // Cleanup
         try await repository.discardFile(at: testFile)
     }
-    @Test func testStagePairedSubstitutionLine() async throws {
+    @Test func testStageOnlyOneSideOfSubstitution() async throws {
+        // A "substitution" (a removed line immediately followed by its
+        // replacement) used to be auto-paired: clicking either side staged
+        // BOTH lines. That magic surprised users for hunks like
+        // `[7 deletions, 3 additions]` where clicking a removal stealthily
+        // staged an unrelated addition. The new contract is "one click =
+        // one line"; pair-staging is reachable by clicking each side.
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
 
         let repository = GitRepository(url: repoURL)
         let testFile = "test_stage_substitution_\(UUID().uuidString).txt"
 
-        // Commit initial file
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nOld line\nLine 3\n")
         try await repository.stageFile(at: testFile)
         try await repository.commit(message: "Initial commit")
 
-        // Replace "Old line" with "New line" — produces a paired remove+add in the diff
         try createTestFile(in: repoURL, named: testFile, content: "Line 1\nNew line\nLine 3\n")
 
         let status = try await repository.getWorkingTreeStatus()
@@ -906,46 +910,24 @@ struct HunkStagingTests {
 
         let hunks = try await repository.getUnstagedDiff(for: file)
         #expect(!hunks.isEmpty, "Should have hunks")
-
         let hunk = hunks[0]
 
-        // Find the added line index (the + side of the substitution)
         guard let addedIndex = hunk.lines.firstIndex(where: { $0.type == .added }) else {
             Issue.record("No added line found")
             return
         }
-
-        // Verify it is a paired substitution: removed line immediately before added line
         #expect(addedIndex > 0 && hunk.lines[addedIndex - 1].type == .removed,
                 "Should be a paired remove+add substitution")
 
-        // Calculate line numbers for the added line
-        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
-        var oldLineNum: Int? = nil
-        var newLineNum: Int? = nil
-        if let regex = try? NSRegularExpression(pattern: headerPattern),
-           let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)) {
-            let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
-            let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
-            var oldCount = 0
-            var newCount = 0
-            for line in hunk.lines.prefix(addedIndex) {
-                if line.type == .unchanged || line.type == .removed { oldCount += 1 }
-                if line.type == .unchanged || line.type == .added { newCount += 1 }
-            }
-            oldLineNum = oldStart + oldCount
-            newLineNum = newStart + newCount
-        }
-
-        // Stage the added line — should stage the whole substitution (remove+add pair)
+        let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: addedIndex)
         try await repository.stageLine(at: addedIndex, oldNum: oldLineNum, newNum: newLineNum, in: hunk, file: file)
 
-        // File should be fully staged (no unstaged changes remain)
+        // File should be PARTIALLY staged — only the added side landed in
+        // the index. The removal still needs a separate click.
         if let line = try statusLine(for: testFile, in: repoURL) {
-            #expect(line.hasPrefix("M  "), "Substitution should be fully staged, not partially")
+            #expect(line.hasPrefix("MM"), "Only the added side should be staged; deletion still pending")
         }
 
-        // Staged diff should have exactly 1 removed and 1 added line
         let statusAfter = try await repository.getWorkingTreeStatus()
         guard let fileAfter = statusAfter.files[testFile] else {
             Issue.record("File not in status after staging")
@@ -954,14 +936,279 @@ struct HunkStagingTests {
         let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
         let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
         let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
-        #expect(stagedRemoved == 1, "Should have 1 staged removed line")
-        #expect(stagedAdded   == 1, "Should have 1 staged added line")
+        #expect(stagedRemoved == 0, "No removal should be staged from the single added-line click")
+        #expect(stagedAdded == 1, "Exactly one addition should be staged")
 
-        // Unstaged diff should be empty
+        // Removal still in the unstaged diff for the user to opt into.
         let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
-        #expect(unstagedHunks.isEmpty, "No unstaged changes should remain after staging substitution")
+        let unstagedRemoved = unstagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(unstagedRemoved == 1, "Removal should remain unstaged until clicked separately")
 
         try await repository.discardFile(at: testFile)
+    }
+
+    // MARK: - Duplicate adjacent lines
+    //
+    // Regression coverage for a bug where staging a single line from a hunk
+    // containing many identical adjacent lines could "stage" the change at
+    // multiple positions, leaving the index with phantom duplicates. Caused
+    // by `git apply --ignore-whitespace --unidiff-zero` matching the
+    // line-text loosely; fixed by passing `strict: true` for line-level
+    // patches and emitting canonical `+(N-1),0` headers for deletions.
+
+    @Test func testStageOneRemovedLineWhenManyIdenticalLinesExist() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "duplicate_remove_\(UUID().uuidString).swift"
+
+        // 7 identical lines surrounded by anchors. Anchors stop git's diff
+        // from collapsing the deletion block into a "context shift".
+        let initial = """
+        let header = "top"
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: initial)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Seven duplicates")
+
+        // Keep one of the seven, remove the other six.
+        let modified = """
+        let header = "top"
+        var dupe = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: modified)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Expected unstaged hunks")
+        let hunk = hunks[0]
+
+        // Pick the first removed line in the hunk.
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .removed }) else {
+            Issue.record("No removed line found")
+            return
+        }
+
+        let removedCount = hunk.lines.filter { $0.type == .removed }.count
+        #expect(removedCount == 6, "Expected 6 removed lines in the unstaged hunk; got \(removedCount)")
+
+        // Compute (oldNum, newNum) for the picked line.
+        let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: lineIndex)
+
+        try await repository.stageLine(
+            at: lineIndex,
+            oldNum: oldLineNum,
+            newNum: newLineNum,
+            in: hunk,
+            file: file
+        )
+
+        // Index must have lost exactly one duplicate. Staged diff: 1 deletion, 0 additions.
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        #expect(stagedRemoved == 1, "Exactly one removal should be staged; got \(stagedRemoved)")
+        #expect(stagedAdded == 0, "No additions should be staged; got \(stagedAdded)")
+
+        // Unstaged side keeps the remaining 5 deletions.
+        let unstagedAfter = try await repository.getUnstagedDiff(for: fileAfter)
+        let unstagedRemoved = unstagedAfter.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(unstagedRemoved == 5, "Five removals should remain unstaged; got \(unstagedRemoved)")
+
+        try await repository.discardFile(at: testFile)
+    }
+
+    @Test func testStageOneAddedLineNextToManyIdenticalRemovedLines() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "duplicate_add_\(UUID().uuidString).swift"
+
+        // HEAD has 7 identical lines.
+        let initial = """
+        let header = "top"
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: initial)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Seven duplicates")
+
+        // Working tree has 3 new top lines, removes all 7 duplicates.
+        let modified = """
+        let header = "top"
+        // doc-1
+        // doc-2
+        var newProperty = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: modified)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not found in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        #expect(!hunks.isEmpty, "Expected unstaged hunks")
+        let hunk = hunks[0]
+
+        // Find the FIRST added line (one of the doc lines or the new var).
+        guard let lineIndex = hunk.lines.firstIndex(where: { $0.type == .added }) else {
+            Issue.record("No added line found")
+            return
+        }
+
+        let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: lineIndex)
+
+        try await repository.stageLine(
+            at: lineIndex,
+            oldNum: oldLineNum,
+            newNum: newLineNum,
+            in: hunk,
+            file: file
+        )
+
+        // Staged side: exactly 1 addition. The presence of 7 identical text
+        // lines elsewhere in the file must not bleed into the staged diff.
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(stagedAdded == 1, "Exactly one addition should be staged; got \(stagedAdded)")
+        #expect(stagedRemoved == 0, "No removals should be staged yet; got \(stagedRemoved)")
+
+        try await repository.discardFile(at: testFile)
+    }
+
+    @Test func testStageEachRemovedLineSequentiallyAmongDuplicates() async throws {
+        // Stage every removed line one-by-one and confirm the index
+        // converges to "one duplicate left" — not "all gone immediately"
+        // and not "still seven" after the loop. Catches both over- and
+        // under-application of the line patch.
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "duplicate_sequential_\(UUID().uuidString).swift"
+
+        let initial = """
+        let header = "top"
+        var dupe = 0
+        var dupe = 0
+        var dupe = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: initial)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Three duplicates")
+
+        let modified = """
+        let header = "top"
+        var dupe = 0
+        let footer = "bottom"
+        """
+        try createTestFile(in: repoURL, named: testFile, content: modified)
+
+        // Stage one removal, refresh, stage the next, refresh, stage the
+        // last. After each step the staged-removed count should grow by
+        // exactly one.
+        for expectedStaged in 1...2 {
+            let status = try await repository.getWorkingTreeStatus()
+            guard let file = status.files[testFile] else {
+                Issue.record("File not found in status (iter \(expectedStaged))")
+                return
+            }
+            let hunks = try await repository.getUnstagedDiff(for: file)
+            guard let hunk = hunks.first,
+                  let lineIndex = hunk.lines.firstIndex(where: { $0.type == .removed })
+            else {
+                Issue.record("No removed line at iter \(expectedStaged)")
+                return
+            }
+            let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: lineIndex)
+            try await repository.stageLine(
+                at: lineIndex,
+                oldNum: oldLineNum,
+                newNum: newLineNum,
+                in: hunk,
+                file: file
+            )
+
+            let statusAfter = try await repository.getWorkingTreeStatus()
+            guard let fileAfter = statusAfter.files[testFile] else {
+                Issue.record("File not in status after iter \(expectedStaged)")
+                return
+            }
+            let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+            let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+            #expect(
+                stagedRemoved == expectedStaged,
+                "After staging iter \(expectedStaged): expected \(expectedStaged) staged removals, got \(stagedRemoved)"
+            )
+        }
+
+        try await repository.discardFile(at: testFile)
+    }
+
+    // MARK: - Helpers
+
+    /// Compute (oldLineNum, newLineNum) for the line at `lineIndex` in
+    /// `hunk` by walking from the parsed hunk header. Mirrors what the
+    /// production callers (e.g. DiffViewModel) do before calling
+    /// `stageLine`.
+    private func lineNumbers(in hunk: DiffHunk, at lineIndex: Int) -> (Int?, Int?) {
+        let headerPattern = #"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@"#
+        guard let regex = try? NSRegularExpression(pattern: headerPattern),
+              let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header))
+        else { return (nil, nil) }
+
+        let oldStart = Int((hunk.header as NSString).substring(with: match.range(at: 1))) ?? 1
+        let newStart = Int((hunk.header as NSString).substring(with: match.range(at: 2))) ?? 1
+
+        var oldCount = 0
+        var newCount = 0
+        for line in hunk.lines.prefix(lineIndex) {
+            if line.type == .unchanged || line.type == .removed { oldCount += 1 }
+            if line.type == .unchanged || line.type == .added   { newCount += 1 }
+        }
+
+        let target = hunk.lines[lineIndex]
+        let oldLineNum: Int? = (target.type == .added) ? nil : oldStart + oldCount
+        let newLineNum: Int? = (target.type == .removed) ? nil : newStart + newCount
+        return (oldLineNum, newLineNum)
     }
 }
 

@@ -93,21 +93,6 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
-        // Detect paired substitution within a contiguous remove/add block and stage both together.
-        let lineNums = hunkLineNumbers(hunk)
-
-        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
-            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
-            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
-            let old = lineNums[removedIndex].old ?? oldLineNum ?? 1
-            let new = lineNums[addedIndex].new ?? newLineNum ?? old
-            var patch = makeHeader(for: file)
-            patch += "@@ -\(old),1 +\(new),1 @@\(String.newLine)"
-            patch += "-\(removedText)\(String.newLine)"
-            patch += "+\(addedText)\(String.newLine)"
-            return patch
-        }
-
         let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
 
@@ -139,22 +124,6 @@ extension PatchGenerator {
     ) -> String {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
-
-        // Detect paired substitution within a contiguous remove/add block and unstage both together.
-        let lineNums = hunkLineNumbers(hunk)
-
-        if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
-            let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
-            let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
-            let new = lineNums[addedIndex].new ?? newLineNum ?? 1
-            let old = lineNums[removedIndex].old ?? oldLineNum ?? new
-            // Reverse: remove the added line from index, restore the removed line
-            var patch = makeHeader(for: file)
-            patch += "@@ -\(new),1 +\(old),1 @@\(String.newLine)"
-            patch += "-\(addedText)\(String.newLine)"
-            patch += "+\(removedText)\(String.newLine)"
-            return patch
-        }
 
         let lineText = line.segments.map { $0.text }.joined()
         var patch = makeHeader(for: file)
