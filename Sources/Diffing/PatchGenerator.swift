@@ -93,12 +93,9 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
-        // Clean N-line substitution? Stage both halves together so single
-        // edits behave like GitKraken's "modify line" gesture. The strict
-        // size check inside `pairedSubstitution` keeps this from silently
-        // grabbing an unrelated add when the remove/add block sizes differ.
+        let lineNums = hunkLineNumbers(hunk)
+
         if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
-            let lineNums = hunkLineNumbers(hunk)
             let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
             let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
             let old = lineNums[removedIndex].old ?? oldLineNum ?? 1
@@ -115,14 +112,14 @@ extension PatchGenerator {
 
         switch line.type {
         case .added:
-            // Adding: old side has 0 lines at (newLineNum - 1), new side has 1 line at newLineNum
-            let pos = (newLineNum ?? 1) - 1
-            patch += "@@ -\(pos),0 +\(newLineNum ?? 1),1 @@\(String.newLine)"
+            let oldAnchor = previousOldAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
+            let newPos = lineNums[lineIndex].new ?? newLineNum ?? 1
+            patch += "@@ -\(oldAnchor),0 +\(newPos),1 @@\(String.newLine)"
             patch += "+\(lineText)\(String.newLine)"
         case .removed:
-            let oldStart = oldLineNum ?? 1
-            let newPos = max(0, oldStart - 1)
-            patch += "@@ -\(oldStart),1 +\(newPos),0 @@\(String.newLine)"
+            let oldPos = lineNums[lineIndex].old ?? oldLineNum ?? 1
+            let newAnchor = previousNewAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
+            patch += "@@ -\(oldPos),1 +\(newAnchor),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .unchanged:
             break
@@ -142,11 +139,9 @@ extension PatchGenerator {
         let line = hunk.lines[lineIndex]
         guard line.type == .added || line.type == .removed else { return "" }
 
-        // Symmetric to `generateSingleLinePatch`: a clean N-line substitution
-        // unstages as a pair so the staged area returns to its pre-edit
-        // state, not a half-applied substitution.
+        let lineNums = hunkLineNumbers(hunk)
+
         if let (removedIndex, addedIndex) = pairedSubstitution(for: lineIndex, in: hunk) {
-            let lineNums = hunkLineNumbers(hunk)
             let removedText = hunk.lines[removedIndex].segments.map { $0.text }.joined()
             let addedText   = hunk.lines[addedIndex].segments.map { $0.text }.joined()
             let new = lineNums[addedIndex].new ?? newLineNum ?? 1
@@ -163,16 +158,14 @@ extension PatchGenerator {
 
         switch line.type {
         case .added:
-            // Reverse of add: remove the line that was added.
-            // Symmetric to the forward `.removed` case — `+(N-1),0`.
-            let newStart = newLineNum ?? 1
-            let pos = max(0, newStart - 1)
-            patch += "@@ -\(newStart),1 +\(pos),0 @@\(String.newLine)"
+            let newPos = lineNums[lineIndex].new ?? newLineNum ?? 1
+            let oldAnchor = previousOldAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
+            patch += "@@ -\(newPos),1 +\(oldAnchor),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .removed:
-            // Reverse of remove: re-add the line that was removed
-            let pos = (oldLineNum ?? 1) - 1
-            patch += "@@ -\(pos),0 +\(oldLineNum ?? 1),1 @@\(String.newLine)"
+            let oldPos = lineNums[lineIndex].old ?? oldLineNum ?? 1
+            let newAnchor = previousNewAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
+            patch += "@@ -\(newAnchor),0 +\(oldPos),1 @@\(String.newLine)"
             patch += "+\(lineText)\(String.newLine)"
         case .unchanged:
             break
@@ -219,6 +212,38 @@ extension PatchGenerator {
 
 // MARK: - Private Helpers
 private extension PatchGenerator {
+    func previousOldAnchor(before lineIndex: Int, lineNums: [(old: Int?, new: Int?)], hunk: DiffHunk) -> Int {
+        for i in stride(from: lineIndex - 1, through: 0, by: -1) {
+            if let old = lineNums[i].old { return old }
+        }
+        return max(0, hunkOldStart(hunk) - 1)
+    }
+
+    func previousNewAnchor(before lineIndex: Int, lineNums: [(old: Int?, new: Int?)], hunk: DiffHunk) -> Int {
+        for i in stride(from: lineIndex - 1, through: 0, by: -1) {
+            if let new = lineNums[i].new { return new }
+        }
+        return max(0, hunkNewStart(hunk) - 1)
+    }
+
+    func hunkOldStart(_ hunk: DiffHunk) -> Int {
+        let pattern = #"@@ -(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)),
+              let value = Int((hunk.header as NSString).substring(with: match.range(at: 1)))
+        else { return 1 }
+        return value
+    }
+
+    func hunkNewStart(_ hunk: DiffHunk) -> Int {
+        let pattern = #"\+(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: hunk.header, range: NSRange(hunk.header.startIndex..., in: hunk.header)),
+              let value = Int((hunk.header as NSString).substring(with: match.range(at: 1)))
+        else { return 1 }
+        return value
+    }
+
     /// Index of the line after which "\ No newline at end of file" should be emitted in a forward patch.
     /// - .old side → after the last removed line
     /// - .new/.both/nil → after the last added line (fallback: last line overall)
