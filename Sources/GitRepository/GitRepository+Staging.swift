@@ -164,7 +164,7 @@ extension GitRepository: StagingWritable {
         )
         guard !patch.isEmpty else { return }
 
-        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true))
+        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true, strict: true))
         guard result.exitCode == 0 else {
             throw GitError.stageHunkFailed(path: file.path)
         }
@@ -182,7 +182,7 @@ extension GitRepository: StagingWritable {
         )
         guard !patch.isEmpty else { return }
 
-        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true))
+        let result = try await commandRunner.run(.applyPatch(patch: patch, cached: true, strict: true))
         guard result.exitCode == 0 else {
             throw GitError.unstageHunkFailed(path: file.path)
         }

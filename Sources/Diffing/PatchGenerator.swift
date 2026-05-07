@@ -118,8 +118,9 @@ extension PatchGenerator {
             patch += "@@ -\(pos),0 +\(newLineNum ?? 1),1 @@\(String.newLine)"
             patch += "+\(lineText)\(String.newLine)"
         case .removed:
-            // Removing: old side has 1 line at oldLineNum, new side has 0 lines
-            patch += "@@ -\(oldLineNum ?? 1),1 +\(oldLineNum ?? 1),0 @@\(String.newLine)"
+            let oldStart = oldLineNum ?? 1
+            let newPos = max(0, oldStart - 1)
+            patch += "@@ -\(oldStart),1 +\(newPos),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .unchanged:
             break
@@ -160,8 +161,11 @@ extension PatchGenerator {
 
         switch line.type {
         case .added:
-            // Reverse of add: remove the line that was added
-            patch += "@@ -\(newLineNum ?? 1),1 +\(newLineNum ?? 1),0 @@\(String.newLine)"
+            // Reverse of add: remove the line that was added.
+            // Symmetric to the forward `.removed` case — `+(N-1),0`.
+            let newStart = newLineNum ?? 1
+            let pos = max(0, newStart - 1)
+            patch += "@@ -\(newStart),1 +\(pos),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .removed:
             // Reverse of remove: re-add the line that was removed

@@ -72,7 +72,7 @@ public enum GitCommand: Sendable {
     case diffFromEmpty(to: String, path: String)
     case showFile(commitId: String, path: String)
     case stashShow(ref: String)
-    case applyPatch(patch: String, cached: Bool)
+    case applyPatch(patch: String, cached: Bool, strict: Bool = false)
 
     // MARK: - Working Tree Status
     case status(porcelain: Bool)
@@ -108,7 +108,7 @@ public enum GitCommand: Sendable {
 extension GitCommand {
     var stdinData: Data? {
         switch self {
-        case .applyPatch(let patch, _):
+        case .applyPatch(let patch, _, _):
             return patch.data(using: .utf8)
         case .credentialApprove(let host, let username, let password):
             return "protocol=https\nhost=\(host)\nusername=\(username)\npassword=\(password)\n".data(using: .utf8)
@@ -333,12 +333,14 @@ extension GitCommand {
             return ["show", "\(commitId):\(path)"]
         case .stashShow(let ref):
             return ["stash", "show", "--include-untracked", "--name-status", "--find-renames", ref]
-        case .applyPatch(_, let cached):
+        case .applyPatch(_, let cached, let strict):
             var args = ["apply"]
             if cached {
                 args.append("--cached")
             }
-            args.append("--ignore-whitespace")
+            if !strict {
+                args.append("--ignore-whitespace")
+            }
             args.append("--unidiff-zero")
             args.append("--whitespace=nowarn")
             args.append("-")
