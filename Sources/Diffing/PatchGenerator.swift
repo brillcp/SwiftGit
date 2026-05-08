@@ -113,13 +113,11 @@ extension PatchGenerator {
         switch line.type {
         case .added:
             let oldAnchor = previousOldAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
-            let newPos = lineNums[lineIndex].new ?? newLineNum ?? 1
-            patch += "@@ -\(oldAnchor),0 +\(newPos),1 @@\(String.newLine)"
+            patch += "@@ -\(oldAnchor),0 +\(oldAnchor + 1),1 @@\(String.newLine)"
             patch += "+\(lineText)\(String.newLine)"
         case .removed:
             let oldPos = lineNums[lineIndex].old ?? oldLineNum ?? 1
-            let newAnchor = previousNewAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
-            patch += "@@ -\(oldPos),1 +\(newAnchor),0 @@\(String.newLine)"
+            patch += "@@ -\(oldPos),1 +\(max(0, oldPos - 1)),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .unchanged:
             break
@@ -159,13 +157,11 @@ extension PatchGenerator {
         switch line.type {
         case .added:
             let newPos = lineNums[lineIndex].new ?? newLineNum ?? 1
-            let oldAnchor = previousOldAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
-            patch += "@@ -\(newPos),1 +\(oldAnchor),0 @@\(String.newLine)"
+            patch += "@@ -\(newPos),1 +\(max(0, newPos - 1)),0 @@\(String.newLine)"
             patch += "-\(lineText)\(String.newLine)"
         case .removed:
-            let oldPos = lineNums[lineIndex].old ?? oldLineNum ?? 1
             let newAnchor = previousNewAnchor(before: lineIndex, lineNums: lineNums, hunk: hunk)
-            patch += "@@ -\(newAnchor),0 +\(oldPos),1 @@\(String.newLine)"
+            patch += "@@ -\(newAnchor),0 +\(newAnchor + 1),1 @@\(String.newLine)"
             patch += "+\(lineText)\(String.newLine)"
         case .unchanged:
             break

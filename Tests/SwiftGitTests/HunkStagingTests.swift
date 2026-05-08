@@ -1108,6 +1108,95 @@ struct HunkStagingTests {
         try await repository.discardFile(at: testFile)
     }
 
+    @Test func testStageOneAddedLineWithPriorAddsInSameHunk() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "prior_adds_\(UUID().uuidString).txt"
+
+        let initial = """
+        ctx1
+        ctx2
+        ctx3
+        ctx4
+        ctx5
+        ctx6
+        """
+        try createTestFile(in: repoURL, named: testFile, content: initial)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "init")
+
+        // Three adds inserted between ctx3 and ctx4. Click on the THIRD
+        // add — its full-hunk newLineNum is 6, but the OLD anchor sits at
+        // line 3, so the patch must claim NEW position 4 (oldAnchor+1) for
+        // the apply to land cleanly. The previous bug used full-hunk
+        // newLineNum and produced a phantom unstaged hunk.
+        let modified = """
+        ctx1
+        ctx2
+        ctx3
+        add1
+        add2
+        add3
+        ctx4
+        ctx5
+        ctx6
+        """
+        try createTestFile(in: repoURL, named: testFile, content: modified)
+
+        let status = try await repository.getWorkingTreeStatus()
+        guard let file = status.files[testFile] else {
+            Issue.record("File not in status")
+            return
+        }
+
+        let hunks = try await repository.getUnstagedDiff(for: file)
+        guard let hunk = hunks.first else {
+            Issue.record("No hunk")
+            return
+        }
+
+        // Find the third added line.
+        let addedIndices = hunk.lines.enumerated().compactMap { $0.element.type == .added ? $0.offset : nil }
+        guard addedIndices.count == 3 else {
+            Issue.record("Expected 3 adds, got \(addedIndices.count)")
+            return
+        }
+        let thirdAddIndex = addedIndices[2]
+        let (oldLineNum, newLineNum) = lineNumbers(in: hunk, at: thirdAddIndex)
+
+        try await repository.stageLine(
+            at: thirdAddIndex,
+            oldNum: oldLineNum,
+            newNum: newLineNum,
+            in: hunk,
+            file: file
+        )
+
+        // Staged: exactly one add (`add3`), no removals.
+        let statusAfter = try await repository.getWorkingTreeStatus()
+        guard let fileAfter = statusAfter.files[testFile] else {
+            Issue.record("File not in status after staging")
+            return
+        }
+        let stagedHunks = try await repository.getStagedDiff(for: fileAfter)
+        let stagedAdded   = stagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        let stagedRemoved = stagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(stagedAdded == 1, "Expected exactly 1 staged addition, got \(stagedAdded)")
+        #expect(stagedRemoved == 0, "Expected no staged removals, got \(stagedRemoved)")
+
+        // Unstaged: only the OTHER two adds (`add1`, `add2`). No phantom
+        // remove/add pair for context lines, no duplicate of `add3`.
+        let unstagedHunks = try await repository.getUnstagedDiff(for: fileAfter)
+        let unstagedAdded   = unstagedHunks.flatMap(\.lines).filter { $0.type == .added }.count
+        let unstagedRemoved = unstagedHunks.flatMap(\.lines).filter { $0.type == .removed }.count
+        #expect(unstagedAdded == 2, "Expected 2 remaining adds in unstaged, got \(unstagedAdded)")
+        #expect(unstagedRemoved == 0, "Expected NO removals in unstaged (would indicate phantom hunk), got \(unstagedRemoved)")
+
+        try await repository.discardFile(at: testFile)
+    }
+
     @Test func testStageEachRemovedLineSequentiallyAmongDuplicates() async throws {
         // Stage every removed line one-by-one and confirm the index
         // converges to "one duplicate left" — not "all gone immediately"
