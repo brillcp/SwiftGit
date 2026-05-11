@@ -184,11 +184,6 @@ private extension GitDiffParser {
                     let oldText = removedLine.segments.map { $0.text }.joined()
                     let newText = addedLine.segments.map { $0.text }.joined()
 
-                    // Identical text means git was forced to show these as -/+ due to partial
-                    // staging — the content hasn't actually changed, so collapse them into a
-                    // single unchanged context line.
-                    // Exception: when hasNoNewlineAtEnd is true the lines differ in their
-                    // trailing-newline status, so keep them as -/+ to preserve that information.
                     guard oldText != newText || hunk.hasNoNewlineAtEnd else {
                         enhancedLines.append(DiffLine(
                             id: removedLine.id,
