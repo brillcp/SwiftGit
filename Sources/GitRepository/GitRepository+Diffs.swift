@@ -56,17 +56,20 @@ extension GitRepository: DiffReadable {
             return try await parseNumstat(from: commandRunner.run(.numstat(commitId: commitId)))
         }
 
-        // Working tree: run both HEAD diff and staged-only diff concurrently,
-        // then union them to cover tracked modifications and newly staged files.
+        // Working tree: run HEAD diff, staged-only diff, and the untracked
+        // line-count pass concurrently. HEAD/staged numstats cover tracked
+        // modifications + newly staged files; untracked count picks up new
+        // files that aren't yet known to git (numstat excludes those).
         async let headResult = commandRunner.run(.numstat(commitId: nil))
         async let stagedResult = commandRunner.run(.numstat(staged: true))
-        let (head, staged) = try await (headResult, stagedResult)
+        async let untrackedAdded = countUntrackedLines()
+        let (head, staged, untracked) = try await (headResult, stagedResult, untrackedAdded)
 
         let headStats = try parseNumstat(from: head)
         let stagedStats = try parseNumstat(from: staged)
 
         return (
-            added: max(headStats.added, stagedStats.added),
+            added: max(headStats.added, stagedStats.added) + untracked,
             removed: max(headStats.removed, stagedStats.removed)
         )
     }
@@ -101,6 +104,38 @@ extension GitRepository: DiffReadable {
 
 // MARK: - Private functions
 private extension GitRepository {
+    func countUntrackedLines() async throws -> Int {
+        let result = try await commandRunner.run(.lsFilesUntracked)
+        guard result.exitCode == 0, !result.stdout.isEmpty else { return 0 }
+
+        // `-z` emits paths separated by NUL.
+        let paths = result.stdout.split(separator: "\0").map(String.init)
+        guard !paths.isEmpty else { return 0 }
+
+        let repoURL = url
+        return await withTaskGroup(of: Int.self) { group in
+            for path in paths {
+                group.addTask {
+                    let fileURL = repoURL.appendingPathComponent(path)
+                    guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe) else { return 0 }
+                    // Skip binaries — a NUL byte in the first 8KB is the
+                    // same heuristic git itself uses.
+                    let probe = data.prefix(8192)
+                    if probe.contains(0) { return 0 }
+                    // Count newlines + 1 if last byte isn't a newline (matches
+                    // `wc -l` semantics for files without trailing newline).
+                    var lines = 0
+                    for byte in data where byte == 0x0A { lines += 1 }
+                    if let last = data.last, last != 0x0A, !data.isEmpty { lines += 1 }
+                    return lines
+                }
+            }
+            var total = 0
+            for await count in group { total += count }
+            return total
+        }
+    }
+
     func parseNumstat(from result: CommandResult) throws -> (added: Int, removed: Int) {
         guard result.exitCode == 0 else { throw GitError.diffFailed }
         var added = 0

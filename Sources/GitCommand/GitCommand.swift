@@ -77,6 +77,7 @@ public enum GitCommand: Sendable {
     // MARK: - Working Tree Status
     case status(porcelain: Bool)
     case lsFilesStaged
+    case lsFilesUntracked
 
     // MARK: - Tags
     case createTag(name: String, ref: String, message: String?)
@@ -358,6 +359,8 @@ extension GitCommand {
             return args
         case .lsFilesStaged:
             return ["ls-files", "-z", "--stage"]
+        case .lsFilesUntracked:
+            return ["ls-files", "-z", "--others", "--exclude-standard"]
 
         // MARK: - Tags
         case .createTag(let name, let ref, let message):
