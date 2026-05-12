@@ -23,6 +23,20 @@ extension GitRepository: TagWritable {
         eventSubject.send(.tagDeleted(name: name))
     }
 
+    public func pushTag(name: String, remote: String = "origin") async throws {
+        let result = try await backgroundRunner.run(.pushTag(remote: remote, name: name))
+
+        guard result.exitCode == 0 else {
+            let output = result.stderr + result.stdout
+            if output.contains("authentication") || output.contains("denied") {
+                throw GitError.authenticationFailed
+            }
+            throw GitError.pushFailed
+        }
+
+        eventSubject.send(.tagPushed(name: name, remote: remote))
+    }
+
     public func deleteRemoteTag(name: String, remote: String = "origin") async throws {
         let result = try await backgroundRunner.run(.deleteRemoteTag(remote: remote, name: name))
 

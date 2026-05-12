@@ -9,4 +9,7 @@ public protocol TagWritable: Actor {
 
     /// Delete a tag from the remote
     func deleteRemoteTag(name: String, remote: String) async throws
+
+    /// Push a single local tag to the remote.
+    func pushTag(name: String, remote: String) async throws
 }
