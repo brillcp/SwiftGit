@@ -20,7 +20,6 @@ public enum GitEvent: Sendable {
     case committed(hash: String)
     case branchChanged(name: String)
     case branchDeleted(name: String)
-    case conflictResolved(path: String)
     case revertedCommit(hash: String)
     case cherryPickCompleted
     case resetCompleted(mode: ResetMode)
