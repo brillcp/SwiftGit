@@ -7,9 +7,7 @@ extension GitRepository: RebaseWritable {
         )
 
         guard result.exitCode == 0 else {
-            let output = result.stderr + result.stdout
-
-            if output.localizedCaseInsensitiveContains("conflict") {
+            if result.indicatesConflict {
                 await cache.remove(.head)
                 await workingTree.invalidateIndexCache()
                 throw GitError.rebaseConflict(branch: branch ?? target)

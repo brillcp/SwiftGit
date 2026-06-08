@@ -7,9 +7,7 @@ extension GitRepository: MergeWritable {
         )
 
         guard result.exitCode == 0 else {
-            let output = result.stderr + result.stdout
-
-            if output.localizedCaseInsensitiveContains("conflict") {
+            if result.indicatesConflict {
                 await workingTree.invalidateIndexCache()
                 throw GitError.conflictDetected
             }

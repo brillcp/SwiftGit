@@ -7,7 +7,7 @@ extension GitRepository: RevertWritable {
         )
 
         if result.exitCode != 0 {
-            if result.stderr.localizedCaseInsensitiveContains("conflict") {
+            if result.indicatesConflict {
                 await workingTree.invalidateIndexCache()
                 throw GitError.revertConflict(commit: commitHash)
             }
