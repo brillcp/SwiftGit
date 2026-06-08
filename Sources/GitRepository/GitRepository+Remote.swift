@@ -56,26 +56,14 @@ extension GitRepository: RemoteWritable {
         )
 
         guard result.exitCode == 0 else {
-            let output = result.stderr + result.stdout
-            let lower = output.lowercased()
-
-            if lower.contains("conflict") {
+            if result.indicatesConflict {
                 await cache.remove(.head)
                 await cache.remove(.refs)
                 await workingTree.invalidateIndexCache()
                 throw GitError.pullConflict
             }
 
-            // Diverged-history rejection: git refuses to pull without an explicit
-            // strategy (`pull.ff=only` in newer git defaults, or "Need to specify
-            // how to reconcile divergent branches"). Distinct from pullConflict —
-            // the merge never ran, so the WT is untouched. Surface as `.pullRejected`
-            // so the UI can offer merge/rebase/reset rather than conflict UI.
-            if lower.contains("diverg")
-                || lower.contains("non-fast-forward")
-                || lower.contains("would clobber")
-                || lower.contains("need to specify how to reconcile")
-                || lower.contains("not possible to fast-forward") {
+            if result.indicatesPullReject {
                 throw GitError.pullRejected(reason: result.stderr)
             }
 

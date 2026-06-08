@@ -9,7 +9,15 @@ public struct CommandResult: Sendable {
     /// merge/rebase/cherry-pick/revert/workflow paths to distinguish a
     /// halted-at-conflict state from a real runtime error.
     public var indicatesConflict: Bool {
+        (stderr + stdout).localizedCaseInsensitiveContains("conflict")
+    }
+
+    public var indicatesPullReject: Bool {
         let combined = stderr + stdout
-        return combined.localizedCaseInsensitiveContains("conflict")
+        return combined.localizedCaseInsensitiveContains("diverg") ||
+        combined.localizedCaseInsensitiveContains("non-fast-forward") ||
+        combined.localizedCaseInsensitiveContains("would clobber") ||
+        combined.localizedCaseInsensitiveContains("need to specify how to reconcile") ||
+        combined.localizedCaseInsensitiveContains("not possible to fast-forward")
     }
 }
