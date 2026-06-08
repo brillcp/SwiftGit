@@ -25,6 +25,7 @@ public enum GitEvent: Sendable {
     case cherryPickCompleted
     case resetCompleted(mode: ResetMode)
     case rebaseCompleted
+    case mergeCompleted(branch: String)
 
     case stashed(id: String)
     case stashApplied
