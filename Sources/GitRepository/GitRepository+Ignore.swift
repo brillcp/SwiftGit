@@ -17,5 +17,6 @@ extension GitRepository: IgnoreWritable {
 
         try content.write(to: gitignoreURL, atomically: true, encoding: .utf8)
         await workingTree.invalidateIndexCache()
+        eventSubject.send(.ignoreUpdated(pattern: pattern))
     }
 }

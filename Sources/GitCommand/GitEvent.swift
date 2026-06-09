@@ -45,4 +45,5 @@ public enum GitEvent: Sendable {
     case tagCreated(name: String)
     case tagDeleted(name: String)
     case tagPushed(name: String, remote: String)
+    case ignoreUpdated(pattern: String)
 }
