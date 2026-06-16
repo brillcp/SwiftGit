@@ -284,7 +284,7 @@ extension GitCommand {
         case .mergeContinue:
             return ["merge", "--continue"]
         case .revertContinue:
-            return ["revert", "--continue", "--no-edit"]
+            return ["revert", "--continue"]
         case .rebaseContinue:
             return ["rebase", "--continue"]
         case .rebaseSkip:
