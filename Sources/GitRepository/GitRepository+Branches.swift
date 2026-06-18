@@ -137,6 +137,8 @@ extension GitRepository: BranchWritable {
         let remote = components.count > 1 ? String(components[0]) : "origin"
         let branch = components.count > 1 ? String(components[1]) : name
 
+        eventSubject.send(.startDeletingRemoteBranch(name: name))
+
         let result = try await backgroundRunner.run(
             .deleteRemoteBranch(remote: remote, branch: branch)
         )

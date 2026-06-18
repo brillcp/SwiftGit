@@ -12,6 +12,7 @@ public enum GitEvent: Sendable {
     case startContinuingOperation
     case startAbortingOperation
     case startSkippingOperation
+    case startDeletingRemoteBranch(name: String)
 
     case pushed(remote: String, branch: String?)
     case fetched(remote: String)
