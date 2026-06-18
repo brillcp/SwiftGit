@@ -63,6 +63,8 @@ extension GitRepository: BranchWritable {
         setUpstream: Bool = false,
         force: Bool = false
     ) async throws {
+        eventSubject.send(.startPushing(remote: remote ?? "origin", branch: branch))
+
         let result = try await backgroundRunner.run(
             .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force)
         )

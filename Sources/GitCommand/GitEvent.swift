@@ -1,6 +1,18 @@
 import Foundation
 
 public enum GitEvent: Sendable {
+    case startPushing(remote: String, branch: String?)
+    case startPulling(remote: String)
+    case startFetching(remote: String)
+    case startMerging(branch: String)
+    case startRebasing
+    case startCherryPicking
+    case startResetting(mode: ResetMode)
+    case startReverting(hash: String)
+    case startContinuingOperation
+    case startAbortingOperation
+    case startSkippingOperation
+
     case pushed(remote: String, branch: String?)
     case fetched(remote: String)
     case pulled(remote: String)

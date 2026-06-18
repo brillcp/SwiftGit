@@ -2,6 +2,8 @@ import Foundation
 
 extension GitRepository: MergeWritable {
     public func merge(branch: String, noFastForward: Bool) async throws {
+        eventSubject.send(.startMerging(branch: branch))
+
         let result = try await commandRunner.run(
             .merge(branch: branch, noFastForward: noFastForward)
         )

@@ -77,6 +77,8 @@ extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
         guard let op = conflictOperation() else { return }
 
+        eventSubject.send(.startAbortingOperation)
+
         var abortedOperation: GitEvent?
 
         switch op {
@@ -118,6 +120,8 @@ extension GitRepository: ConflictWritable {
             throw GitError.rebaseSkipFailed
         }
 
+        eventSubject.send(.startSkippingOperation)
+
         let result = try await commandRunner.run(.rebaseSkip)
         guard result.exitCode == 0 else {
             throw GitError.rebaseSkipFailed
@@ -135,6 +139,8 @@ extension GitRepository: ConflictWritable {
 
     public func continueOperation() async throws {
         guard let op = conflictOperation() else { return }
+
+        eventSubject.send(.startContinuingOperation)
 
         var continuedOperation: GitEvent?
         switch op {

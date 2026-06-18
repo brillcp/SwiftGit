@@ -2,6 +2,8 @@ import Foundation
 
 extension GitRepository: RebaseWritable {
     public func rebase(branch: String? = nil, onto target: String) async throws {
+        eventSubject.send(.startRebasing)
+
         let result = try await commandRunner.run(
             .rebase(branch: branch, onto: target)
         )

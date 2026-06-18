@@ -26,6 +26,8 @@ extension GitRepository {
 
 extension GitRepository: RemoteWritable {
     public func fetch(remote: String? = nil, prune: Bool = true) async throws {
+        eventSubject.send(.startFetching(remote: remote ?? "origin"))
+
         let result = try await backgroundRunner.run(
             .fetch(remote: remote, prune: prune)
         )
@@ -51,6 +53,8 @@ extension GitRepository: RemoteWritable {
     }
 
     public func pull(remote: String? = nil, branch: String? = nil) async throws {
+        eventSubject.send(.startPulling(remote: remote ?? "origin"))
+
         let result = try await backgroundRunner.run(
             .pull(remote: remote, branch: branch)
         )

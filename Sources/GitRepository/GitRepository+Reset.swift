@@ -2,6 +2,8 @@ import Foundation
 
 extension GitRepository: ResetWritable {
     public func reset(to commit: String, mode: ResetMode) async throws {
+        eventSubject.send(.startResetting(mode: mode))
+
         let result = try await commandRunner.run(
             .resetToCommit(mode: mode, target: commit)
         )

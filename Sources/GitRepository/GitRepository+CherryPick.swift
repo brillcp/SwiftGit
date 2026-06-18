@@ -2,6 +2,8 @@ import Foundation
 
 extension GitRepository: CherryPickWritable {
     public func cherryPick(_ commitHash: String) async throws {
+        eventSubject.send(.startCherryPicking)
+
         let status = try await getWorkingTreeStatus()
         let needsStash = !status.files.isEmpty
 
