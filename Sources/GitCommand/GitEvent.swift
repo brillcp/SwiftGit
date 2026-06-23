@@ -34,26 +34,18 @@ public enum GitEvent: Sendable {
     case branchChanged(name: String)
     case branchDeleted(name: String)
     case revertedCommit(hash: String)
-    case cherryPickCompleted
     case resetCompleted(mode: ResetMode)
-    case rebaseCompleted
-    case mergeCompleted(branch: String)
+    case operationCompleted(operation: ConflictOperation, ref: String?)
 
     case stashed(id: String)
     case stashApplied
     case stashPopped(id: String)
     case stashDropped(id: String)
 
-    case cherryPickContinued
-    case mergeContinued
-    case revertContinued
-    case rebaseContinued
-    case rebaseSkipped
+    case operationContinued(operation: ConflictOperation, isComplete: Bool)
+    case operationSkipped(operation: ConflictOperation, isComplete: Bool)
 
-    case cherryPickAborted
-    case mergeAborted
-    case revertAborted
-    case rebaseAborted
+    case operationAborted(operation: ConflictOperation)
 
     case tagCreated(name: String)
     case tagDeleted(name: String)

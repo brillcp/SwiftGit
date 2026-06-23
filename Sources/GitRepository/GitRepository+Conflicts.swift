@@ -79,24 +79,18 @@ extension GitRepository: ConflictWritable {
 
         eventSubject.send(.startAbortingOperation)
 
-        var abortedOperation: GitEvent?
-
         switch op {
         case .merge:
             try await commandRunner.run(.mergeAbort)
-            abortedOperation = .mergeAborted
         case .cherryPick:
             try await commandRunner.run(.cherryPickAbort)
-            abortedOperation = .cherryPickAborted
         case .revert:
             try await commandRunner.run(.revertAbort)
-            abortedOperation = .revertAborted
         case .rebase:
             let result = try await commandRunner.run(.rebaseAbort)
             guard result.exitCode == 0 else {
                 throw GitError.rebaseAbortFailed
             }
-            abortedOperation = .rebaseAborted
         }
 
         await cache.remove(.head)
@@ -107,9 +101,7 @@ extension GitRepository: ConflictWritable {
         }
         await workingTree.invalidateIndexCache()
 
-        if let abortedOperation {
-            eventSubject.send(abortedOperation)
-        }
+        eventSubject.send(.operationAborted(operation: op))
     }
 
     public func skipOperation() async throws {
@@ -134,7 +126,7 @@ extension GitRepository: ConflictWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.rebaseSkipped)
+        eventSubject.send(.operationSkipped(operation: .rebase, isComplete: conflictOperation() == nil))
     }
 
     public func continueOperation() async throws {
@@ -142,14 +134,12 @@ extension GitRepository: ConflictWritable {
 
         eventSubject.send(.startContinuingOperation)
 
-        var continuedOperation: GitEvent?
         switch op {
         case .merge:
             let result = try await commandRunner.run(.mergeContinue)
             guard result.exitCode == 0 else {
                 throw GitError.mergeContinueFailed
             }
-            continuedOperation = .mergeContinued
         case .cherryPick:
             let result = try await commandRunner.run(.cherryPickContinue)
             // Check for empty cherry-pick
@@ -159,24 +149,19 @@ extension GitRepository: ConflictWritable {
                 guard skipResult.exitCode == 0 else {
                     throw GitError.cherryPickSkipFailed
                 }
-                continuedOperation = .cherryPickContinued
             } else if result.exitCode != 0 {
                 throw GitError.cherryPickContinueFailed
-            } else {
-                continuedOperation = .cherryPickContinued
             }
         case .revert:
             let result = try await commandRunner.run(.revertContinue)
             guard result.exitCode == 0 else {
                 throw GitError.revertContinueFailed
             }
-            continuedOperation = .revertContinued
         case .rebase:
             let result = try await commandRunner.run(.rebaseContinue)
             guard result.exitCode == 0 else {
                 throw GitError.rebaseContinueFailed
             }
-            continuedOperation = .rebaseContinued
         }
 
         await cache.remove(.head)
@@ -187,9 +172,7 @@ extension GitRepository: ConflictWritable {
         }
         await workingTree.invalidateIndexCache()
 
-        if let event = continuedOperation {
-            eventSubject.send(event)
-        }
+        eventSubject.send(.operationContinued(operation: op, isComplete: conflictOperation() == nil))
     }
 }
 

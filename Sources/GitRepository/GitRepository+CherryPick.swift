@@ -37,6 +37,6 @@ extension GitRepository: CherryPickWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.cherryPickCompleted)
+        eventSubject.send(.operationCompleted(operation: .cherryPick, ref: commitHash))
     }
 }

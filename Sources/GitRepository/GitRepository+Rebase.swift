@@ -24,6 +24,6 @@ extension GitRepository: RebaseWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.rebaseCompleted)
+        eventSubject.send(.operationCompleted(operation: .rebase, ref: branch ?? target))
     }
 }
