@@ -157,6 +157,43 @@ struct ConflictTests {
         #expect(await repository.conflictOperation() == nil)
     }
 
+    @Test func testEmptyCherryPickIsSkipped() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        try createTestFile(in: repoURL, named: "already-applied.txt", content: "base")
+        try await repository.stageFile(at: "already-applied.txt")
+        try await repository.commit(message: "Initial commit")
+
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "already-applied.txt", content: "same change")
+        try await repository.stageFile(at: "already-applied.txt")
+        try await repository.commit(message: "Feature applies same change")
+
+        guard let featureHash = try await repository.getHEAD() else {
+            throw TestError.noHead
+        }
+
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "already-applied.txt", content: "same change")
+        try await repository.stageFile(at: "already-applied.txt")
+        try await repository.commit(message: "Main already has same change")
+
+        let headBeforeCherryPick = try await repository.getHEAD()
+
+        try await repository.cherryPick(featureHash)
+
+        let headAfterCherryPick = try await repository.getHEAD()
+        let status = try await repository.getWorkingTreeStatus()
+
+        #expect(headAfterCherryPick == headBeforeCherryPick)
+        #expect(status.files.isEmpty)
+        #expect(await repository.conflictOperation() == nil)
+        #expect((try await repository.getConflictedFiles()).isEmpty)
+    }
+
     // MARK: - Revert Conflicts
 
     @Test func testRevertConflictDetection() async throws {
