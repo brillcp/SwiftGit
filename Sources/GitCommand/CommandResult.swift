@@ -12,6 +12,12 @@ public struct CommandResult: Sendable {
         (stderr + stdout).localizedCaseInsensitiveContains("conflict")
     }
 
+    public var indicatesEmptyCherryPick: Bool {
+        let combined = stderr + stdout
+        return combined.localizedCaseInsensitiveContains("previous cherry-pick is now empty") ||
+            combined.localizedCaseInsensitiveContains("nothing to commit, working tree clean")
+    }
+
     public var indicatesPullReject: Bool {
         let combined = stderr + stdout
         return combined.localizedCaseInsensitiveContains("diverg") ||
