@@ -391,7 +391,7 @@ extension GitCommand {
         case .lsRemoteTags(let remote):
             return ["ls-remote", "--tags", remote]
         case .showRef:
-            return ["show-ref"]
+            return ["show-ref", "--dereference"]
         case .revParse(let rev):
             return ["rev-parse", "--verify", rev]
         case .symbolicRef:

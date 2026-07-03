@@ -23,6 +23,56 @@ struct EdgeCasesTests {
         #expect(stashes.isEmpty)
     }
 
+    @Test func testLightweightTagRefUsesCommitHash() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        try createTestFile(in: repoURL, named: "file.txt", content: "Content")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial commit")
+
+        guard let head = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+
+        try await repository.createTag(name: "lightweight-release", ref: head, message: nil)
+
+        let refs = try await repository.getRefs()
+        let tag = refs[head]?.first { $0.name == "lightweight-release" && $0.type == .tag }
+
+        #expect(tag?.hash == head)
+    }
+
+    @Test func testAnnotatedTagRefUsesPeeledCommitHash() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        try createTestFile(in: repoURL, named: "file.txt", content: "Content")
+        try await repository.stageFile(at: "file.txt")
+        try await repository.commit(message: "Initial commit")
+
+        guard let head = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+
+        try await repository.createTag(name: "annotated-release", ref: head, message: "Release tag")
+
+        let tagObjectHash = try gitOutput(in: repoURL, "rev-parse", "annotated-release")
+        let peeledCommitHash = try gitOutput(in: repoURL, "rev-parse", "annotated-release^{}")
+        let refs = try await repository.getRefs()
+        let tag = refs[peeledCommitHash]?.first { $0.name == "annotated-release" && $0.type == .tag }
+        let tagStoredAtObjectHash = refs[tagObjectHash]?.contains { $0.name == "annotated-release" && $0.type == .tag } ?? false
+
+        #expect(tagObjectHash != peeledCommitHash)
+        #expect(peeledCommitHash == head)
+        #expect(tag?.hash == peeledCommitHash)
+        #expect(!tagStoredAtObjectHash)
+    }
+
     @Test func testEmptyCommitMessage() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -172,5 +222,32 @@ private extension EdgeCasesTests {
         let gitDir = repoURL.appendingPathComponent(GitPath.git.rawValue)
         let headFile = gitDir.appendingPathComponent(GitPath.head.rawValue)
         try content.write(to: headFile, atomically: true, encoding: .utf8)
+    }
+
+    func gitOutput(in repoURL: URL, _ arguments: String...) throws -> String {
+        let task = Process()
+        task.launchPath = "/usr/bin/git"
+        task.arguments = ["-C", repoURL.path] + arguments
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        task.standardOutput = stdoutPipe
+        task.standardError = stderrPipe
+
+        task.launch()
+        task.waitUntilExit()
+
+        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+
+        guard task.terminationStatus == 0 else {
+            throw NSError(
+                domain: "SwiftGitTests",
+                code: Int(task.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: stderr]
+            )
+        }
+
+        return stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

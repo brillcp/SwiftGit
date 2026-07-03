@@ -48,6 +48,9 @@ extension RefReader: RefReaderProtocol {
             .components(separatedBy: .newlines)
             .filter { !$0.isEmpty }
 
+        var tagRefs: [String: String] = [:]
+        var peeledTagRefs: [String: String] = [:]
+
         for line in lines {
             let parts = line.split(separator: String.space, maxSplits: 1)
             guard parts.count == 2 else { continue }
@@ -73,12 +76,23 @@ extension RefReader: RefReaderProtocol {
                 ref = GitRef(name: name, hash: hash, type: .remoteBranch)
             } else if fullName.hasPrefix(refTags) {
                 let name = String(fullName.dropFirst(refTags.count))
-                ref = GitRef(name: name, hash: hash, type: .tag)
+                if name.hasSuffix("^{}") {
+                    peeledTagRefs[String(name.dropLast(3))] = hash
+                } else {
+                    tagRefs[name] = hash
+                }
+                continue
             } else {
                 continue // Skip other refs
             }
 
             refsByHash[hash, default: []].append(ref)
+        }
+
+        for name in tagRefs.keys.sorted() {
+            let hash = peeledTagRefs[name] ?? tagRefs[name]
+            guard let hash else { continue }
+            refsByHash[hash, default: []].append(GitRef(name: name, hash: hash, type: .tag))
         }
 
         await cache.set(.refs, value: refsByHash)
