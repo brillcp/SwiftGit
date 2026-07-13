@@ -4,6 +4,27 @@ import Testing
 
 @Suite("Remote Fetch Tests")
 struct RemoteFetchTests {
+    @Test func testFetchPreservesLocalOnlyTag() async throws {
+        let remoteURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: remoteURL) }
+
+        let remoteRepository = GitRepository(url: remoteURL)
+        try createTestFile(in: remoteURL, named: "release.txt", content: "v1")
+        try await remoteRepository.stageFile(at: "release.txt")
+        try await remoteRepository.commit(message: "Initial release")
+
+        let localURL = try await clone(remoteURL, named: "local-tag")
+        defer { try? FileManager.default.removeItem(at: localURL) }
+
+        try git(in: localURL, "tag", "local-only")
+
+        let localRepository = GitRepository(url: localURL)
+        try await localRepository.fetch(remote: "origin", prune: true)
+
+        let tags = try gitOutput(in: localURL, "tag", "--list", "local-only")
+        #expect(tags == "local-only")
+    }
+
     @Test func testFetchUpdatesRewrittenRemoteTag() async throws {
         let remoteURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: remoteURL) }

@@ -135,7 +135,7 @@ extension GitCommand {
         case .fetch(let remote, let prune):
             var args = ["fetch"]
             args.append("--force")
-            if prune { args.append(contentsOf: ["--prune", "--prune-tags"]) }
+            if prune { args.append("--prune") }
             args.append("--tags")
             if let remote { args.append(remote) }
             return args
