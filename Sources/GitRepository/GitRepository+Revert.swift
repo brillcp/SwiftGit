@@ -19,7 +19,6 @@ extension GitRepository: RevertWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.revertedCommit(hash: commitHash))
         eventSubject.send(.operationCompleted(operation: .revert, ref: commitHash))
     }
 }

@@ -33,7 +33,6 @@ public enum GitEvent: Sendable {
     case committed(hash: String)
     case branchChanged(name: String)
     case branchDeleted(name: String)
-    case revertedCommit(hash: String)
     case resetCompleted(mode: ResetMode)
     case operationCompleted(operation: ConflictOperation, ref: String?)
 
