@@ -99,10 +99,7 @@ public enum GitError: LocalizedError {
     case rebaseSkipFailed
 
     // MARK: - Abort operations
-    case cherryPickAbortFailed
-    case mergeAbortFailed
-    case revertAbortFailed
-    case rebaseAbortFailed
+    case operationAbortFailed(operation: ConflictOperation, reason: String)
 
     // MARK: - Tag Operations
     case tagCreationFailed(name: String)
@@ -276,14 +273,14 @@ public enum GitError: LocalizedError {
             return "Failed to skip rebase commit"
 
         // MARK: - Abort operations
-        case .cherryPickAbortFailed:
-            return "Failed to abort cherry-pick"
-        case .mergeAbortFailed:
-            return "Failed to abort merge"
-        case .revertAbortFailed:
-            return "Failed to abort revert"
-        case .rebaseAbortFailed:
-            return "Failed to abort rebase"
+        case .operationAbortFailed(let operation, let reason):
+            let operationName = switch operation {
+            case .merge: "merge"
+            case .cherryPick: "cherry-pick"
+            case .revert: "revert"
+            case .rebase: "rebase"
+            }
+            return "Failed to abort \(operationName): \(reason)"
 
         // MARK: - Tag Operations
         case .tagCreationFailed(let name):

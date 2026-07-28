@@ -79,18 +79,18 @@ extension GitRepository: ConflictWritable {
 
         eventSubject.send(.startAbortingOperation)
 
-        switch op {
-        case .merge:
-            try await commandRunner.run(.mergeAbort)
-        case .cherryPick:
-            try await commandRunner.run(.cherryPickAbort)
-        case .revert:
-            try await commandRunner.run(.revertAbort)
-        case .rebase:
-            let result = try await commandRunner.run(.rebaseAbort)
-            guard result.exitCode == 0 else {
-                throw GitError.rebaseAbortFailed
-            }
+        let command = switch op {
+        case .merge: GitCommand.mergeAbort
+        case .cherryPick: GitCommand.cherryPickAbort
+        case .revert: GitCommand.revertAbort
+        case .rebase: GitCommand.rebaseAbort
+        }
+        let result = try await commandRunner.run(command)
+        guard result.exitCode == 0 else {
+            throw GitError.operationAbortFailed(
+                operation: op,
+                reason: result.failureDescription
+            )
         }
 
         await cache.remove(.head)

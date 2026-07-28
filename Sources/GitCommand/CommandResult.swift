@@ -5,6 +5,20 @@ public struct CommandResult: Sendable {
     public let stderr: String
     public let exitCode: Int
 
+    var failureDescription: String {
+        let standardError = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !standardError.isEmpty {
+            return standardError
+        }
+
+        let standardOutput = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !standardOutput.isEmpty {
+            return standardOutput
+        }
+
+        return "Git exited with status \(exitCode)."
+    }
+
     /// True when either output stream mentions "conflict" — used by
     /// merge/rebase/cherry-pick/revert/workflow paths to distinguish a
     /// halted-at-conflict state from a real runtime error.

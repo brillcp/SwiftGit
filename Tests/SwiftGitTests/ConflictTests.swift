@@ -64,6 +64,61 @@ struct ConflictTests {
         #expect(operation == nil, "No operation should be in progress")
     }
 
+    @Test func testMergeAbortFailurePreservesConflictStateAndReason() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Base conflict")
+        try createTestFile(in: repoURL, named: "automatic.txt", content: "Base automatic")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.stageFile(at: "automatic.txt")
+        try await repository.commit(message: "Initial commit")
+
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Feature conflict")
+        try createTestFile(in: repoURL, named: "automatic.txt", content: "Feature automatic")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.stageFile(at: "automatic.txt")
+        try await repository.commit(message: "Feature changes")
+
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "Main conflict")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "Main conflict")
+
+        try? await repository.merge(branch: "feature", noFastForward: true)
+        #expect(await repository.conflictOperation() == .merge)
+
+        try createTestFile(
+            in: repoURL,
+            named: "automatic.txt",
+            content: "Edited after the merge started"
+        )
+
+        do {
+            try await repository.abortOperation()
+            Issue.record("Expected abort to fail rather than overwrite a post-merge edit")
+        } catch let error as GitError {
+            guard case .operationAbortFailed(let operation, let reason) = error else {
+                Issue.record("Unexpected error: \(error)")
+                return
+            }
+
+            #expect(operation == .merge)
+            #expect(reason.contains("not uptodate"))
+        }
+
+        #expect(await repository.conflictOperation() == .merge)
+        #expect(!(try await repository.getConflictedFiles()).isEmpty)
+        let content = try String(
+            contentsOf: repoURL.appendingPathComponent("automatic.txt"),
+            encoding: .utf8
+        )
+        #expect(content == "Edited after the merge started")
+    }
+
     @Test func testMergeContinue() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
