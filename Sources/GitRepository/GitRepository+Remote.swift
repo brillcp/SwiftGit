@@ -52,14 +52,6 @@ extension GitRepository: RemoteWritable {
         eventSubject.send(.remoteAdded(name: name))
     }
 
-    public func hasRemote(named name: String) -> Bool {
-        let configURL = url.appending(path: ".git/config", directoryHint: .notDirectory)
-        guard let content = try? String(contentsOf: configURL, encoding: .utf8) else { return false }
-        return content.components(separatedBy: "\n").contains {
-            $0.trimmingCharacters(in: .whitespaces) == #"[remote "\#(name)"]"#
-        }
-    }
-
     public func pull(remote: String? = nil, branch: String? = nil) async throws {
         eventSubject.send(.startPulling(remote: remote ?? "origin"))
 

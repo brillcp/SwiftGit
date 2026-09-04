@@ -10,7 +10,4 @@ public protocol RemoteWritable: Actor {
 
     /// Add a named remote to the repository
     func addRemote(name: String, url: String, at repoURL: URL) async throws
-
-    /// Returns true if a remote with the given name exists in .git/config
-    func hasRemote(named name: String) -> Bool
 }
