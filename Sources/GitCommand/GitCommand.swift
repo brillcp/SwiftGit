@@ -66,7 +66,7 @@ public enum GitCommand: Sendable {
 
     // MARK: - Diff & Patches
     case diff(path: String, staged: Bool, untracked: Bool, deleted: Bool)
-    case numstat(commitId: String? = nil, staged: Bool = false)
+    case numstat(commitId: String? = nil)
     case showCommitFiles(commitId: String)
     case showFileDiff(commitId: String, path: String)
     case diffCommits(from: String, to: String, path: String)
@@ -319,12 +319,9 @@ extension GitCommand {
             }
             args.append(path)
             return args
-        case .numstat(let commitId, let staged):
+        case .numstat(let commitId):
             if let commitId {
                 return ["diff", "--numstat", "\(commitId)^", commitId]
-            }
-            if staged {
-                return ["diff", "--numstat", "--cached"]
             }
             return ["diff", "--numstat", "HEAD"]
         case .showCommitFiles(let commitId):

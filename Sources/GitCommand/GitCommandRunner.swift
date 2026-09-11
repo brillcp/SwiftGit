@@ -10,6 +10,7 @@ public protocol GitCommandable: Actor {
 public actor CommandRunner {
     private let fileManager: FileManager
     private let repoURL: URL
+    private var cachedGitURL: URL?
 
     public init(repoURL: URL, fileManager: FileManager = .default) {
         self.repoURL = repoURL
@@ -129,7 +130,8 @@ private extension CommandRunner {
         stdinData: Data? = nil
     ) throws -> (process: Process, stdout: Pipe, stderr: Pipe) {
         let process = Process()
-        process.executableURL = try findGitBinary()
+        if cachedGitURL == nil { cachedGitURL = try findGitBinary() }
+        process.executableURL = cachedGitURL
         process.currentDirectoryURL = repoURL
         process.arguments = arguments
 

@@ -56,21 +56,17 @@ extension GitRepository: DiffReadable {
             return try await parseNumstat(from: commandRunner.run(.numstat(commitId: commitId)))
         }
 
-        // Working tree: run HEAD diff, staged-only diff, and the untracked
-        // line-count pass concurrently. HEAD/staged numstats cover tracked
-        // modifications + newly staged files; untracked count picks up new
-        // files that aren't yet known to git (numstat excludes those).
+        // git diff --numstat HEAD covers all tracked changes (staged + unstaged vs HEAD).
+        // countUntrackedLines() picks up new files not yet known to git.
         async let headResult = commandRunner.run(.numstat(commitId: nil))
-        async let stagedResult = commandRunner.run(.numstat(staged: true))
         async let untrackedAdded = countUntrackedLines()
-        let (head, staged, untracked) = try await (headResult, stagedResult, untrackedAdded)
+        let (head, untracked) = try await (headResult, untrackedAdded)
 
         let headStats = try parseNumstat(from: head)
-        let stagedStats = try parseNumstat(from: staged)
 
         return (
-            added: max(headStats.added, stagedStats.added) + untracked,
-            removed: max(headStats.removed, stagedStats.removed)
+            added: headStats.added + untracked,
+            removed: headStats.removed
         )
     }
 
