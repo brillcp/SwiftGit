@@ -56,8 +56,6 @@ extension GitRepository: DiffReadable {
             return try await parseNumstat(from: commandRunner.run(.numstat(commitId: commitId)))
         }
 
-        // git diff --numstat HEAD covers all tracked changes (staged + unstaged vs HEAD).
-        // countUntrackedLines() picks up new files not yet known to git.
         async let headResult = commandRunner.run(.numstat(commitId: nil))
         async let untrackedAdded = countUntrackedLines()
         let (head, untracked) = try await (headResult, untrackedAdded)
