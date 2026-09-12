@@ -107,27 +107,22 @@ private extension GitRepository {
         guard !paths.isEmpty else { return 0 }
 
         let repoURL = url
-        return await withTaskGroup(of: Int.self) { group in
-            for path in paths {
-                group.addTask {
-                    let fileURL = repoURL.appendingPathComponent(path)
-                    guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe) else { return 0 }
-                    // Skip binaries — a NUL byte in the first 8KB is the
-                    // same heuristic git itself uses.
-                    let probe = data.prefix(8192)
-                    if probe.contains(0) { return 0 }
-                    // Count newlines + 1 if last byte isn't a newline (matches
-                    // `wc -l` semantics for files without trailing newline).
-                    var lines = 0
-                    for byte in data where byte == 0x0A { lines += 1 }
-                    if let last = data.last, last != 0x0A, !data.isEmpty { lines += 1 }
-                    return lines
-                }
-            }
+        return await Task.detached(priority: .utility) {
             var total = 0
-            for await count in group { total += count }
+            for path in paths {
+                let fileURL = repoURL.appendingPathComponent(path)
+                guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe) else { continue }
+                // Skip binaries — a NUL byte in the first 8KB is the
+                // same heuristic git itself uses.
+                let probe = data.prefix(8192)
+                if probe.contains(0) { continue }
+                // Count newlines + 1 if last byte isn't a newline (matches
+                // `wc -l` semantics for files without trailing newline).
+                for byte in data where byte == 0x0A { total += 1 }
+                if let last = data.last, last != 0x0A, !data.isEmpty { total += 1 }
+            }
             return total
-        }
+        }.value
     }
 
     func parseNumstat(from result: CommandResult) throws -> (added: Int, removed: Int) {
