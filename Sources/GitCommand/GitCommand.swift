@@ -140,7 +140,7 @@ extension GitCommand {
             if let remote { args.append(remote) }
             return args
         case .pull(let remote, let branch):
-            var args = ["pull"]
+            var args = ["-c", "merge.conflictStyle=zdiff3", "pull"]
             if let remote { args.append(remote) }
             if let branch { args.append(branch) }
             return args
@@ -252,9 +252,9 @@ extension GitCommand {
             args += ["--"] + paths
             return args
         case .stashPop(let index):
-            return ["stash", "pop", String.stashId(for: index)]
+            return ["-c", "merge.conflictStyle=zdiff3", "stash", "pop", String.stashId(for: index)]
         case .stashApply(let index):
-            return ["stash", "apply", String.stashId(for: index)]
+            return ["-c", "merge.conflictStyle=zdiff3", "stash", "apply", String.stashId(for: index)]
         case .stashDrop(let index):
             return ["stash", "drop", String.stashId(for: index)]
         case .stashRestoreFile(let index, let path):
@@ -270,7 +270,7 @@ extension GitCommand {
         case .cherryPickSkip:
             return ["cherry-pick", "--skip"]
         case .revert(let commitHash, let noCommit):
-            var args = ["revert"]
+            var args = ["-c", "merge.conflictStyle=zdiff3", "revert"]
             if noCommit {
                 args.append("--no-commit")
             }
