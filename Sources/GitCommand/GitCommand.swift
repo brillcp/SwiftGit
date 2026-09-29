@@ -149,7 +149,7 @@ extension GitCommand {
         case .clone(let url, let destination):
             return ["clone", url, destination]
         case .merge(let branch, let noFastForward):
-            var args = ["merge", branch]
+            var args = ["-c", "merge.conflictStyle=zdiff3", "merge", branch]
             if noFastForward {
                 args.append("--no-ff")
             }
@@ -266,7 +266,7 @@ extension GitCommand {
         case .resetToCommit(let mode, let target):
             return ["reset", mode.rawValue, target]
         case .cherryPick(let commitHash):
-            return ["cherry-pick", commitHash]
+            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", commitHash]
         case .cherryPickSkip:
             return ["cherry-pick", "--skip"]
         case .revert(let commitHash, let noCommit):
@@ -277,7 +277,7 @@ extension GitCommand {
             args.append(commitHash)
             return args
         case .rebase(let branch, let onto):
-            var args = ["rebase", onto]
+            var args = ["-c", "merge.conflictStyle=zdiff3", "rebase", onto]
             if let branch { args.append(branch) }
             return args
         case .cherryPickContinue:
