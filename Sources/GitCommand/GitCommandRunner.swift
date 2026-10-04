@@ -21,6 +21,16 @@ public actor CommandRunner {
 // MARK: - GitCommandable
 extension CommandRunner: GitCommandable {
     public func run(_ command: GitCommand) async throws -> CommandResult {
+        try await run(command, onProgress: nil)
+    }
+
+    /// Runs a command, optionally reporting each line of stderr as it arrives (before the
+    /// process exits). Used for long-running commands like `clone` where output should be
+    /// surfaced incrementally rather than only once the process finishes.
+    public func run(
+        _ command: GitCommand,
+        onProgress: (@Sendable (String) -> Void)?
+    ) async throws -> CommandResult {
         let (process, stdoutPipe, stderrPipe) = try makeGitProcess(
             arguments: command.arguments,
             stdinData: command.stdinData
@@ -34,7 +44,7 @@ extension CommandRunner: GitCommandable {
         }.value
 
         async let stderrData = Task.detached {
-            stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            Self.readStderr(stderrPipe.fileHandleForReading, onProgress: onProgress)
         }.value
 
         // Suspend the actor (freeing the thread) until the process exits
@@ -91,6 +101,42 @@ extension CommandRunner: GitCommandable {
 
 // MARK: - Private functions
 private extension CommandRunner {
+    /// Reads stderr incrementally, reporting each line to `onProgress` as soon as it's
+    /// available. Git reports clone/fetch progress using `\r` to redraw the current line
+    /// rather than `\n`, so both are treated as line terminators.
+    static func readStderr(_ handle: FileHandle, onProgress: (@Sendable (String) -> Void)?) -> Data {
+        guard let onProgress else {
+            return handle.readDataToEndOfFile()
+        }
+
+        var collected = Data()
+        var lineBuffer = Data()
+        let lineTerminators: Set<UInt8> = [0x0A, 0x0D] // \n, \r
+
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break }
+            collected.append(chunk)
+
+            for byte in chunk {
+                if lineTerminators.contains(byte) {
+                    if !lineBuffer.isEmpty {
+                        onProgress(String(decoding: lineBuffer, as: UTF8.self))
+                        lineBuffer.removeAll(keepingCapacity: true)
+                    }
+                } else {
+                    lineBuffer.append(byte)
+                }
+            }
+        }
+
+        if !lineBuffer.isEmpty {
+            onProgress(String(decoding: lineBuffer, as: UTF8.self))
+        }
+
+        return collected
+    }
+
     func findGitBinary() throws -> URL {
         // Try common paths
         let paths = [

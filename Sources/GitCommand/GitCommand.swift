@@ -147,7 +147,7 @@ extension GitCommand {
         case .addRemote(let name, let url):
             return ["remote", "add", name, url]
         case .clone(let url, let destination):
-            return ["clone", url, destination]
+            return ["clone", "--progress", url, destination]
         case .merge(let branch, let noFastForward):
             var args = ["-c", "merge.conflictStyle=zdiff3", "merge", branch]
             if noFastForward {

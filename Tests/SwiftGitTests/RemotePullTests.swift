@@ -83,7 +83,7 @@ private extension RemotePullTests {
     func clone(_ repoURL: URL, named name: String) async throws -> URL {
         let cloneURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("pull-\(name)-\(UUID().uuidString)")
-        try await GitRepository.clone(url: repoURL.path, to: cloneURL)
+        for try await _ in GitRepository.clone(url: repoURL.path, to: cloneURL) {}
         return cloneURL
     }
 

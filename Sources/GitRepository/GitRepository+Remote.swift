@@ -1,16 +1,32 @@
 import Foundation
 
 extension GitRepository {
-    /// Clone a remote repository to a local destination.
-    /// This is a static method because no repository instance exists yet.
-    public static func clone(url: String, to destination: URL) async throws {
-        let parentDir = destination.deletingLastPathComponent()
-        let runner = CommandRunner(repoURL: parentDir)
-        let result = try await runner.run(.clone(url: url, destination: destination.path(percentEncoded: false)))
+    /// Clone a remote repository to a local destination, reporting progress as it arrives.
+    /// This is a static method because no repository instance exists yet. The stream finishes
+    /// normally once the clone succeeds, or throws if it fails.
+    public static func clone(url: String, to destination: URL) -> AsyncThrowingStream<CloneProgress, Error> {
+        AsyncThrowingStream { continuation in
+            Task.detached {
+                do {
+                    let parentDir = destination.deletingLastPathComponent()
+                    let runner = CommandRunner(repoURL: parentDir)
+                    let result = try await runner.run(
+                        .clone(url: url, destination: destination.path(percentEncoded: false))
+                    ) { line in
+                        if let progress = CloneProgress.parse(line: line) {
+                            continuation.yield(progress)
+                        }
+                    }
 
-        guard result.exitCode == 0 else {
-            let msg = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw GitError.cloneFailed(msg.isEmpty ? "Clone failed" : msg)
+                    guard result.exitCode == 0 else {
+                        let msg = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                        throw GitError.cloneFailed(msg.isEmpty ? "Clone failed" : msg)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 
