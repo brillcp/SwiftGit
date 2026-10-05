@@ -33,12 +33,12 @@ extension GitRepository: BranchReadable {
         return Upstream(remote: remote, branch: branchName)
     }
 
-    public func getAheadBehind(local: String, upstream: String) async throws -> (ahead: Int, behind: Int) {
+    public func getAheadBehind(local: String, upstream: String) async throws -> AheadBehind {
         let result = try await commandRunner.run(
             .revListLeftRightCount(local: local, upstream: upstream)
         )
 
-        guard result.exitCode == 0 else { return (0, 0) }
+        guard result.exitCode == 0 else { return AheadBehind(ahead: 0, behind: 0) }
 
         // Output is one line: "<ahead>\t<behind>". Anything else means git
         // produced unexpected output — fall back to (0, 0) rather than throw.
@@ -49,9 +49,9 @@ extension GitRepository: BranchReadable {
         guard parts.count == 2,
               let ahead = Int(parts[0]),
               let behind = Int(parts[1])
-        else { return (0, 0) }
+        else { return AheadBehind(ahead: 0, behind: 0) }
 
-        return (ahead, behind)
+        return AheadBehind(ahead: ahead, behind: behind)
     }
 }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Branches {
+public struct Branches: Equatable {
     public let local: [GitRef]
     public let remote: [GitRef]
     public let current: String?

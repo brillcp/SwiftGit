@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Stash: Identifiable, Sendable {
+public struct Stash: Identifiable, Sendable, Equatable {
     public var id: String { hash }
     public let hash: String
     public let index: Int
