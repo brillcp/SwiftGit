@@ -268,7 +268,7 @@ extension GitCommand {
         case .cherryPick(let commitHash):
             return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", commitHash]
         case .cherryPickSkip:
-            return ["cherry-pick", "--skip"]
+            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", "--skip"]
         case .revert(let commitHash, let noCommit):
             var args = ["-c", "merge.conflictStyle=zdiff3", "revert"]
             if noCommit {
@@ -281,15 +281,15 @@ extension GitCommand {
             if let branch { args.append(branch) }
             return args
         case .cherryPickContinue:
-            return ["cherry-pick", "--continue", "--no-edit"]
+            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", "--continue", "--no-edit"]
         case .mergeContinue:
             return ["merge", "--continue"]
         case .revertContinue:
-            return ["revert", "--continue"]
+            return ["-c", "merge.conflictStyle=zdiff3", "revert", "--continue"]
         case .rebaseContinue:
-            return ["rebase", "--continue"]
+            return ["-c", "merge.conflictStyle=zdiff3", "rebase", "--continue"]
         case .rebaseSkip:
-            return ["rebase", "--skip"]
+            return ["-c", "merge.conflictStyle=zdiff3", "rebase", "--skip"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:

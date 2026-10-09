@@ -176,6 +176,61 @@ struct ConflictTests {
         #expect(operation == .cherryPick)
     }
 
+    @Test func testRebaseContinueKeepsBaseSectionOnNextConflict() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+
+        // The conflict style must come from the command, not from the machine's
+        // config, so pin the repo to the plain style the fix has to override.
+        try setGitConfig(in: repoURL, "merge.conflictStyle", "merge")
+
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "base\n")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "base")
+
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "feature one\n")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "feature one")
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "feature two\n")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "feature two")
+
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "main target\n")
+        try await repository.stageFile(at: "conflict.txt")
+        try await repository.commit(message: "main target")
+
+        try await repository.checkoutBranch("feature", createNew: false)
+        try? await repository.rebase(onto: "main")
+        #expect(await repository.conflictOperation() == .rebase)
+
+        let firstStop = try String(contentsOf: repoURL.appendingPathComponent("conflict.txt"), encoding: .utf8)
+        #expect(firstStop.contains("|||||||"), "first stop is started with zdiff3 and must carry a base section")
+
+        try createTestFile(in: repoURL, named: "conflict.txt", content: "resolved first\n")
+        try await repository.stageFile(at: "conflict.txt")
+        try? await repository.continueOperation()
+
+        #expect(await repository.conflictOperation() == .rebase, "second commit must conflict too")
+        let secondStop = try String(contentsOf: repoURL.appendingPathComponent("conflict.txt"), encoding: .utf8)
+        #expect(secondStop.contains("<<<<<<<"))
+        #expect(secondStop.contains("|||||||"), "continue must keep the diff3 base section for the next stop")
+    }
+
+    private func setGitConfig(in repoURL: URL, _ key: String, _ value: String) throws {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        task.arguments = ["-C", repoURL.path, "config", key, value]
+        task.standardOutput = Pipe()
+        task.standardError = Pipe()
+        try task.run()
+        task.waitUntilExit()
+        #expect(task.terminationStatus == 0, "git config \(key) failed")
+    }
+
     @Test func testCherryPickAbort() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
