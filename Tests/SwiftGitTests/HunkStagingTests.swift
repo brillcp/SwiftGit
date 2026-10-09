@@ -281,6 +281,80 @@ struct HunkStagingTests {
         try await repository.discardFile(at: testFile)
     }
 
+    @Test func testRevertHunkFromCommit() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+        let fileURL = repoURL.appendingPathComponent(testFile)
+
+        try "Line 1\nLine 2\nLine 3\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        try "Line 1\nModified Line 2\nLine 3\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Modify line 2")
+
+        guard let commitHash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+
+        let hunks = try await repository.getFileDiff(for: commitHash, at: testFile)
+        #expect(hunks.count == 1, "Expected a single hunk for the committed change")
+
+        try await repository.revertHunk(hunks[0], at: testFile)
+
+        // Working tree is back to the pre-commit content…
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(content == "Line 1\nLine 2\nLine 3\n")
+
+        // …and shows up as an unstaged modification, not staged.
+        let status = try await repository.getWorkingTreeStatus()
+        #expect(status.files[testFile]?.unstaged == .modified)
+        #expect(status.files[testFile]?.staged == nil)
+
+        // HEAD is untouched — reverting a hunk does not create a commit.
+        let headAfter = try await repository.getHEAD()
+        #expect(headAfter == commitHash)
+    }
+
+    @Test func testRevertHunkFailsWhenFileDiverged() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let testFile = "test.txt"
+        let fileURL = repoURL.appendingPathComponent(testFile)
+
+        try "Line 1\nLine 2\nLine 3\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Initial")
+
+        try "Line 1\nModified Line 2\nLine 3\n".write(to: fileURL, atomically: true, encoding: .utf8)
+        try await repository.stageFile(at: testFile)
+        try await repository.commit(message: "Modify line 2")
+
+        guard let commitHash = try await repository.getHEAD() else {
+            Issue.record("No HEAD")
+            return
+        }
+        let hunks = try await repository.getFileDiff(for: commitHash, at: testFile)
+
+        // Rewrite the file so the hunk's context no longer matches.
+        try "Completely\nDifferent\nContent\n".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        await #expect(throws: GitError.self) {
+            try await repository.revertHunk(hunks[0], at: testFile)
+        }
+
+        // The diverged content must be left untouched on failure.
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(content == "Completely\nDifferent\nContent\n")
+    }
+
     @Test func testDiscardHunkWithTrailingNewline() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

@@ -172,8 +172,14 @@ extension PatchGenerator {
 
     /// Generate a reverse patch (for unstaging/discarding)
     public func generateReversePatch(hunk: DiffHunk, file: WorkingTreeFile) -> String {
+        generateReversePatch(hunk: hunk, path: file.path)
+    }
+
+    /// Generate a reverse patch for a hunk at the given path.
+    /// Used when the hunk comes from a committed diff (no `WorkingTreeFile` available), e.g. reverting a hunk.
+    public func generateReversePatch(hunk: DiffHunk, path: String) -> String {
         var patch = ""
-        patch += makeHeader(for: file)  // Already has \n at end
+        patch += makeHeader(path: path)  // Already has \n at end
         patch += reverseHunkHeader(hunk.header) + String.newLine
 
         // In the reverse patch, added lines become '-' and removed lines become '+'.
@@ -286,10 +292,14 @@ private extension PatchGenerator {
     }
 
     func makeHeader(for file: WorkingTreeFile) -> String {
+        makeHeader(path: file.path)
+    }
+
+    func makeHeader(path: String) -> String {
         var header = ""
-        header += "diff --git a/\(file.path) b/\(file.path)\(String.newLine)"
-        header += "--- a/\(file.path)\(String.newLine)"
-        header += "+++ b/\(file.path)\(String.newLine)"
+        header += "diff --git a/\(path) b/\(path)\(String.newLine)"
+        header += "--- a/\(path)\(String.newLine)"
+        header += "+++ b/\(path)\(String.newLine)"
         return header
     }
 

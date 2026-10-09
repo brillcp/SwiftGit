@@ -21,4 +21,20 @@ extension GitRepository: RevertWritable {
         await workingTree.invalidateIndexCache()
         eventSubject.send(.operationCompleted(operation: .revert, ref: commitHash))
     }
+
+    public func revertHunk(_ hunk: DiffHunk, at path: String) async throws {
+        let patch = patchGenerator.generateReversePatch(hunk: hunk, path: path)
+
+        // Working tree only (no --cached): the reverted hunk becomes an unstaged change.
+        let result = try await commandRunner.run(
+            .applyPatch(patch: patch, cached: false)
+        )
+
+        guard result.exitCode == 0 else {
+            throw GitError.revertHunkFailed(path: path)
+        }
+
+        await workingTree.invalidateIndexCache()
+        eventSubject.send(.hunkReverted(hunk: hunk, path: path))
+    }
 }

@@ -29,6 +29,7 @@ public enum GitEvent: Sendable {
     case hunkStaged(hunk: DiffHunk, path: String)
     case hunkUnstaged(hunk: DiffHunk, path: String)
     case hunkDiscarded(hunk: DiffHunk, path: String)
+    case hunkReverted(hunk: DiffHunk, path: String)
 
     case committed(hash: String)
     case branchChanged(name: String)

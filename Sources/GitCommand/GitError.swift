@@ -79,6 +79,7 @@ public enum GitError: LocalizedError {
     case cherryPickConflict(commit: String)
     case revertFailed(commit: String)
     case revertConflict(commit: String)
+    case revertHunkFailed(path: String)
 
     // MARK: - Conflict Detection
     case conflictDetected
@@ -241,6 +242,8 @@ public enum GitError: LocalizedError {
             return "Failed to revert commit \(commit.shortHash)."
         case .revertConflict(let commit):
             return "Reverting \(commit.shortHash) caused conflicts. Resolve them and commit."
+        case .revertHunkFailed(let path):
+            return "Failed to revert changes in '\(path)'. The file may have changed since this commit."
 
         // MARK: - Conflict Detection
         case .conflictDetected:
