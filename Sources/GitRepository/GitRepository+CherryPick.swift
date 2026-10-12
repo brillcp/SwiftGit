@@ -2,7 +2,7 @@ import Foundation
 
 extension GitRepository: CherryPickWritable {
     public func cherryPick(_ commitHash: String) async throws {
-        eventSubject.send(.startCherryPicking)
+        eventPublisher.send(.startCherryPicking)
 
         let status = try await getWorkingTreeStatus()
         let needsStash = !status.files.isEmpty
@@ -29,7 +29,7 @@ extension GitRepository: CherryPickWritable {
                 await cache.remove(.head)
                 await cache.remove(.refs)
                 await workingTree.invalidateIndexCache()
-                eventSubject.send(.operationSkipped(operation: .cherryPick, isComplete: true))
+                eventPublisher.send(.operationSkipped(operation: .cherryPick, isComplete: true))
                 return
             }
 
@@ -54,6 +54,6 @@ extension GitRepository: CherryPickWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.operationCompleted(operation: .cherryPick, ref: commitHash))
+        eventPublisher.send(.operationCompleted(operation: .cherryPick, ref: commitHash))
     }
 }

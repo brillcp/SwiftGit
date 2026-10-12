@@ -1,4 +1,3 @@
-@preconcurrency import Combine
 import Foundation
 import Synchronization
 import Testing
@@ -136,17 +135,50 @@ struct GitEventTests {
     }
 }
 
+@Test func eventStreamDeliversEventsAndStopsWhenTheConsumerLeaves() async throws {
+    let publisher = GitEventPublisher()
+    let stream = publisher.subscribe()
+    var iterator = stream.makeAsyncIterator()
+
+    publisher.send(.allFilesStaged)
+    publisher.send(.allFilesUnstaged)
+
+    guard case .allFilesStaged = await iterator.next() else {
+        Issue.record("First buffered event should be .allFilesStaged")
+        return
+    }
+    guard case .allFilesUnstaged = await iterator.next() else {
+        Issue.record("Second buffered event should be .allFilesUnstaged")
+        return
+    }
+
+    // A second subscriber only sees events sent after it subscribed.
+    let late = publisher.subscribe()
+    var lateIterator = late.makeAsyncIterator()
+    publisher.send(.allFilesDiscarded)
+    guard case .allFilesDiscarded = await lateIterator.next() else {
+        Issue.record("Late subscriber should receive only the event sent after subscribing")
+        return
+    }
+    guard case .allFilesDiscarded = await iterator.next() else {
+        Issue.record("First subscriber should also receive the third event")
+        return
+    }
+}
+
 private func recordEvents(
     from repository: GitRepository,
     during operation: () async throws -> Void
 ) async throws -> [GitEvent] {
+    // The synchronous observer, not the async stream: events are recorded
+    // on the emitting thread, so everything the operation emitted is in the
+    // array by the time it returns.
     let recordedEvents = Mutex<[GitEvent]>([])
-    let publisher = await repository.events
-    let cancellable = publisher.sink { event in
+    let observation = repository.eventPublisher.observe { event in
         recordedEvents.withLock { $0.append(event) }
     }
 
     try await operation()
-    cancellable.cancel()
+    observation.cancel()
     return recordedEvents.withLock { $0 }
 }

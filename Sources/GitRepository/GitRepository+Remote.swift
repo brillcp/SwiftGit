@@ -42,7 +42,7 @@ extension GitRepository {
 
 extension GitRepository: RemoteWritable {
     public func fetch(remote: String? = nil, prune: Bool = true) async throws {
-        eventSubject.send(.startFetching(remote: remote ?? "origin"))
+        eventPublisher.send(.startFetching(remote: remote ?? "origin"))
 
         let result = try await backgroundRunner.run(
             .fetch(remote: remote, prune: prune)
@@ -53,7 +53,7 @@ extension GitRepository: RemoteWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.fetched(remote: remote ?? "origin"))
+        eventPublisher.send(.fetched(remote: remote ?? "origin"))
     }
 
     public func addRemote(name: String, url: String, at repoURL: URL) async throws {
@@ -65,11 +65,11 @@ extension GitRepository: RemoteWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.remoteAdded(name: name))
+        eventPublisher.send(.remoteAdded(name: name))
     }
 
     public func pull(remote: String? = nil, branch: String? = nil) async throws {
-        eventSubject.send(.startPulling(remote: remote ?? "origin"))
+        eventPublisher.send(.startPulling(remote: remote ?? "origin"))
 
         let result = try await backgroundRunner.run(
             .pull(remote: remote, branch: branch)
@@ -97,6 +97,6 @@ extension GitRepository: RemoteWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.pulled(remote: remote ?? "origin"))
+        eventPublisher.send(.pulled(remote: remote ?? "origin"))
     }
 }

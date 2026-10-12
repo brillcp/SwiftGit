@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 public protocol GitRepositoryProtocol:
     CommitReadable,
@@ -27,7 +26,11 @@ public protocol GitRepositoryProtocol:
     /// The URL of the repository
     var url: URL { get }
 
-    var events: AnyPublisher<GitEvent, Never> { get }
+    /// A fresh stream of repository events, starting with the next one
+    /// emitted. Every caller gets an independent stream; stop iterating (or
+    /// cancel the consuming task) to unsubscribe. `nonisolated` so callers on
+    /// other actors can subscribe without an actor hop.
+    nonisolated func events() -> AsyncStream<GitEvent>
 
     /// Initialize a repository at the given URL
     init(url: URL, cache: ObjectCacheProtocol)

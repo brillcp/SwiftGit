@@ -25,7 +25,7 @@ extension GitRepository: StashWritable {
         await cache.remove(.stashes)
 
         if let id = try await getStashes().first?.id {
-            eventSubject.send(.stashed(id: id))
+            eventPublisher.send(.stashed(id: id))
         }
     }
 
@@ -43,7 +43,7 @@ extension GitRepository: StashWritable {
         await cache.remove(.refs)
         await cache.remove(.stashes)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashPopped(id: stashId))
+        eventPublisher.send(.stashPopped(id: stashId))
     }
 
     public func stashApply(index: Int) async throws {
@@ -58,7 +58,7 @@ extension GitRepository: StashWritable {
         await cache.remove(.refs)
         await cache.remove(.stashes)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashApplied)
+        eventPublisher.send(.stashApplied)
     }
 
     public func stashDrop(index: Int) async throws {
@@ -72,7 +72,7 @@ extension GitRepository: StashWritable {
         }
 
         await cache.remove(.stashes)
-        eventSubject.send(.stashDropped(id: stashId))
+        eventPublisher.send(.stashDropped(id: stashId))
     }
 
     public func stashFiles(paths: [String], message: String? = nil) async throws {
@@ -94,7 +94,7 @@ extension GitRepository: StashWritable {
         await cache.remove(.stashes)
 
         if let id = try await getStashes().first?.id {
-            eventSubject.send(.stashed(id: id))
+            eventPublisher.send(.stashed(id: id))
         }
     }
 
@@ -115,7 +115,7 @@ extension GitRepository: StashWritable {
         await cache.remove(.stashes)
 
         if let id = try await getStashes().first?.id {
-            eventSubject.send(.stashed(id: id))
+            eventPublisher.send(.stashed(id: id))
         }
     }
 
@@ -128,7 +128,7 @@ extension GitRepository: StashWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashApplied)
+        eventPublisher.send(.stashApplied)
     }
 
     public func stashRestoreFiles(index: Int, paths: [String]) async throws {
@@ -142,6 +142,6 @@ extension GitRepository: StashWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.stashApplied)
+        eventPublisher.send(.stashApplied)
     }
 }

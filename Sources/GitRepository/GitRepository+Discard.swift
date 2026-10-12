@@ -36,7 +36,7 @@ extension GitRepository: DiscardWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.fileDiscarded(path: path))
+        eventPublisher.send(.fileDiscarded(path: path))
     }
 
     public func discardHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
@@ -52,7 +52,7 @@ extension GitRepository: DiscardWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.hunkDiscarded(hunk: hunk, path: path))
+        eventPublisher.send(.hunkDiscarded(hunk: hunk, path: path))
     }
 
     public func discardAllFiles() async throws {
@@ -65,7 +65,7 @@ extension GitRepository: DiscardWritable {
         try await commandRunner.run(.clean(force: true, directories: true))
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesDiscarded)
+        eventPublisher.send(.allFilesDiscarded)
     }
 
     public func discardUnstagedChanges() async throws {
@@ -82,6 +82,6 @@ extension GitRepository: DiscardWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesDiscarded)
+        eventPublisher.send(.allFilesDiscarded)
     }
 }

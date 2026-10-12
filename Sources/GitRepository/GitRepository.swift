@@ -1,12 +1,13 @@
 import Foundation
-import Combine
 public actor GitRepository: GitRepositoryProtocol {
     // MARK: Private properties
     private var securityScopeStarted: Bool = false
 
     // MARK: - Internal properties
     let protectedBranches = ["main", "master", "develop", "production", "staging"]
-    let eventSubject = PassthroughSubject<GitEvent, Never>()
+    /// `Sendable`, so this `let` is implicitly nonisolated and `events()` can
+    /// hand out streams without an actor hop.
+    nonisolated let eventPublisher = GitEventPublisher()
     let workingTreeParser: WorkingTreeParserProtocol
     let workingTree: WorkingTreeReaderProtocol
     let patchGenerator: PatchGenerator
@@ -49,8 +50,8 @@ public actor GitRepository: GitRepositoryProtocol {
 
     // MARK: - Public properties
     public let url: URL
-    public var events: AnyPublisher<GitEvent, Never> {
-        eventSubject.eraseToAnyPublisher()
+    nonisolated public func events() -> AsyncStream<GitEvent> {
+        eventPublisher.subscribe()
     }
 
     // MARK: - Init
@@ -102,7 +103,7 @@ public actor GitRepository: GitRepositoryProtocol {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(workflow.onComplete)
+        eventPublisher.send(workflow.onComplete)
     }
 }
 

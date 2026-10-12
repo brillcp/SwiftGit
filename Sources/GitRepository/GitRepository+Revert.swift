@@ -2,7 +2,7 @@ import Foundation
 
 extension GitRepository: RevertWritable {
     public func revertCommit(_ commitHash: String) async throws {
-        eventSubject.send(.startReverting(hash: commitHash))
+        eventPublisher.send(.startReverting(hash: commitHash))
 
         let result = try await commandRunner.run(
             .revert(commitHash: commitHash, noCommit: false)
@@ -19,7 +19,7 @@ extension GitRepository: RevertWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.operationCompleted(operation: .revert, ref: commitHash))
+        eventPublisher.send(.operationCompleted(operation: .revert, ref: commitHash))
     }
 
     public func revertHunk(_ hunk: DiffHunk, at path: String) async throws {
@@ -35,6 +35,6 @@ extension GitRepository: RevertWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.hunkReverted(hunk: hunk, path: path))
+        eventPublisher.send(.hunkReverted(hunk: hunk, path: path))
     }
 }

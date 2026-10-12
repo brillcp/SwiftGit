@@ -2,7 +2,7 @@ import Foundation
 
 extension GitRepository: RebaseWritable {
     public func rebase(branch: String? = nil, onto target: String) async throws {
-        eventSubject.send(.startRebasing)
+        eventPublisher.send(.startRebasing)
 
         let result = try await commandRunner.run(
             .rebase(branch: branch, onto: target)
@@ -24,6 +24,6 @@ extension GitRepository: RebaseWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.operationCompleted(operation: .rebase, ref: branch ?? target))
+        eventPublisher.send(.operationCompleted(operation: .rebase, ref: branch ?? target))
     }
 }

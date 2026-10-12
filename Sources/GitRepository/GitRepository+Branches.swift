@@ -63,7 +63,7 @@ extension GitRepository: BranchWritable {
         setUpstream: Bool = false,
         force: Bool = false
     ) async throws {
-        eventSubject.send(.startPushing(remote: remote ?? "origin", branch: branch))
+        eventPublisher.send(.startPushing(remote: remote ?? "origin", branch: branch))
 
         let result = try await backgroundRunner.run(
             .push(remote: remote, branch: branch, setUpstream: setUpstream, force: force)
@@ -86,7 +86,7 @@ extension GitRepository: BranchWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.pushed(remote: remote ?? "origin", branch: branch))
+        eventPublisher.send(.pushed(remote: remote ?? "origin", branch: branch))
     }
 
     public func checkoutBranch(_ name: String, createNew: Bool) async throws {
@@ -108,7 +108,7 @@ extension GitRepository: BranchWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.branchChanged(name: name))
+        eventPublisher.send(.branchChanged(name: name))
     }
 
     public func deleteBranch(_ name: String, force: Bool) async throws {
@@ -129,7 +129,7 @@ extension GitRepository: BranchWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.branchDeleted(name: name))
+        eventPublisher.send(.branchDeleted(name: name))
     }
 
     public func deleteRemoteBranch(_ name: String) async throws {
@@ -137,7 +137,7 @@ extension GitRepository: BranchWritable {
         let remote = components.count > 1 ? String(components[0]) : "origin"
         let branch = components.count > 1 ? String(components[1]) : name
 
-        eventSubject.send(.startDeletingRemoteBranch(name: name))
+        eventPublisher.send(.startDeletingRemoteBranch(name: name))
 
         let result = try await backgroundRunner.run(
             .deleteRemoteBranch(remote: remote, branch: branch)
@@ -152,6 +152,6 @@ extension GitRepository: BranchWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.branchDeleted(name: name))
+        eventPublisher.send(.branchDeleted(name: name))
     }
 }

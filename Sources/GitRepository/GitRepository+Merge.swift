@@ -2,7 +2,7 @@ import Foundation
 
 extension GitRepository: MergeWritable {
     public func merge(branch: String, noFastForward: Bool) async throws {
-        eventSubject.send(.startMerging(branch: branch))
+        eventPublisher.send(.startMerging(branch: branch))
 
         let result = try await commandRunner.run(
             .merge(branch: branch, noFastForward: noFastForward)
@@ -19,6 +19,6 @@ extension GitRepository: MergeWritable {
         await cache.remove(.head)
         await cache.remove(.refs)
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.operationCompleted(operation: .merge, ref: branch))
+        eventPublisher.send(.operationCompleted(operation: .merge, ref: branch))
     }
 }

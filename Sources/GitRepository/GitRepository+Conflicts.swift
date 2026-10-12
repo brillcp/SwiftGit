@@ -77,7 +77,7 @@ extension GitRepository: ConflictWritable {
     public func abortOperation() async throws {
         guard let op = conflictOperation() else { return }
 
-        eventSubject.send(.startAbortingOperation)
+        eventPublisher.send(.startAbortingOperation)
 
         let command = switch op {
         case .merge: GitCommand.mergeAbort
@@ -101,7 +101,7 @@ extension GitRepository: ConflictWritable {
         }
         await workingTree.invalidateIndexCache()
 
-        eventSubject.send(.operationAborted(operation: op))
+        eventPublisher.send(.operationAborted(operation: op))
     }
 
     public func skipOperation() async throws {
@@ -112,7 +112,7 @@ extension GitRepository: ConflictWritable {
             throw GitError.rebaseSkipFailed
         }
 
-        eventSubject.send(.startSkippingOperation)
+        eventPublisher.send(.startSkippingOperation)
 
         let result = try await commandRunner.run(.rebaseSkip)
         guard result.exitCode == 0 else {
@@ -126,13 +126,13 @@ extension GitRepository: ConflictWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.operationSkipped(operation: .rebase, isComplete: conflictOperation() == nil))
+        eventPublisher.send(.operationSkipped(operation: .rebase, isComplete: conflictOperation() == nil))
     }
 
     public func continueOperation() async throws {
         guard let op = conflictOperation() else { return }
 
-        eventSubject.send(.startContinuingOperation)
+        eventPublisher.send(.startContinuingOperation)
 
         switch op {
         case .merge:
@@ -172,7 +172,7 @@ extension GitRepository: ConflictWritable {
         }
         await workingTree.invalidateIndexCache()
 
-        eventSubject.send(.operationContinued(operation: op, isComplete: conflictOperation() == nil))
+        eventPublisher.send(.operationContinued(operation: op, isComplete: conflictOperation() == nil))
     }
 }
 

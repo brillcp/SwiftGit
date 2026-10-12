@@ -75,6 +75,6 @@ extension GitRepository: CommitWritable {
         await workingTree.invalidateIndexCache()
 
         let hash = try await getHEAD() ?? ""
-        eventSubject.send(.committed(hash: hash))
+        eventPublisher.send(.committed(hash: hash))
     }
 }

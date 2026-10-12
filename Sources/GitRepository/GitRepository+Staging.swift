@@ -17,7 +17,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.fileStaged(path: path))
+        eventPublisher.send(.fileStaged(path: path))
     }
 
     public func stageFiles(paths: [String]) async throws {
@@ -40,7 +40,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesStaged)
+        eventPublisher.send(.allFilesStaged)
     }
 
     public func stageAllFiles() async throws {
@@ -51,7 +51,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesStaged)
+        eventPublisher.send(.allFilesStaged)
     }
 
     public func unstageFile(at path: String) async throws {
@@ -70,7 +70,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.fileUnstaged(path: path))
+        eventPublisher.send(.fileUnstaged(path: path))
     }
 
     public func unstageFiles(paths: [String]) async throws {
@@ -93,7 +93,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesUnstaged)
+        eventPublisher.send(.allFilesUnstaged)
     }
 
     public func unstageAllFiles() async throws {
@@ -104,7 +104,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.allFilesUnstaged)
+        eventPublisher.send(.allFilesUnstaged)
     }
 
     public func stageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
@@ -127,7 +127,7 @@ extension GitRepository: StagingWritable {
 
         await workingTree.invalidateIndexCache()
 
-        eventSubject.send(.hunkStaged(hunk: hunk, path: path))
+        eventPublisher.send(.hunkStaged(hunk: hunk, path: path))
     }
 
     public func unstageHunk(_ hunk: DiffHunk, in file: WorkingTreeFile) async throws {
@@ -148,7 +148,7 @@ extension GitRepository: StagingWritable {
         await workingTree.invalidateIndexCache()
 
         try await cleanupTrailingNewlineChange(for: path)
-        eventSubject.send(.hunkUnstaged(hunk: hunk, path: path))
+        eventPublisher.send(.hunkUnstaged(hunk: hunk, path: path))
     }
 
     public func stageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws {
@@ -170,7 +170,7 @@ extension GitRepository: StagingWritable {
         }
 
         await workingTree.invalidateIndexCache()
-        eventSubject.send(.hunkStaged(hunk: hunk, path: file.path))
+        eventPublisher.send(.hunkStaged(hunk: hunk, path: file.path))
     }
 
     public func unstageLine(at lineIndex: Int, oldNum: Int?, newNum: Int?, in hunk: DiffHunk, file: WorkingTreeFile) async throws {
@@ -189,7 +189,7 @@ extension GitRepository: StagingWritable {
 
         await workingTree.invalidateIndexCache()
         try await cleanupTrailingNewlineChange(for: file.path)
-        eventSubject.send(.hunkUnstaged(hunk: hunk, path: file.path))
+        eventPublisher.send(.hunkUnstaged(hunk: hunk, path: file.path))
     }
 }
 

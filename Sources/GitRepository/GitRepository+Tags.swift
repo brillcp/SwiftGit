@@ -9,7 +9,7 @@ extension GitRepository: TagWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.tagCreated(name: name))
+        eventPublisher.send(.tagCreated(name: name))
     }
 
     public func deleteTag(name: String) async throws {
@@ -20,7 +20,7 @@ extension GitRepository: TagWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.tagDeleted(name: name))
+        eventPublisher.send(.tagDeleted(name: name))
     }
 
     public func pushTag(name: String, remote: String = "origin") async throws {
@@ -34,7 +34,7 @@ extension GitRepository: TagWritable {
             throw GitError.pushFailed
         }
 
-        eventSubject.send(.tagPushed(name: name, remote: remote))
+        eventPublisher.send(.tagPushed(name: name, remote: remote))
     }
 
     public func deleteRemoteTag(name: String, remote: String = "origin") async throws {
@@ -49,6 +49,6 @@ extension GitRepository: TagWritable {
         }
 
         await cache.remove(.refs)
-        eventSubject.send(.tagDeleted(name: name))
+        eventPublisher.send(.tagDeleted(name: name))
     }
 }
