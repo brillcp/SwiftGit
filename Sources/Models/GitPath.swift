@@ -1,6 +1,6 @@
 import Foundation
 
-public enum GitPath: String {
+public enum GitPath: String, Sendable {
     case git = ".git"
     case objects
     case pack

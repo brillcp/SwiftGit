@@ -10,7 +10,7 @@ public enum CacheKey: Hashable, Sendable {
     case fileDiff(commitId: String, path: String)
 }
 
-public struct CacheStats {
+public struct CacheStats: Sendable {
     let hits: Int
     let misses: Int
     let evictions: Int

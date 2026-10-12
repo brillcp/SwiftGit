@@ -1,7 +1,7 @@
 import Foundation
 
 /// Generates Git patch files from hunks
-public struct PatchGenerator {
+public struct PatchGenerator: Sendable {
     public init() {}
 }
 
