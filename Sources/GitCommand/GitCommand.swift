@@ -358,6 +358,7 @@ extension GitCommand {
             args.append("-z")
             args.append("-uall")
             args.append("--find-renames")
+            args.append("--ignore-submodules=dirty")
             return args
         case .lsFilesStaged:
             return ["ls-files", "-z", "--stage"]
