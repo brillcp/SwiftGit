@@ -4,6 +4,35 @@ import Foundation
 
 @Suite("Stash Tests")
 struct StashTests {
+    @Test func `Stash push methods return the new stash's id`() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        try createTestFile(in: repoURL, named: "a.txt", content: "a")
+        try createTestFile(in: repoURL, named: "b.txt", content: "b")
+        try await repository.stageAllFiles()
+        try await repository.commit(message: "Initial")
+
+        try createTestFile(in: repoURL, named: "a.txt", content: "a2")
+        let pushed = try await repository.stashPush(message: "push")
+        #expect(pushed != nil)
+        #expect(pushed == (try await repository.getStashes().first?.id))
+
+        try createTestFile(in: repoURL, named: "a.txt", content: "a3")
+        let single = try await repository.stashFile(path: "a.txt", message: "file")
+        #expect(single != nil && single != pushed)
+        #expect(single == (try await repository.getStashes().first?.id))
+
+        try createTestFile(in: repoURL, named: "a.txt", content: "a4")
+        try createTestFile(in: repoURL, named: "b.txt", content: "b2")
+        let multiple = try await repository.stashFiles(paths: ["a.txt", "b.txt"], message: "files")
+        #expect(multiple != nil && multiple != single)
+        #expect(multiple == (try await repository.getStashes().first?.id))
+
+        #expect(try await repository.stashFiles(paths: [], message: nil) == nil)
+    }
+
     @Test func testCreateAndListStash() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

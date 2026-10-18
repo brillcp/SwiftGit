@@ -2,8 +2,9 @@ import Foundation
 
 /// Protocol for managing stashes (save, apply, drop)
 public protocol StashWritable: Actor {
-    /// Save current changes to a new stash
-    func stashPush(message: String?) async throws
+    /// Save current changes to a new stash. Returns the new stash's id.
+    @discardableResult
+    func stashPush(message: String?) async throws -> Stash.ID?
 
     /// Apply and remove the most recent stash (or specific stash by index)
     func stashPop(index: Int) async throws
@@ -14,11 +15,14 @@ public protocol StashWritable: Actor {
     /// Delete a stash
     func stashDrop(index: Int) async throws
 
-    /// Stash changes for a single file
-    func stashFile(path: String, message: String?) async throws
+    /// Stash changes for a single file. Returns the new stash's id.
+    @discardableResult
+    func stashFile(path: String, message: String?) async throws -> Stash.ID?
 
-    /// Stash changes for multiple files in a single git operation
-    func stashFiles(paths: [String], message: String?) async throws
+    /// Stash changes for multiple files in a single git operation. Returns
+    /// the new stash's id, or nil when `paths` is empty.
+    @discardableResult
+    func stashFiles(paths: [String], message: String?) async throws -> Stash.ID?
 
     /// Restore a single file from a stash without applying the whole stash
     func stashRestoreFile(index: Int, path: String) async throws

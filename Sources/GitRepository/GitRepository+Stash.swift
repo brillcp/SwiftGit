@@ -8,7 +8,8 @@ extension GitRepository: StashReadable {
 
 // MARK: - StashManageable
 extension GitRepository: StashWritable {
-    public func stashPush(message: String? = nil) async throws {
+    @discardableResult
+    public func stashPush(message: String? = nil) async throws -> Stash.ID? {
         let result = try await commandRunner.run(
             .stashPush(message: message))
 
@@ -23,10 +24,7 @@ extension GitRepository: StashWritable {
 
         await workingTree.invalidateIndexCache()
         await cache.remove(.stashes)
-
-        if let id = try await getStashes().first?.id {
-            eventPublisher.send(.stashed(id: id))
-        }
+        return try await publishNewestStash()
     }
 
     public func stashPop(index: Int) async throws {
@@ -75,8 +73,9 @@ extension GitRepository: StashWritable {
         eventPublisher.send(.stashDropped(id: stashId))
     }
 
-    public func stashFiles(paths: [String], message: String? = nil) async throws {
-        guard !paths.isEmpty else { return }
+    @discardableResult
+    public func stashFiles(paths: [String], message: String? = nil) async throws -> Stash.ID? {
+        guard !paths.isEmpty else { return nil }
 
         let result = try await commandRunner.run(
             .stashPushFiles(paths: paths, message: message))
@@ -92,13 +91,11 @@ extension GitRepository: StashWritable {
 
         await workingTree.invalidateIndexCache()
         await cache.remove(.stashes)
-
-        if let id = try await getStashes().first?.id {
-            eventPublisher.send(.stashed(id: id))
-        }
+        return try await publishNewestStash()
     }
 
-    public func stashFile(path: String, message: String? = nil) async throws {
+    @discardableResult
+    public func stashFile(path: String, message: String? = nil) async throws -> Stash.ID? {
         let result = try await commandRunner.run(
             .stashPushFile(path: path, message: message))
 
@@ -113,10 +110,7 @@ extension GitRepository: StashWritable {
 
         await workingTree.invalidateIndexCache()
         await cache.remove(.stashes)
-
-        if let id = try await getStashes().first?.id {
-            eventPublisher.send(.stashed(id: id))
-        }
+        return try await publishNewestStash()
     }
 
     public func stashRestoreFile(index: Int, path: String) async throws {
@@ -143,5 +137,15 @@ extension GitRepository: StashWritable {
 
         await workingTree.invalidateIndexCache()
         eventPublisher.send(.stashApplied)
+    }
+}
+
+private extension GitRepository {
+    /// The stash just pushed is always `stash@{0}`; announce it and hand its
+    /// id back so callers don't need a second `getStashes()`.
+    func publishNewestStash() async throws -> Stash.ID? {
+        guard let id = try await getStashes().first?.id else { return nil }
+        eventPublisher.send(.stashed(id: id))
+        return id
     }
 }
