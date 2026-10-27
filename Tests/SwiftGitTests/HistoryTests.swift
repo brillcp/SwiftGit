@@ -46,10 +46,36 @@ struct HistoryTests {
         try runGit(repoURL, "checkout", "-q", "feature")
         try runGit(repoURL, "rebase", "-q", "main")
 
-        let entries = try await repository.rangeDiff(oldRange: "fork..\(before)", newRange: "main..feature", includePatches: false)
+        let entries = try await repository.rangeDiff(base: "main", oldTip: before, newTip: "feature", creationFactor: nil, includePatches: false)
         #expect(entries.count == 2)
         #expect(entries.allSatisfy { $0.change == .unchanged })
         #expect(entries.map(\.subject) == ["Feature adds a line", "Feature edits a"])
+    }
+
+    @Test func rangeDiffAllowsAnEmptyNewRange() async throws {
+        let repoURL = try makeForkedRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+        let repository = GitRepository(url: repoURL)
+
+        // Every feature commit dropped: nothing left in main..main.
+        let entries = try await repository.rangeDiff(base: "main", oldTip: "feature", newTip: "main", creationFactor: nil, includePatches: false)
+        #expect(entries.map(\.change) == [.removed, .removed])
+    }
+
+    @Test func aHigherCreationFactorPairsAReworkedCommit() async throws {
+        let repoURL = try makeForkedRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+        let repository = GitRepository(url: repoURL)
+
+        // Rewrite feature's last commit completely, as a conflict resolution can.
+        let before = try runGit(repoURL, "rev-parse", "feature")
+        try runGit(repoURL, "checkout", "-q", "feature")
+        try createTestFile(in: repoURL, named: "a.txt", content: "something else entirely\n")
+        try runGit(repoURL, "commit", "-q", "--amend", "-am", "Feature edits a")
+
+        let paired = try await repository.rangeDiff(base: "fork", oldTip: before, newTip: "feature", creationFactor: 100, includePatches: true)
+        #expect(paired.map(\.change) == [.unchanged, .modified])
+        #expect(paired.last?.patch.contains("something else entirely") == true)
     }
 
     @Test func rangeDiffParsesEveryKindOfRow() {

@@ -35,9 +35,9 @@ extension GitRepository: HistoryReadable {
         return Array(GrepMatch.parse(result.stdout, ref: ref).prefix(limit))
     }
 
-    public func rangeDiff(oldRange: String, newRange: String, includePatches: Bool) async throws -> [RangeDiffEntry] {
+    public func rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool) async throws -> [RangeDiffEntry] {
         let result = try await commandRunner.run(
-            .rangeDiff(oldRange: oldRange, newRange: newRange, includePatches: includePatches)
+            .rangeDiff(base: base, oldTip: oldTip, newTip: newTip, creationFactor: creationFactor, includePatches: includePatches)
         )
         guard result.exitCode == 0 else {
             throw GitError.historyFailed(reason: result.stderr)

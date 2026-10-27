@@ -115,8 +115,9 @@ public enum GitCommand: Sendable {
     case fileHistory(range: String, path: String, limit: Int)
     /// `git grep` for a fixed string in `ref`, or in the working tree when nil.
     case grep(text: String, ref: String?)
-    /// `git range-diff <oldRange> <newRange>`.
-    case rangeDiff(oldRange: String, newRange: String, includePatches: Bool)
+    /// `git range-diff <base> <oldTip> <newTip>`: `base..oldTip` against
+    /// `base..newTip`. Unlike the two-range form, an empty range is allowed.
+    case rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool)
 }
 
 extension GitCommand {
@@ -429,10 +430,11 @@ extension GitCommand {
             var args = ["grep", "-n", "-I", "--null", "--full-name", "--fixed-strings", "-e", text]
             if let ref { args.append(ref) }
             return args
-        case .rangeDiff(let oldRange, let newRange, let includePatches):
+        case .rangeDiff(let base, let oldTip, let newTip, let creationFactor, let includePatches):
             var args = ["range-diff", "--no-color"]
+            if let creationFactor { args.append("--creation-factor=\(creationFactor)") }
             if !includePatches { args.append("--no-patch") }
-            return args + [oldRange, newRange]
+            return args + [base, oldTip, newTip]
         }
     }
 }

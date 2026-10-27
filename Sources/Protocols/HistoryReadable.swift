@@ -12,7 +12,13 @@ public protocol HistoryReadable: Actor {
     /// tree when nil. Binary files are skipped; at most `limit` matches.
     func search(_ text: String, in ref: String?, limit: Int) async throws -> [GrepMatch]
 
-    /// How the commits in `oldRange` map onto those in `newRange`, e.g. a
-    /// branch before and after a rebase.
-    func rangeDiff(oldRange: String, newRange: String, includePatches: Bool) async throws -> [RangeDiffEntry]
+    /// How the commits in `base..oldTip` map onto those in `base..newTip`,
+    /// e.g. a branch before and after a rebase onto `base`.
+    ///
+    /// `creationFactor` is git's `--creation-factor`, the percentage of a
+    /// patch's size two versions may differ by and still pair up (git
+    /// defaults to 60). After a rebase every commit has a counterpart unless
+    /// it was dropped, so 100 keeps a heavily reworked commit paired instead
+    /// of showing it as one removed and one added.
+    func rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool) async throws -> [RangeDiffEntry]
 }
