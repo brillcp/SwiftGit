@@ -16,6 +16,7 @@ public protocol GitRepositoryProtocol:
     CherryPickWritable,
     RevertWritable,
     ConflictReadable,
+    HistoryReadable,
     ConflictWritable,
     MergeWritable,
     ResetWritable,

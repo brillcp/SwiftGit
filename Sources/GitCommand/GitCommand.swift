@@ -106,6 +106,17 @@ public enum GitCommand: Sendable {
     /// `git rev-list --left-right --count <local>...<upstream>` — emits a single
     /// "<ahead>\t<behind>" line.
     case revListLeftRightCount(local: String, upstream: String)
+
+    // MARK: - History
+    /// `git merge-base <a> <b>` — the best common ancestor's hash.
+    case mergeBase(String, String)
+    /// `git log <range> -- <path>`, one commit per record, records ended by
+    /// `\u{1e}` so multi-line bodies parse.
+    case fileHistory(range: String, path: String, limit: Int)
+    /// `git grep` for a fixed string in `ref`, or in the working tree when nil.
+    case grep(text: String, ref: String?)
+    /// `git range-diff <oldRange> <newRange>`.
+    case rangeDiff(oldRange: String, newRange: String, includePatches: Bool)
 }
 
 extension GitCommand {
@@ -408,6 +419,20 @@ extension GitCommand {
             return ["rev-parse", "--abbrev-ref", target]
         case .revListLeftRightCount(let local, let upstream):
             return ["rev-list", "--left-right", "--count", "\(local)...\(upstream)"]
+
+        // MARK: - History
+        case .mergeBase(let a, let b):
+            return ["merge-base", a, b]
+        case .fileHistory(let range, let path, let limit):
+            return ["log", "-n", "\(limit)", "--format=\(commitFormat)%x1e", range, "--", path]
+        case .grep(let text, let ref):
+            var args = ["grep", "-n", "-I", "--null", "--full-name", "--fixed-strings", "-e", text]
+            if let ref { args.append(ref) }
+            return args
+        case .rangeDiff(let oldRange, let newRange, let includePatches):
+            var args = ["range-diff", "--no-color"]
+            if !includePatches { args.append("--no-patch") }
+            return args + [oldRange, newRange]
         }
     }
 }
