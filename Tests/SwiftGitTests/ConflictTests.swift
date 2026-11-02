@@ -704,6 +704,7 @@ struct ConflictTests {
         #expect(await repository.theirsBranchName() == nil)
         #expect(await repository.rebaseHeadName() == nil)
         #expect(await repository.rebaseOnto() == nil)
+        #expect(await repository.rebaseOriginalHead() == nil)
     }
 
     @Test func testRebaseHeadNameAndOntoDuringRebase() async throws {
@@ -720,9 +721,11 @@ struct ConflictTests {
             throw TestError.noHead
         }
         try await repository.checkoutBranch("feature", createNew: false)
+        let featureHash = try await repository.getHEAD()
 
         try? await repository.rebase(onto: "main")
         #expect(await repository.conflictOperation() == .rebase)
+        #expect(await repository.rebaseOriginalHead() == featureHash, "orig-head should be feature's tip before the rebase")
 
         let head = await repository.rebaseHeadName()
         #expect(head == "feature", "head-name should be the branch being rebased")

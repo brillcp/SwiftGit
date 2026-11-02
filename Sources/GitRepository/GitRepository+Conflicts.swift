@@ -70,6 +70,10 @@ extension GitRepository: ConflictReadable {
     public func rebaseOnto() -> String? {
         readRebaseMergeFile(named: "onto")
     }
+
+    public func rebaseOriginalHead() -> String? {
+        readRebaseMergeFile(named: "orig-head")
+    }
 }
 
 // MARK: - ConflictWritable

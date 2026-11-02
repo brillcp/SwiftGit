@@ -27,6 +27,10 @@ public protocol ConflictReadable: Actor {
     /// During a rebase: the trimmed contents of `.git/rebase-merge/onto`
     /// (commit hash or ref). `nil` when not rebasing.
     func rebaseOnto() -> String?
+
+    /// During a rebase: the branch tip before the rebase started, from
+    /// `.git/rebase-merge/orig-head`. `nil` when not rebasing.
+    func rebaseOriginalHead() -> String?
 }
 
 /// Type of Git operation that can result in conflicts

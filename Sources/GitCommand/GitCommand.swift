@@ -106,6 +106,16 @@ public enum GitCommand: Sendable {
     /// `git rev-list --left-right --count <local>...<upstream>` — emits a single
     /// "<ahead>\t<behind>" line.
     case revListLeftRightCount(local: String, upstream: String)
+
+    // MARK: - History
+    /// `git merge-base <a> <b>` — the best common ancestor's hash.
+    case mergeBase(String, String)
+    /// `git log <range> -- <path>`, one commit per record, records ended by
+    /// `\u{1e}` so multi-line bodies parse.
+    case fileHistory(range: String, path: String, limit: Int)
+    /// `git range-diff <base> <oldTip> <newTip>`: `base..oldTip` against
+    /// `base..newTip`. Unlike the two-range form, an empty range is allowed.
+    case rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool)
 }
 
 extension GitCommand {
@@ -408,6 +418,17 @@ extension GitCommand {
             return ["rev-parse", "--abbrev-ref", target]
         case .revListLeftRightCount(let local, let upstream):
             return ["rev-list", "--left-right", "--count", "\(local)...\(upstream)"]
+
+        // MARK: - History
+        case .mergeBase(let a, let b):
+            return ["merge-base", a, b]
+        case .fileHistory(let range, let path, let limit):
+            return ["log", "-n", "\(limit)", "--format=\(commitFormat)%x1e", range, "--", path]
+        case .rangeDiff(let base, let oldTip, let newTip, let creationFactor, let includePatches):
+            var args = ["range-diff", "--no-color"]
+            if let creationFactor { args.append("--creation-factor=\(creationFactor)") }
+            if !includePatches { args.append("--no-patch") }
+            return args + [base, oldTip, newTip]
         }
     }
 }

@@ -112,6 +112,7 @@ public enum GitError: LocalizedError {
 
     case workflowFailed(name: String)
     case refsFailed
+    case historyFailed(reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -302,6 +303,8 @@ public enum GitError: LocalizedError {
 
         case .refsFailed:
             return "Failed to read refs."
+        case .historyFailed(let reason):
+            return "Failed to read history: \(reason)"
         }
     }
 }
