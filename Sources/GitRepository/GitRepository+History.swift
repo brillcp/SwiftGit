@@ -24,17 +24,6 @@ extension GitRepository: HistoryReadable {
             .compactMap { try? Commit.parse(from: $0) }
     }
 
-    public func search(_ text: String, in ref: String?, limit: Int) async throws -> [GrepMatch] {
-        guard !text.isEmpty else { return [] }
-        let result = try await commandRunner.run(.grep(text: text, ref: ref))
-        // Exit 1 means nothing matched.
-        if result.exitCode == 1, result.stderr.isEmpty { return [] }
-        guard result.exitCode == 0 else {
-            throw GitError.historyFailed(reason: result.stderr)
-        }
-        return Array(GrepMatch.parse(result.stdout, ref: ref).prefix(limit))
-    }
-
     public func rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool) async throws -> [RangeDiffEntry] {
         let result = try await commandRunner.run(
             .rangeDiff(base: base, oldTip: oldTip, newTip: newTip, creationFactor: creationFactor, includePatches: includePatches)

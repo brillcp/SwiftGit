@@ -8,10 +8,6 @@ public protocol HistoryReadable: Actor {
     /// Commits in `range` (e.g. `base..HEAD`) that touched `path`, newest first.
     func fileHistory(path: String, range: String, limit: Int) async throws -> [Commit]
 
-    /// Lines containing `text` (a fixed string) in `ref`, or in the working
-    /// tree when nil. Binary files are skipped; at most `limit` matches.
-    func search(_ text: String, in ref: String?, limit: Int) async throws -> [GrepMatch]
-
     /// How the commits in `base..oldTip` map onto those in `base..newTip`,
     /// e.g. a branch before and after a rebase onto `base`.
     ///

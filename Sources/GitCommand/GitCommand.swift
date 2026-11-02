@@ -113,8 +113,6 @@ public enum GitCommand: Sendable {
     /// `git log <range> -- <path>`, one commit per record, records ended by
     /// `\u{1e}` so multi-line bodies parse.
     case fileHistory(range: String, path: String, limit: Int)
-    /// `git grep` for a fixed string in `ref`, or in the working tree when nil.
-    case grep(text: String, ref: String?)
     /// `git range-diff <base> <oldTip> <newTip>`: `base..oldTip` against
     /// `base..newTip`. Unlike the two-range form, an empty range is allowed.
     case rangeDiff(base: String, oldTip: String, newTip: String, creationFactor: Int?, includePatches: Bool)
@@ -426,10 +424,6 @@ extension GitCommand {
             return ["merge-base", a, b]
         case .fileHistory(let range, let path, let limit):
             return ["log", "-n", "\(limit)", "--format=\(commitFormat)%x1e", range, "--", path]
-        case .grep(let text, let ref):
-            var args = ["grep", "-n", "-I", "--null", "--full-name", "--fixed-strings", "-e", text]
-            if let ref { args.append(ref) }
-            return args
         case .rangeDiff(let base, let oldTip, let newTip, let creationFactor, let includePatches):
             var args = ["range-diff", "--no-color"]
             if let creationFactor { args.append("--creation-factor=\(creationFactor)") }

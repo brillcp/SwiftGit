@@ -23,20 +23,6 @@ struct HistoryTests {
         #expect(commits.last?.body.contains("with body") == true)
     }
 
-    @Test func searchFindsFixedStringsInARefAndTheWorkingTree() async throws {
-        let repoURL = try makeForkedRepo()
-        defer { try? FileManager.default.removeItem(at: repoURL) }
-        let repository = GitRepository(url: repoURL)
-
-        let inFeature = try await repository.search("feature line", in: "feature", limit: 10)
-        #expect(inFeature == [GrepMatch(path: "a.txt", line: 2, text: "feature line (x)")])
-
-        // main is checked out and never had it.
-        #expect(try await repository.search("feature line", in: nil, limit: 10).isEmpty)
-        // A regex metacharacter is matched literally.
-        #expect(try await repository.search("(x)", in: "feature", limit: 10).count == 1)
-    }
-
     @Test func rangeDiffPairsRebasedCommits() async throws {
         let repoURL = try makeForkedRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }
@@ -108,9 +94,9 @@ private func makeForkedRepo() throws -> URL {
     try runGit(repoURL, "tag", "fork")
 
     try runGit(repoURL, "checkout", "-q", "-b", "feature")
-    try createTestFile(in: repoURL, named: "a.txt", content: "one\nfeature line (x)\n")
+    try createTestFile(in: repoURL, named: "a.txt", content: "one\nfeature line\n")
     try runGit(repoURL, "commit", "-q", "-am", "Feature adds a line\n\nwith body")
-    try createTestFile(in: repoURL, named: "a.txt", content: "ONE\nfeature line (x)\n")
+    try createTestFile(in: repoURL, named: "a.txt", content: "ONE\nfeature line\n")
     try runGit(repoURL, "commit", "-q", "-am", "Feature edits a")
 
     try runGit(repoURL, "checkout", "-q", "main")
