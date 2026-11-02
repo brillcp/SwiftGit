@@ -150,7 +150,7 @@ extension GitCommand {
             if let remote { args.append(remote) }
             return args
         case .pull(let remote, let branch):
-            var args = ["-c", "merge.conflictStyle=zdiff3", "pull"]
+            var args = ["-c", "merge.conflictStyle=diff3", "pull"]
             if let remote { args.append(remote) }
             if let branch { args.append(branch) }
             return args
@@ -159,7 +159,7 @@ extension GitCommand {
         case .clone(let url, let destination):
             return ["clone", "--progress", url, destination]
         case .merge(let branch, let noFastForward):
-            var args = ["-c", "merge.conflictStyle=zdiff3", "merge", branch]
+            var args = ["-c", "merge.conflictStyle=diff3", "merge", branch]
             if noFastForward {
                 args.append("--no-ff")
             }
@@ -262,9 +262,9 @@ extension GitCommand {
             args += ["--"] + paths
             return args
         case .stashPop(let index):
-            return ["-c", "merge.conflictStyle=zdiff3", "stash", "pop", String.stashId(for: index)]
+            return ["-c", "merge.conflictStyle=diff3", "stash", "pop", String.stashId(for: index)]
         case .stashApply(let index):
-            return ["-c", "merge.conflictStyle=zdiff3", "stash", "apply", String.stashId(for: index)]
+            return ["-c", "merge.conflictStyle=diff3", "stash", "apply", String.stashId(for: index)]
         case .stashDrop(let index):
             return ["stash", "drop", String.stashId(for: index)]
         case .stashRestoreFile(let index, let path):
@@ -276,30 +276,30 @@ extension GitCommand {
         case .resetToCommit(let mode, let target):
             return ["reset", mode.rawValue, target]
         case .cherryPick(let commitHash):
-            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", commitHash]
+            return ["-c", "merge.conflictStyle=diff3", "cherry-pick", commitHash]
         case .cherryPickSkip:
-            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", "--skip"]
+            return ["-c", "merge.conflictStyle=diff3", "cherry-pick", "--skip"]
         case .revert(let commitHash, let noCommit):
-            var args = ["-c", "merge.conflictStyle=zdiff3", "revert"]
+            var args = ["-c", "merge.conflictStyle=diff3", "revert"]
             if noCommit {
                 args.append("--no-commit")
             }
             args.append(commitHash)
             return args
         case .rebase(let branch, let onto):
-            var args = ["-c", "merge.conflictStyle=zdiff3", "rebase", onto]
+            var args = ["-c", "merge.conflictStyle=diff3", "rebase", onto]
             if let branch { args.append(branch) }
             return args
         case .cherryPickContinue:
-            return ["-c", "merge.conflictStyle=zdiff3", "cherry-pick", "--continue", "--no-edit"]
+            return ["-c", "merge.conflictStyle=diff3", "cherry-pick", "--continue", "--no-edit"]
         case .mergeContinue:
             return ["merge", "--continue"]
         case .revertContinue:
-            return ["-c", "merge.conflictStyle=zdiff3", "revert", "--continue"]
+            return ["-c", "merge.conflictStyle=diff3", "revert", "--continue"]
         case .rebaseContinue:
-            return ["-c", "merge.conflictStyle=zdiff3", "rebase", "--continue"]
+            return ["-c", "merge.conflictStyle=diff3", "rebase", "--continue"]
         case .rebaseSkip:
-            return ["-c", "merge.conflictStyle=zdiff3", "rebase", "--skip"]
+            return ["-c", "merge.conflictStyle=diff3", "rebase", "--skip"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:

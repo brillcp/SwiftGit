@@ -208,7 +208,7 @@ struct ConflictTests {
         #expect(await repository.conflictOperation() == .rebase)
 
         let firstStop = try String(contentsOf: repoURL.appendingPathComponent("conflict.txt"), encoding: .utf8)
-        #expect(firstStop.contains("|||||||"), "first stop is started with zdiff3 and must carry a base section")
+        #expect(firstStop.contains("|||||||"), "first stop is started with diff3 and must carry a base section")
 
         try createTestFile(in: repoURL, named: "conflict.txt", content: "resolved first\n")
         try await repository.stageFile(at: "conflict.txt")
@@ -218,6 +218,37 @@ struct ConflictTests {
         let secondStop = try String(contentsOf: repoURL.appendingPathComponent("conflict.txt"), encoding: .utf8)
         #expect(secondStop.contains("<<<<<<<"))
         #expect(secondStop.contains("|||||||"), "continue must keep the diff3 base section for the next stop")
+    }
+
+    @Test func `A line both sides changed the same way stays in the block with its base line`() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+        let repository = GitRepository(url: repoURL)
+
+        // Both sides add a comma to "feed" and a different key after it. zdiff3
+        // would move the shared "feed" line out of the block and leave its old
+        // version alone in the base section, lined up against other keys.
+        try createTestFile(in: repoURL, named: "config.json", content: "{\n  \"feed\": 1\n}\n")
+        try await repository.stageFile(at: "config.json")
+        try await repository.commit(message: "base")
+
+        try await repository.checkoutBranch("feature", createNew: true)
+        try createTestFile(in: repoURL, named: "config.json", content: "{\n  \"feed\": 1,\n  \"alerts\": 2\n}\n")
+        try await repository.stageFile(at: "config.json")
+        try await repository.commit(message: "feature")
+
+        try await repository.checkoutBranch("main", createNew: false)
+        try createTestFile(in: repoURL, named: "config.json", content: "{\n  \"feed\": 1,\n  \"notifications\": 2\n}\n")
+        try await repository.stageFile(at: "config.json")
+        try await repository.commit(message: "main")
+
+        try await repository.checkoutBranch("feature", createNew: false)
+        try? await repository.rebase(onto: "main")
+
+        let lines = try String(contentsOf: repoURL.appendingPathComponent("config.json"), encoding: .utf8)
+            .components(separatedBy: "\n")
+        let start = try #require(lines.firstIndex { $0.hasPrefix("<<<<<<<") })
+        #expect(lines[start + 1] == "  \"feed\": 1,", "the shared line stays inside the block")
     }
 
     private func setGitConfig(in repoURL: URL, _ key: String, _ value: String) throws {
