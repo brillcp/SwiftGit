@@ -151,15 +151,10 @@ extension GitRepository: ConflictWritable {
                 throw GitError.mergeContinueFailed
             }
         case .cherryPick:
+            // A stop that resolved to nothing can't be continued; the caller
+            // skips it with `skipOperation()`, as for rebase and revert.
             let result = try await commandRunner.run(.cherryPickContinue)
-            // Check for empty cherry-pick
-            if result.exitCode != 0 && result.stderr.contains("now empty") {
-                // Auto-skip empty cherry-picks
-                let skipResult = try await commandRunner.run(.cherryPickSkip)
-                guard skipResult.exitCode == 0 else {
-                    throw GitError.cherryPickSkipFailed
-                }
-            } else if result.exitCode != 0 {
+            guard result.exitCode == 0 else {
                 throw GitError.cherryPickContinueFailed
             }
         case .revert:
