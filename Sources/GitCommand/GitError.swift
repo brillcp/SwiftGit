@@ -98,6 +98,9 @@ public enum GitError: LocalizedError {
 
     // MARK: - Skip operations
     case rebaseSkipFailed
+    case revertSkipFailed
+    /// A merge has no commit to skip; it is continued or aborted.
+    case skipUnsupported(operation: ConflictOperation)
 
     // MARK: - Abort operations
     case operationAbortFailed(operation: ConflictOperation, reason: String)
@@ -275,6 +278,10 @@ public enum GitError: LocalizedError {
         // MARK: - Skip operations
         case .rebaseSkipFailed:
             return "Failed to skip rebase commit"
+        case .revertSkipFailed:
+            return "Failed to skip revert"
+        case .skipUnsupported:
+            return "A merge can't be skipped; continue or abort it."
 
         // MARK: - Abort operations
         case .operationAbortFailed(let operation, let reason):

@@ -490,6 +490,52 @@ struct ConflictTests {
         #expect(await repository.conflictOperation() == nil)
     }
 
+    @Test func testCherryPickSkip() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let cherryPickHash = try await setupCherryPickConflict(in: repoURL, repository: repository)
+        let headBefore = try await repository.getHEAD()
+        try? await repository.cherryPick(cherryPickHash)
+        #expect(await repository.conflictOperation() == .cherryPick)
+
+        try await repository.skipOperation()
+
+        #expect(await repository.conflictOperation() == nil)
+        #expect(try await repository.getHEAD() == headBefore)
+    }
+
+    @Test func testRevertSkip() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let revertHash = try await setupRevertConflict(in: repoURL, repository: repository)
+        let headBefore = try await repository.getHEAD()
+        try? await repository.revertCommit(revertHash)
+        #expect(await repository.conflictOperation() == .revert)
+
+        try await repository.skipOperation()
+
+        #expect(await repository.conflictOperation() == nil)
+        #expect(try await repository.getHEAD() == headBefore)
+    }
+
+    @Test func testMergeCannotBeSkipped() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+
+        let repository = GitRepository(url: repoURL)
+        let cherryPickHash = try await setupCherryPickConflict(in: repoURL, repository: repository)
+        _ = cherryPickHash
+        try? await repository.merge(branch: "feature", noFastForward: true)
+        #expect(await repository.conflictOperation() == .merge)
+
+        await #expect(throws: GitError.self) { try await repository.skipOperation() }
+        #expect(await repository.conflictOperation() == .merge)
+    }
+
     @Test func testRebaseContinue() async throws {
         let repoURL = try createIsolatedTestRepo()
         defer { try? FileManager.default.removeItem(at: repoURL) }

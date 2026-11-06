@@ -108,19 +108,25 @@ extension GitRepository: ConflictWritable {
         eventPublisher.send(.operationAborted(operation: op))
     }
 
+    /// Drops the commit the operation stopped on and goes on with the next,
+    /// for the operations that replay commits one at a time: rebase,
+    /// cherry-pick and revert. A merge has no commit to skip.
     public func skipOperation() async throws {
         guard let op = conflictOperation() else { return }
-        guard op == .rebase else {
-            // Skip is only defined for rebase. Other operations have no equivalent
-            // "skip this commit and keep going" semantic.
-            throw GitError.rebaseSkipFailed
+        let command: GitCommand
+        let failure: GitError
+        switch op {
+        case .rebase: (command, failure) = (.rebaseSkip, .rebaseSkipFailed)
+        case .cherryPick: (command, failure) = (.cherryPickSkip, .cherryPickSkipFailed)
+        case .revert: (command, failure) = (.revertSkip, .revertSkipFailed)
+        case .merge: throw GitError.skipUnsupported(operation: op)
         }
 
         eventPublisher.send(.startSkippingOperation)
 
-        let result = try await commandRunner.run(.rebaseSkip)
+        let result = try await commandRunner.run(command)
         guard result.exitCode == 0 else {
-            throw GitError.rebaseSkipFailed
+            throw failure
         }
 
         await cache.remove(.head)
@@ -130,7 +136,7 @@ extension GitRepository: ConflictWritable {
             return false
         }
         await workingTree.invalidateIndexCache()
-        eventPublisher.send(.operationSkipped(operation: .rebase, isComplete: conflictOperation() == nil))
+        eventPublisher.send(.operationSkipped(operation: op, isComplete: conflictOperation() == nil))
     }
 
     public func continueOperation() async throws {

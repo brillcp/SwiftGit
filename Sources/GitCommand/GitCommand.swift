@@ -57,6 +57,7 @@ public enum GitCommand: Sendable {
     case revertContinue
     case rebaseContinue
     case rebaseSkip
+    case revertSkip
 
     // MARK: - Conflict Resolution
     case mergeAbort
@@ -300,6 +301,8 @@ extension GitCommand {
             return ["-c", "merge.conflictStyle=diff3", "rebase", "--continue"]
         case .rebaseSkip:
             return ["-c", "merge.conflictStyle=diff3", "rebase", "--skip"]
+        case .revertSkip:
+            return ["-c", "merge.conflictStyle=diff3", "revert", "--skip"]
 
         // MARK: - Conflict Resolution
         case .mergeAbort:
