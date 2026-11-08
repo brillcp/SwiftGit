@@ -85,7 +85,9 @@ public enum GitCommand: Sendable {
     case createTag(name: String, ref: String, message: String?)
     case deleteTag(name: String)
     case deleteRemoteTag(remote: String, name: String)
-    case pushTag(remote: String, name: String)
+    case pushTag(remote: String, name: String, force: Bool)
+    case moveTag(name: String, ref: String, message: String?)
+    case tagInfo(name: String)
 
     // MARK: - Credentials
     case credentialApprove(host: String, username: String, password: String)
@@ -390,8 +392,15 @@ extension GitCommand {
             return ["tag", "-d", name]
         case .deleteRemoteTag(let remote, let name):
             return ["push", remote, "--delete", name]
-        case .pushTag(let remote, let name):
-            return ["push", remote, "refs/tags/\(name)"]
+        case .pushTag(let remote, let name, let force):
+            return ["push"] + (force ? ["--force"] : []) + [remote, "refs/tags/\(name)"]
+        case .moveTag(let name, let ref, let message):
+            if let message {
+                return ["tag", "-f", "-a", name, ref, "-m", message]
+            }
+            return ["tag", "-f", name, ref]
+        case .tagInfo(let name):
+            return ["for-each-ref", "refs/tags/\(name)", "--format=%(objecttype)%00%(contents)"]
 
         // MARK: - Credentials
         case .credentialApprove:

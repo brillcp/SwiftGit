@@ -108,6 +108,7 @@ public enum GitError: LocalizedError {
     // MARK: - Tag Operations
     case tagCreationFailed(name: String)
     case tagDeletionFailed(name: String)
+    case tagMoveFailed(name: String)
 
     // MARK: - Credential Operations
     case credentialStoreFailed(host: String)
@@ -298,6 +299,8 @@ public enum GitError: LocalizedError {
             return "Failed to create tag '\(name)'."
         case .tagDeletionFailed(let name):
             return "Failed to delete tag '\(name)'."
+        case .tagMoveFailed(let name):
+            return "Failed to move tag '\(name)'."
 
         // MARK: - Credential Operations
         case .credentialStoreFailed(let host):
