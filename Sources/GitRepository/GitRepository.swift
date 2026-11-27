@@ -89,10 +89,10 @@ public actor GitRepository: GitRepositoryProtocol {
             let result = try await commandRunner.run(command)
 
             guard result.exitCode == 0 else {
+                await cache.remove(.head)
+                await cache.remove(.refs)
+                await workingTree.invalidateIndexCache()
                 if result.indicatesConflict {
-                    await cache.remove(.head)
-                    await cache.remove(.refs)
-                    await workingTree.invalidateIndexCache()
                     throw GitError.conflictDetected
                 }
                 let message = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)

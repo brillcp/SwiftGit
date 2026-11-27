@@ -92,6 +92,33 @@ struct LoadStateTests {
         #expect(try await repository.getBranches().current == nil)
     }
 
+    @Test func `A failed workflow leaves no stale HEAD in the cache`() async throws {
+        let repoURL = try createIsolatedTestRepo()
+        defer { try? FileManager.default.removeItem(at: repoURL) }
+        let repository = GitRepository(url: repoURL)
+        try createTestFile(in: repoURL, named: "a.txt", content: "1")
+        try await repository.stageAllFiles()
+        try await repository.commit(message: "Initial")
+        try git(repoURL, "checkout", "-q", "-b", "other")
+        try createTestFile(in: repoURL, named: "a.txt", content: "2")
+        try git(repoURL, "commit", "-q", "-am", "Other")
+        try git(repoURL, "checkout", "-q", "main")
+
+        let mainHash = try await repository.getHEAD()
+        #expect(mainHash == (try gitOutput(repoURL, "rev-parse", "main")))
+        let workflow = GitWorkflow(
+            commands: [.checkout(branch: "other"), .merge(branch: "missing", noFastForward: true)],
+            onComplete: .operationCompleted(operation: .merge, ref: "missing")
+        )
+        await #expect(throws: GitError.self) {
+            try await repository.executeWorkflow(workflow)
+        }
+
+        let head = try await repository.getHEAD()
+        #expect(head != mainHash)
+        #expect(head == (try gitOutput(repoURL, "rev-parse", "other")))
+    }
+
     // MARK: - Stashes
 
     @Test func `Stash list parses selector, hash, date and message`() {
