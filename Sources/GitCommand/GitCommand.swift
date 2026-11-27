@@ -110,6 +110,8 @@ public enum GitCommand: Sendable {
     /// "<ahead>\t<behind>" line.
     case revListLeftRightCount(local: String, upstream: String)
 
+    case branchSyncState
+
     // MARK: - History
     /// `git merge-base <a> <b>` — the best common ancestor's hash.
     case mergeBase(String, String)
@@ -132,6 +134,15 @@ extension GitCommand {
             return "protocol=https\nhost=\(host)\n".data(using: .utf8)
         default:
             return nil
+        }
+    }
+
+    var environment: [String: String] {
+        switch self {
+        case .branchSyncState:
+            return ["LC_ALL": "C"]
+        default:
+            return [:]
         }
     }
 
@@ -418,7 +429,7 @@ extension GitCommand {
         case .symbolicRef:
             return ["symbolic-ref", "HEAD"]
         case .stashList:
-            return ["stash", "list"]
+            return ["stash", "list", "--format=%gd%x00%H%x00%at%x00%gs"]
         case .showCommitDate(let ref):
             return ["show", "-s", "--format=%at", ref]
 
@@ -430,6 +441,12 @@ extension GitCommand {
             return ["rev-parse", "--abbrev-ref", target]
         case .revListLeftRightCount(let local, let upstream):
             return ["rev-list", "--left-right", "--count", "\(local)...\(upstream)"]
+        case .branchSyncState:
+            return [
+                "for-each-ref",
+                "--format=%(refname)%00%(upstream:remotename)%00%(upstream)%00%(upstream:track)",
+                "refs/heads"
+            ]
 
         // MARK: - History
         case .mergeBase(let a, let b):

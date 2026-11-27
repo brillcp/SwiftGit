@@ -33,7 +33,8 @@ extension CommandRunner: GitCommandable {
     ) async throws -> CommandResult {
         let (process, stdoutPipe, stderrPipe) = try makeGitProcess(
             arguments: command.arguments,
-            stdinData: command.stdinData
+            stdinData: command.stdinData,
+            environment: command.environment
         )
 
         try process.run()
@@ -173,7 +174,8 @@ private extension CommandRunner {
 
     func makeGitProcess(
         arguments: [String],
-        stdinData: Data? = nil
+        stdinData: Data? = nil,
+        environment: [String: String] = [:]
     ) throws -> (process: Process, stdout: Pipe, stderr: Pipe) {
         let process = Process()
         if cachedGitURL == nil { cachedGitURL = try findGitBinary() }
@@ -185,6 +187,7 @@ private extension CommandRunner {
         process.environment = ProcessInfo.processInfo.environment
         process.environment?["GIT_PAGER"] = ""
         process.environment?["GIT_EDITOR"] = "true"
+        process.environment?.merge(environment) { _, new in new }
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()

@@ -2,14 +2,21 @@ import Foundation
 
 extension GitRepository: BranchReadable {
     public func getBranches() async throws -> Branches {
-        let refMap = try await refReader.getRefs()
-        let allRefs = refMap.values.flatMap { $0 }
+        async let refMap = refReader.getRefs()
+        async let current = refReader.getHEADBranch()
+        let allRefs = try await refMap.values.flatMap { $0 }
 
         return Branches(
             local: allRefs.filter { $0.type == .localBranch },
             remote: allRefs.filter { $0.type == .remoteBranch },
-            current: try await refReader.getHEADBranch()
+            current: try await current
         )
+    }
+
+    public func getBranchSyncState() async throws -> [String: BranchSyncState] {
+        let result = try await commandRunner.run(.branchSyncState)
+        guard result.exitCode == 0 else { return [:] }
+        return BranchSyncState.parse(result.stdout)
     }
 
     public func getUpstream(for branch: String?) async throws -> Upstream? {

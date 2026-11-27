@@ -147,46 +147,37 @@ extension RefReader: RefReaderProtocol {
             return [] // No stashes
         }
 
-        let lines = result.stdout
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .components(separatedBy: .newlines)
-            .filter { !$0.isEmpty }
-
-        var stashes: [Stash] = []
-
-        for line in lines {
-            // Format: "stash@{0}: WIP on main: abc1234 commit message"
-            let parts = line.split(separator: ":", maxSplits: 2)
-            guard parts.count >= 2 else { continue }
-
-            // Extract index from "stash@{0}"
-            let stashRef = String(parts[0])
-            guard let indexStart = stashRef.firstIndex(of: "{"),
-                  let indexEnd = stashRef.firstIndex(of: "}"),
-                  let index = Int(stashRef[stashRef.index(after: indexStart)..<indexEnd])
-            else { continue }
-
-            // Get hash and date for this stash
-            let hashResult = try await commandRunner.run(.revParse(rev: stashRef))
-            guard hashResult.exitCode == 0 else { continue }
-            let hash = hashResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            // Get commit date
-            let dateResult = try await commandRunner.run(.showCommitDate(ref: stashRef))
-            let date: Date
-            if dateResult.exitCode == 0,
-               let timestamp = TimeInterval(dateResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                date = Date(timeIntervalSince1970: timestamp)
-            } else {
-                date = Date()
-            }
-
-            // Message is everything after second colon
-            let message = parts.count == 3 ? String(parts[2]).trimmingCharacters(in: .whitespaces) : ""
-            stashes.append(Stash(hash: hash, index: index, message: message, date: date))
-        }
-
+        let stashes = Self.parseStashes(result.stdout)
         await cache.set(.stashes, value: stashes)
         return stashes
+    }
+}
+
+extension RefReader {
+    /// Parses `GitCommand.stashList` output: `<selector>\0<hash>\0<time>\0<subject>`
+    /// per line, e.g. `stash@{0}`, then a reflog subject such as
+    /// `WIP on main: abc1234 message`. The stash message is the subject
+    /// after its first colon.
+    static func parseStashes(_ output: String) -> [Stash] {
+        output.split(separator: String.newLine, omittingEmptySubsequences: true).compactMap { line in
+            let fields = line.split(separator: "\0", maxSplits: 3, omittingEmptySubsequences: false)
+            guard fields.count == 4 else { return nil }
+
+            let selector = fields[0]
+            guard let open = selector.firstIndex(of: "{"),
+                  let close = selector.firstIndex(of: "}"),
+                  let index = Int(selector[selector.index(after: open)..<close])
+            else { return nil }
+
+            let hash = String(fields[1])
+            guard hash.isValidSHA else { return nil }
+
+            let date = TimeInterval(fields[2]).map { Date(timeIntervalSince1970: $0) } ?? Date()
+
+            let subject = fields[3].split(separator: ":", maxSplits: 1)
+            let message = subject.count == 2 ? subject[1].trimmingCharacters(in: .whitespaces) : ""
+
+            return Stash(hash: hash, index: index, message: message, date: date)
+        }
     }
 }

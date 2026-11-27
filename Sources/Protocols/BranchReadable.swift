@@ -14,4 +14,10 @@ public protocol BranchReadable: Actor {
     /// vice versa. Use this — not the loaded commit window — to determine
     /// ahead/behind, since the window may not contain either ref.
     func getAheadBehind(local: String, upstream: String) async throws -> AheadBehind
+
+
+    /// Upstream and ahead/behind counts for every local branch that tracks a
+    /// remote branch, keyed by local branch name, from one git process.
+    /// Branches without an upstream, or whose upstream is gone, are absent.
+    func getBranchSyncState() async throws -> [String: BranchSyncState]
 }
